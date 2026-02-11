@@ -56,11 +56,11 @@ export default function Home() {
             旅宿業 x 創作者 媒合新標準
           </span>
           <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight">
-            不再被動等待，<br/>主動發現下一個爆紅機會
+            連結在地旅宿與風格創作者，<br/>讓體驗成為最有價值的貨幣
           </h1>
           <p className="max-w-2xl text-lg text-slate-300 mb-10">
-            全台首創「行程逆向媒合」平台。網紅發布旅遊計畫，旅宿業者主動提供體驗機會。
-            透明定價、互惠計算機、自動結案報告。
+            全台首創「行程逆向媒合」平台。網紅用影響力換取深度旅遊，業者用閒置空房換取精準曝光。
+            智能合約保障、透明數據分析，讓合作更簡單。
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
             <Link 
@@ -101,7 +101,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* How it Works Section (NEW) */}
+      {/* How it Works Section */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold text-slate-900 mb-4">簡單三步驟，開啟互惠旅程</h2>
@@ -171,7 +171,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Success Stories / Case Studies (NEW) */}
+      {/* Success Stories / Case Studies */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="text-center mb-16">
           <span className="text-sky-600 font-bold tracking-wider uppercase text-sm mb-2 block">Success Stories</span>
