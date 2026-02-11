@@ -336,7 +336,7 @@ export default function SmartContractPage() {
              <h2 className="text-3xl font-bold text-slate-900 mb-4">合約已簽署完成！</h2>
              <p className="text-slate-600 max-w-md mb-8">
                系統已將具備法律效力的合約副本發送至雙方 Email。
-               <br/>您也可以隨時在「會員中心 > 我的合約」中查看。
+               <br/>您也可以隨時在「會員中心 &gt; 我的合約」中查看。
              </p>
 
              <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
