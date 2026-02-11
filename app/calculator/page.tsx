@@ -1,239 +1,360 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Instagram, Youtube, Star, Gift, ShieldCheck, Info, DollarSign, TrendingUp, BarChart3 } from 'lucide-react';
+import { useState } from 'react';
+import { FileText, PenTool, CheckCircle, Download, Shield, ChevronRight, Calendar, User, Building2, Printer, ArrowLeft } from 'lucide-react';
 
-export default function CalculatorPage() {
-  const [platform, setPlatform] = useState<'instagram' | 'youtube' | 'tiktok'>('instagram');
-  const [followers, setFollowers] = useState(15000);
-  const [engagement, setEngagement] = useState(3.5);
-  const [cost, setCost] = useState(2500); // 新增：互惠成本
+export default function SmartContractPage() {
+  const [step, setStep] = useState(1); // 1: Input, 2: Preview, 3: Success
+  const [isSigning, setIsSigning] = useState(false);
   
-  // 計算結果狀態
-  const [tier, setTier] = useState('');
-  const [suggestion, setSuggestion] = useState('');
-  const [color, setColor] = useState('bg-slate-100');
-  
-  // ROI 分析狀態
-  const [estReach, setEstReach] = useState(0);
-  const [cpm, setCpm] = useState(0);
-  const [verdict, setVerdict] = useState({ text: '', color: '' });
+  const [formData, setFormData] = useState({
+    businessName: '',
+    creatorName: '',
+    collabType: '住宿體驗互惠',
+    startDate: '',
+    endDate: '',
+    deliverables: {
+      post: 1,
+      story: 3,
+      reels: 0,
+      video: 0,
+      blog: 0
+    },
+    authorization: '僅限官方社群轉發 (Repost)',
+    deposit: 0
+  });
 
-  // 自動計算邏輯 (監聽數值變更)
-  useEffect(() => {
-    // 1. 簡易權重計算 (Tier 判斷)
-    let score = followers * (engagement / 100);
-    if (platform === 'youtube') score *= 2.5;
+  const handleDeliverableChange = (type: keyof typeof formData.deliverables, delta: number) => {
+    setFormData(prev => ({
+      ...prev,
+      deliverables: {
+        ...prev.deliverables,
+        [type]: Math.max(0, prev.deliverables[type] + delta)
+      }
+    }));
+  };
 
-    // 根據分數判定等級與建議
-    if (score < 500) {
-      setTier('Level 1: 潛力體驗員 (Rising Star)');
-      setSuggestion('適合互惠：餐飲體驗 / 門票 / 單項商品 (價值約 $500-$1,500)');
-      setColor('from-slate-500 to-slate-700');
-    } else if (score < 1500) {
-      setTier('Level 2: 區域推廣大使 (Micro Influencer)');
-      setSuggestion('適合互惠：雙人下午茶 / 豪華晚餐 / 體驗課程 (價值約 $1,500-$3,000)');
-      setColor('from-green-500 to-teal-600');
-    } else if (score < 5000) {
-      setTier('Level 3: 專業體驗官 (Pro Creator)');
-      setSuggestion('適合互惠：平日雙人房住宿一晚 (含早餐) / 全套式體驗 (價值約 $3,000-$6,000)');
-      setColor('from-blue-500 to-indigo-600');
-    } else {
-      setTier('Level 4: 年度影響力夥伴 (Top Tier)');
-      setSuggestion('適合互惠：假日住宿 / 一泊二食 / 住宿 + 稿酬 (價值 $6,000 以上)');
-      setColor('from-purple-500 to-pink-600');
-    }
-
-    // 2. ROI / CPM 計算邏輯 (新增)
-    // 假設自然觸及率：IG 約 60% 粉絲, YT 約 40%, TikTok 約 80% (粗估模型)
-    let reachRatio = 0.6;
-    if (platform === 'youtube') reachRatio = 0.4;
-    if (platform === 'tiktok') reachRatio = 0.8;
-
-    // 加上互動率加成 (互動越高，演算法推播越多)
-    const engagementBonus = 1 + (engagement / 100);
-    
-    const calculatedReach = Math.round(followers * reachRatio * engagementBonus);
-    setEstReach(calculatedReach);
-
-    // CPM = (成本 / 觸及人數) * 1000
-    const calculatedCpm = Math.round((cost / calculatedReach) * 1000);
-    setCpm(calculatedCpm);
-
-    // 評語判定 (一般 FB 廣告 CPM 約 $300-$500)
-    if (calculatedCpm < 300) {
-      setVerdict({ text: '超划算！低於一般廣告行情', color: 'text-green-400' });
-    } else if (calculatedCpm <= 500) {
-      setVerdict({ text: '合理行情，與投放廣告相當', color: 'text-yellow-400' });
-    } else {
-      setVerdict({ text: '成本稍高，建議爭取更多授權(如圖片使用權)', color: 'text-orange-400' });
-    }
-
-  }, [followers, engagement, platform, cost]);
+  const handleSign = () => {
+    setIsSigning(true);
+    // 模擬簽署過程
+    setTimeout(() => {
+      setIsSigning(false);
+      setStep(3);
+    }, 1500);
+  };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      {/* Header */}
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-slate-900 mb-4">互惠標準參考工具</h1>
+        <div className="inline-flex items-center justify-center p-3 bg-indigo-100 rounded-full mb-4">
+           <Shield className="w-8 h-8 text-indigo-600" />
+        </div>
+        <h1 className="text-3xl font-bold text-slate-900 mb-4">智能互惠合約產生器</h1>
         <p className="text-slate-600 max-w-2xl mx-auto">
-          避免報價爭議，建立市場共識。輸入您的社群數據與成本，系統將協助評估「互惠規格」與「ROI」。
+          口說無憑，一鍵簽約。保障雙方權益，讓合作更安心、專業。
+          <br/>系統將自動生成符合台灣法規的標準互惠合作備忘錄。
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
-        {/* 左側：輸入面板 */}
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
-          <div className="space-y-8">
-            {/* 平台選擇 */}
-            <div>
-              <label className="block text-sm font-bold text-slate-700 mb-3">經營平台</label>
-              <div className="flex gap-2">
-                {[
-                  { id: 'instagram', icon: Instagram, label: 'Instagram' },
-                  { id: 'youtube', icon: Youtube, label: 'YouTube' },
-                  { id: 'tiktok', icon: Star, label: 'TikTok' },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPlatform(p.id as any)}
-                    className={`flex-1 py-3 px-2 rounded-xl border flex items-center justify-center gap-2 transition-all ${
-                      platform === p.id 
-                        ? 'bg-indigo-50 border-indigo-600 text-indigo-700 font-bold ring-2 ring-indigo-200 ring-offset-1' 
-                        : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    <p.icon size={18} />
-                    <span className="text-sm">{p.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 粉絲數滑桿 */}
-            <div>
-              <label className="flex justify-between text-sm font-medium text-slate-700 mb-4">
-                <span>粉絲追蹤數 (Followers)</span>
-                <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded">
-                  {followers.toLocaleString()}
-                </span>
-              </label>
-              <input 
-                type="range" 
-                min="1000" 
-                max="100000" 
-                step="1000" 
-                value={followers} 
-                onChange={(e) => setFollowers(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-              />
-            </div>
-
-            {/* 互動率滑桿 */}
-            <div>
-              <label className="flex justify-between text-sm font-medium text-slate-700 mb-4">
-                <span className="flex items-center gap-1">
-                  平均互動率 (Engagement)
-                  <Info size={14} className="text-slate-400" />
-                </span>
-                <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded">
-                  {engagement}%
-                </span>
-              </label>
-              <input 
-                type="range" 
-                min="0.5" 
-                max="10" 
-                step="0.1" 
-                value={engagement} 
-                onChange={(e) => setEngagement(parseFloat(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-              />
-            </div>
-
-            {/* 新增：互惠成本輸入 */}
-            <div className="pt-6 border-t border-slate-100">
-              <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <DollarSign size={16} className="text-green-600" />
-                您的互惠成本估算 (NT$)
-              </label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                <input 
-                  type="number"
-                  value={cost}
-                  onChange={(e) => setCost(Number(e.target.value))}
-                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                * 請輸入房間定價、餐飲售價或體驗門票價值
-              </p>
-            </div>
+      {/* Progress Steps */}
+      <div className="flex justify-center mb-12">
+        <div className="flex items-center gap-4">
+          <div className={`flex items-center gap-2 ${step >= 1 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>
+            <span className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 1 ? 'border-indigo-600 bg-indigo-50' : 'border-slate-300'}`}>1</span>
+            填寫條件
+          </div>
+          <div className="w-12 h-0.5 bg-slate-200"></div>
+          <div className={`flex items-center gap-2 ${step >= 2 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>
+            <span className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 2 ? 'border-indigo-600 bg-indigo-50' : 'border-slate-300'}`}>2</span>
+            預覽合約
+          </div>
+          <div className="w-12 h-0.5 bg-slate-200"></div>
+          <div className={`flex items-center gap-2 ${step >= 3 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`}>
+            <span className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${step >= 3 ? 'border-indigo-600 bg-indigo-50' : 'border-slate-300'}`}>3</span>
+            簽署完成
           </div>
         </div>
+      </div>
 
-        {/* 右側：結果面板 */}
-        <div className={`text-white p-8 rounded-2xl shadow-xl relative overflow-hidden bg-gradient-to-br ${color} transition-colors duration-500 flex flex-col`}>
-          {/* 背景裝飾 */}
-          <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl -mr-10 -mt-10"></div>
-          
-          <div className="relative z-10 flex flex-col h-full">
-            {/* 上半部：等級與建議 */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center p-2 bg-white/20 backdrop-blur-md rounded-full mb-4 ring-1 ring-white/30">
-                <ShieldCheck className="w-6 h-6 text-white" />
-              </div>
-              <h3 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">
-                System Assessment
-              </h3>
-              <div className="text-xl font-bold text-white mb-4">
-                {tier}
-              </div>
-              <div className="bg-black/20 p-4 rounded-xl backdrop-blur-sm border border-white/10 text-left">
-                <p className="text-xs text-indigo-200 font-bold uppercase mb-1 flex items-center gap-1">
-                  <Gift size={12} /> 建議規格
-                </p>
-                <p className="text-sm font-medium leading-relaxed shadow-sm">
-                  {suggestion}
-                </p>
-              </div>
-            </div>
-
-            {/* 下半部：ROI 分析 (新功能) */}
-            <div className="mt-auto bg-white/95 text-slate-900 rounded-xl p-5 shadow-lg backdrop-blur-sm">
-              <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
-                <BarChart3 size={18} className="text-indigo-600" />
-                <h4 className="font-bold text-sm">行銷價值反推 (ROI Estimator)</h4>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">預估觸及人數</p>
-                  <p className="text-lg font-bold text-slate-900">{estReach.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 mb-1">預估 CPM (每千次成本)</p>
-                  <p className="text-lg font-bold text-indigo-600">${cpm}</p>
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-start gap-2">
-                <TrendingUp size={16} className={`mt-0.5 shrink-0 ${
-                  cpm < 300 ? 'text-green-500' : cpm <= 500 ? 'text-yellow-500' : 'text-orange-500'
-                }`} />
-                <div>
-                   <p className={`text-sm font-bold ${verdict.color}`}>
-                     {verdict.text}
-                   </p>
-                   <p className="text-xs text-slate-400 mt-0.5">
-                     (一般 FB/IG 廣告 CPM 行情約 $300-$500)
-                   </p>
-                </div>
-              </div>
-            </div>
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
+        
+        {/* --- Step 1: Input Form --- */}
+        {step === 1 && (
+          <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              <PenTool className="text-indigo-500" /> 設定合作參數
+            </h2>
             
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Left Column: Basic Info */}
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">甲方 (商家名稱)</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+                    <input 
+                      type="text" 
+                      placeholder="例如：海角七號民宿"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                      value={formData.businessName}
+                      onChange={(e) => setFormData({...formData, businessName: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">乙方 (創作者名稱)</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+                    <input 
+                      type="text" 
+                      placeholder="例如：林小美"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                      value={formData.creatorName}
+                      onChange={(e) => setFormData({...formData, creatorName: e.target.value})}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">合作類型</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={formData.collabType}
+                    onChange={(e) => setFormData({...formData, collabType: e.target.value})}
+                  >
+                    <option>住宿體驗互惠</option>
+                    <option>餐飲美食推廣</option>
+                    <option>商品開箱體驗</option>
+                    <option>景點/活動推廣</option>
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">體驗開始日</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">體驗結束日</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Deliverables & Terms */}
+              <div className="space-y-6">
+                 <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-4">應交付互惠內容 (Deliverables)</label>
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        { id: 'post', label: 'IG/FB 貼文', icon: '🖼️' },
+                        { id: 'story', label: '限時動態', icon: '⏱️' },
+                        { id: 'reels', label: '短影音 Reels', icon: '🎬' },
+                        { id: 'blog', label: '部落格文章', icon: '📝' },
+                      ].map((item) => (
+                        <div key={item.id} className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                            <span>{item.icon}</span> {item.label}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => handleDeliverableChange(item.id as any, -1)}
+                              className="w-6 h-6 rounded-full bg-white border border-slate-300 text-slate-500 hover:bg-slate-100 flex items-center justify-center pb-0.5"
+                            >-</button>
+                            <span className="font-bold w-4 text-center">{formData.deliverables[item.id as keyof typeof formData.deliverables]}</span>
+                            <button 
+                              onClick={() => handleDeliverableChange(item.id as any, 1)}
+                              className="w-6 h-6 rounded-full bg-indigo-100 border border-indigo-200 text-indigo-600 hover:bg-indigo-200 flex items-center justify-center pb-0.5"
+                            >+</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                 </div>
+
+                 <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">素材授權範圍</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    value={formData.authorization}
+                    onChange={(e) => setFormData({...formData, authorization: e.target.value})}
+                  >
+                    <option>僅限官方社群轉發 (Repost)</option>
+                    <option>授權官方網站使用 (Web only)</option>
+                    <option>全通路授權 (含廣告投放)</option>
+                    <option>買斷 (永久使用權)</option>
+                  </select>
+                  <p className="text-xs text-slate-500 mt-2">
+                    * 不同的授權範圍可能會影響互惠價值，請與創作者確認。
+                  </p>
+                </div>
+
+                <div>
+                   <label className="block text-sm font-bold text-slate-700 mb-2">履約保證金 (Escrow)</label>
+                   <div className="relative">
+                      <span className="absolute left-3 top-3 text-slate-400">$</span>
+                      <input 
+                        type="number" 
+                        className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                        value={formData.deposit}
+                        onChange={(e) => setFormData({...formData, deposit: Number(e.target.value)})}
+                      />
+                   </div>
+                   <p className="text-xs text-slate-500 mt-2">
+                     * 若設定保證金，款項將由平台暫管，待合作完成後退還。
+                   </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 flex justify-end">
+              <button 
+                onClick={() => setStep(2)}
+                disabled={!formData.businessName || !formData.creatorName}
+                className="px-8 py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                生成合約預覽 <ChevronRight size={20} />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* --- Step 2: Contract Preview --- */}
+        {step === 2 && (
+          <div className="p-0 sm:p-8 h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-500">
+             <div className="flex justify-between items-center mb-6 px-4 sm:px-0 mt-4 sm:mt-0">
+               <button onClick={() => setStep(1)} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm font-medium">
+                 <ArrowLeft size={16} /> 返回修改
+               </button>
+               <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                 <FileText className="text-indigo-500" /> 合約預覽模式
+               </h2>
+               <button className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-sm font-medium">
+                 <Printer size={16} /> 列印
+               </button>
+             </div>
+
+             {/* Contract Paper UI */}
+             <div className="bg-white border border-slate-200 shadow-sm p-8 sm:p-12 mx-auto max-w-3xl w-full flex-grow overflow-y-auto rounded-lg text-slate-800 leading-relaxed text-sm sm:text-base mb-6">
+                <div className="text-center border-b-2 border-slate-800 pb-6 mb-8">
+                  <h1 className="text-2xl font-bold mb-2">互惠合作備忘錄</h1>
+                  <p className="text-slate-500 text-sm">Agreement of Mutual Cooperation</p>
+                </div>
+
+                <div className="space-y-6">
+                  <p>
+                    <strong>立合約書人</strong><br/>
+                    甲方：<span className="underline decoration-dotted font-bold mx-1">{formData.businessName || '__________'}</span> (以下簡稱甲方)<br/>
+                    乙方：<span className="underline decoration-dotted font-bold mx-1">{formData.creatorName || '__________'}</span> (以下簡稱乙方)
+                  </p>
+                  
+                  <p>
+                    茲因甲方委託乙方進行 <strong>{formData.collabType}</strong> 之推廣事宜，雙方同意訂定本合約，條款如下：
+                  </p>
+
+                  <div>
+                    <h3 className="font-bold mb-2">第一條、合作期間</h3>
+                    <p>自中華民國 <span className="underline mx-1">{formData.startDate || 'YYYY/MM/DD'}</span> 起至 <span className="underline mx-1">{formData.endDate || 'YYYY/MM/DD'}</span> 止。</p>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold mb-2">第二條、乙方應交付內容 (Deliverables)</h3>
+                    <p>乙方應於體驗結束後 7 日內，於其經營之社群平台發布以下內容：</p>
+                    <ul className="list-disc pl-5 mt-2 space-y-1">
+                      {formData.deliverables.post > 0 && <li>Instagram/Facebook 圖文貼文：<strong>{formData.deliverables.post}</strong> 則</li>}
+                      {formData.deliverables.story > 0 && <li>限時動態 (需保留 24 小時)：<strong>{formData.deliverables.story}</strong> 則</li>}
+                      {formData.deliverables.reels > 0 && <li>短影音 Reels (15-60秒)：<strong>{formData.deliverables.reels}</strong> 支</li>}
+                      {formData.deliverables.blog > 0 && <li>部落格文章 (含 SEO 關鍵字)：<strong>{formData.deliverables.blog}</strong> 篇</li>}
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold mb-2">第三條、授權範圍</h3>
+                    <p>乙方同意將產出之內容授權予甲方使用，範圍如下：<br/>
+                    <span className="font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">{formData.authorization}</span>
+                    </p>
+                  </div>
+
+                   <div>
+                    <h3 className="font-bold mb-2">第四條、履約保證</h3>
+                    {formData.deposit > 0 ? (
+                      <p>為確保合約履行，乙方同意由 X-Match 平台暫扣履約保證金 <strong>NT$ {formData.deposit}</strong>。待乙方完成上述交付項目並經甲方驗收無誤後，平台將全額退還該筆款項。</p>
+                    ) : (
+                      <p>本合作未設定履約保證金。若乙方無故未履行合約，X-Match 平台將註記違規並限制其帳號權限。</p>
+                    )}
+                  </div>
+                  
+                  <div className="pt-8 mt-8 border-t border-slate-200 grid grid-cols-2 gap-12">
+                     <div>
+                       <p className="mb-8">甲方簽署：</p>
+                       <div className="h-12 border-b border-slate-300"></div>
+                     </div>
+                     <div>
+                       <p className="mb-8">乙方簽署：</p>
+                       <div className="h-12 border-b border-slate-300"></div>
+                     </div>
+                  </div>
+                </div>
+             </div>
+
+             <div className="flex justify-center w-full mt-auto pb-8">
+               <button 
+                 onClick={handleSign}
+                 disabled={isSigning}
+                 className="w-full max-w-md py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2"
+               >
+                 {isSigning ? (
+                   <>處理中...</>
+                 ) : (
+                   <>
+                     <PenTool size={20} /> 同意並進行數位簽署
+                   </>
+                 )}
+               </button>
+             </div>
+          </div>
+        )}
+
+        {/* --- Step 3: Success --- */}
+        {step === 3 && (
+          <div className="p-8 h-full flex flex-col items-center justify-center text-center animate-in zoom-in duration-500">
+             <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6">
+               <CheckCircle className="w-12 h-12 text-green-600" />
+             </div>
+             <h2 className="text-3xl font-bold text-slate-900 mb-4">合約已簽署完成！</h2>
+             <p className="text-slate-600 max-w-md mb-8">
+               系統已將具備法律效力的合約副本發送至雙方 Email。
+               <br/>您也可以隨時在「會員中心 > 我的合約」中查看。
+             </p>
+
+             <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+               <button className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-2">
+                 <Download size={20} /> 下載 PDF
+               </button>
+               <button 
+                 onClick={() => {
+                   setStep(1);
+                   setFormData({...formData, businessName: '', creatorName: ''});
+                 }}
+                 className="flex-1 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 flex items-center justify-center gap-2"
+               >
+                 <FileText size={20} /> 建立新合約
+               </button>
+             </div>
+          </div>
+        )}
       </div>
     </div>
   );
