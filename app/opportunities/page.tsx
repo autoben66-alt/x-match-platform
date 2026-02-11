@@ -109,6 +109,7 @@ const OPPORTUNITIES_DATA: Opportunity[] = [
 export default function OpportunitiesPage() {
   const [applyJob, setApplyJob] = useState<Opportunity | null>(null); // 控制「快速應徵」視窗
   const [viewJob, setViewJob] = useState<Opportunity | null>(null);   // 控制「詳情」視窗
+  const [activeImage, setActiveImage] = useState<string>('');         // 控制詳情視窗的當前大圖
   const [isSuccess, setIsSuccess] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('全部');
 
@@ -173,7 +174,10 @@ export default function OpportunitiesPage() {
         {filteredOpportunities.map(job => (
           <div 
             key={job.id} 
-            onClick={() => setViewJob(job)} // 點擊整張卡片開啟詳情
+            onClick={() => {
+              setViewJob(job);
+              setActiveImage(job.image); // 開啟詳情時，預設顯示主圖
+            }} 
             className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col sm:flex-row hover:shadow-xl hover:border-indigo-200 transition-all duration-300 group cursor-pointer h-full relative"
           >
             
@@ -290,8 +294,8 @@ export default function OpportunitiesPage() {
             {/* Header Image / Gallery */}
             <div className="relative h-64 sm:h-72 shrink-0 bg-slate-200">
                <img 
-                 src={viewJob.image} 
-                 className="w-full h-full object-cover" 
+                 src={activeImage} // 使用 activeImage 顯示當前選中的圖片
+                 className="w-full h-full object-cover transition-opacity duration-300" 
                  alt={viewJob.business} 
                />
                <button 
@@ -302,7 +306,15 @@ export default function OpportunitiesPage() {
                </button>
                <div className="absolute bottom-4 left-4 flex gap-2 overflow-x-auto max-w-[calc(100%-2rem)]">
                  {[viewJob.image, ...viewJob.gallery].slice(0, 4).map((img, i) => (
-                   <img key={i} src={img} className="w-16 h-12 object-cover rounded-md border-2 border-white/50 cursor-pointer hover:border-white transition-colors" alt="Gallery" />
+                   <img 
+                    key={i} 
+                    src={img} 
+                    onClick={() => setActiveImage(img)} // 點擊時切換主圖
+                    className={`w-16 h-12 object-cover rounded-md border-2 cursor-pointer transition-colors ${
+                      activeImage === img ? 'border-indigo-500' : 'border-white/50 hover:border-white'
+                    }`}
+                    alt="Gallery" 
+                   />
                  ))}
                </div>
             </div>
