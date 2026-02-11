@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
-  CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X
+  CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
+  Zap, Crown, Shield, Rocket
 } from 'lucide-react';
 
 // 定義後台分頁
@@ -296,28 +297,76 @@ export default function DashboardPage() {
           </div>
         );
 
-      // --- E. 錢包/訂閱 (Wallet) - 僅限業者 ---
+      // --- E. 錢包/訂閱 (Wallet) - 僅限業者 (更新：加入升級與推廣選項) ---
       case 'wallet':
-        // 創作者已移除此選項，理論上不會進入此 case，但保留業者邏輯
         return role === 'business' ? (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
-            <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
-              <div className="relative z-10">
-                <p className="text-indigo-300 text-sm font-bold uppercase tracking-wider mb-1">目前方案</p>
-                <div className="flex items-end justify-between">
-                  <h3 className="text-3xl font-bold">Free 免費版</h3>
-                  <button className="bg-white text-slate-900 px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-50">升級 Pro</button>
+            
+            {/* Current Plan & Upgrade */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Free Plan Card */}
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div className="relative z-10">
+                  <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded mb-4 inline-block">目前方案</span>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">Free 免費體驗版</h3>
+                  <div className="flex items-baseline mb-4">
+                    <span className="text-4xl font-extrabold text-slate-900">$0</span>
+                    <span className="text-slate-500 ml-2">/ 月</span>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 每月 3 次合作邀請</li>
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約</li>
+                  </ul>
+                  <button className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl cursor-not-allowed">使用中</button>
                 </div>
-                <div className="mt-6 flex gap-8">
-                  <div>
-                    <p className="text-slate-400 text-xs">剩餘邀請額度</p>
-                    <p className="text-xl font-bold">2 <span className="text-sm text-slate-500">/ 3</span></p>
+              </div>
+
+              {/* Pro Plan Card */}
+              <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white">
+                <div className="absolute top-0 right-0 bg-yellow-400 text-indigo-900 text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
+                <div className="relative z-10">
+                  <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
+                    專業成長版 Pro <Crown size={20} className="text-yellow-400 fill-yellow-400"/>
+                  </h3>
+                  <div className="flex items-baseline mb-4">
+                    <span className="text-4xl font-extrabold">$999</span>
+                    <span className="text-indigo-200 ml-2">/ 月</span>
                   </div>
-                  <div>
-                    <p className="text-slate-400 text-xs">急單點數</p>
-                    <p className="text-xl font-bold">0</p>
+                  <ul className="space-y-3 mb-6 text-indigo-100">
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送邀請 & 合約</li>
+                    <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 解鎖網紅深度數據</li>
+                    <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 贈送每月置頂推廣 ($300)</li>
+                    <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 贈送每月精準推播</li>
+                  </ul>
+                  <button className="w-full py-2 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">立即升級</button>
+                </div>
+              </div>
+            </div>
+
+            {/* Boost Options */}
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Rocket className="text-indigo-600" size={20}/> 單次付費推廣 (Boost)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="p-2 bg-amber-100 text-amber-600 rounded-lg group-hover:scale-110 transition-transform"><Zap size={20} fill="currentColor"/></div>
+                    <span className="font-bold text-slate-900">$300</span>
                   </div>
+                  <h4 className="font-bold text-slate-900">置頂推廣 (Featured)</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-3">讓您的徵才需求置頂 3 天，曝光加倍。</p>
+                  <button className="text-xs font-bold text-indigo-600 hover:underline">購買點數 &rarr;</button>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="p-2 bg-sky-100 text-sky-600 rounded-lg group-hover:scale-110 transition-transform"><Rocket size={20} fill="currentColor"/></div>
+                    <span className="font-bold text-slate-900">$100</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900">精準推播 (Smart Push)</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-3">主動推播給附近 10 位符合條件的網紅。</p>
+                  <button className="text-xs font-bold text-indigo-600 hover:underline">購買點數 &rarr;</button>
                 </div>
               </div>
             </div>
@@ -328,9 +377,10 @@ export default function DashboardPage() {
       case 'settings':
         return role === 'business' ? (
            <div className="space-y-6">
+             {/* Header with Save Button (Hidden on Mobile) */}
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">編輯商家檔案 (Business Profile)</h2>
-               <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700">
+               <button className="hidden sm:flex bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-indigo-700">
                  <Save size={16}/> 儲存變更
                </button>
              </div>
@@ -425,6 +475,13 @@ export default function DashboardPage() {
 
                  </div>
                </div>
+             </div>
+
+             {/* Mobile Save Button (Shown at the bottom) */}
+             <div className="block sm:hidden mt-6 pb-6">
+                <button className="w-full bg-indigo-600 text-white px-4 py-3 rounded-xl text-base font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg">
+                  <Save size={18}/> 儲存所有變更
+                </button>
              </div>
            </div>
         ) : (
