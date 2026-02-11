@@ -53,10 +53,10 @@ export default function Home() {
         </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 flex flex-col items-center text-center">
           <span className="inline-block py-1 px-3 rounded-full bg-sky-500/30 text-sky-200 text-sm font-semibold mb-6 backdrop-blur-sm border border-sky-400/30">
-            旅宿業 x 創作者 媒合新標準
+            餐旅業 x 創作者 媒合新標準
           </span>
           <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight">
-            體驗，即是價值。<br/>開啟旅宿與創作者的互惠新局
+            體驗，即是價值。<br/>開啟業者與創作者的互惠新局
           </h1>
           <p className="max-w-xl text-lg text-slate-300 mb-10">
             首創「行程逆向媒合」。網紅以影響力換宿，業者以空房換曝光。
