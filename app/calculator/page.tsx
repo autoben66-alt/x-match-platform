@@ -1,389 +1,240 @@
 'use client';
 
-import { useState } from 'react';
-import { Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, ArrowRight, X, CheckCircle, Send } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Instagram, Youtube, Star, Gift, ShieldCheck, Info, DollarSign, TrendingUp, BarChart3 } from 'lucide-react';
 
-// 定義行程資料結構
-interface Trip {
-  id: number;
-  creatorName: string;
-  creatorAvatar: string;
-  destination: string;
-  dates: string;
-  daysLeft?: number; // 倒數天數 (模擬急單)
-  category: '住宿' | '餐飲' | '體驗' | '交通'; // 新增分類
-  partySize: string; // 新增隨行人數
-  offers: number; // 新增目前報價數 (競爭熱度)
-  purpose: string;
-  needs: string;
-  status: 'Open' | 'Matched' | 'Completed';
-  tags: string[];
-}
+export default function CalculatorPage() {
+  const [platform, setPlatform] = useState<'instagram' | 'youtube' | 'tiktok'>('instagram');
+  const [followers, setFollowers] = useState(15000);
+  const [engagement, setEngagement] = useState(3.5);
+  const [cost, setCost] = useState(2500); // 新增：互惠成本
+  
+  // 計算結果狀態
+  const [tier, setTier] = useState('');
+  const [suggestion, setSuggestion] = useState('');
+  const [color, setColor] = useState('bg-slate-100');
+  
+  // ROI 分析狀態
+  const [estReach, setEstReach] = useState(0);
+  const [cpm, setCpm] = useState(0);
+  const [verdict, setVerdict] = useState({ text: '', color: '' });
 
-// 模擬行程資料 (包含急單、分類、人數、報價數)
-const TRIPS_DATA: Trip[] = [
-  {
-    id: 1,
-    creatorName: "Jason 攝影",
-    creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason",
-    destination: "蘭嶼",
-    dates: "2024/06/10 - 06/14",
-    daysLeft: 3, // 急單！
-    category: "住宿",
-    partySize: "1人 (攝影師)",
-    offers: 12,
-    purpose: "拍攝星空銀河與飛魚季紀錄片，預計產出 YouTube 4K 影片。",
-    needs: "尋找特色民宿，需有頂樓或陽台可拍星空，希望含機車租借。",
-    status: "Open",
-    tags: ["攝影", "自然", "離島"]
-  },
-  {
-    id: 2,
-    creatorName: "食尚艾莉",
-    creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly",
-    destination: "台南中西區",
-    dates: "2024/06/05 - 06/07",
-    daysLeft: 1, // 超急單！
-    category: "餐飲",
-    partySize: "2人",
-    offers: 8,
-    purpose: "巷弄老宅咖啡廳與甜點店巡禮，發布 IG Reels。",
-    needs: "尋找復古風格的咖啡廳或冰店，需有自然光座位。",
-    status: "Open",
-    tags: ["美食", "老宅", "文青"]
-  },
-  {
-    id: 3,
-    creatorName: "Outdoor 阿宏",
-    creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka",
-    destination: "苗栗南庄",
-    dates: "2024/07/01 - 07/03",
-    daysLeft: 20,
-    category: "體驗",
-    partySize: "4人 (露營團)",
-    offers: 5,
-    purpose: "夏季露營裝備評測影片，推廣戶外生活風格。",
-    needs: "露營區營位 x2，需有插座與乾淨衛浴。",
-    status: "Open",
-    tags: ["露營", "戶外"]
-  },
-  {
-    id: 4,
-    creatorName: "林小美",
-    creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
-    destination: "宜蘭礁溪",
-    dates: "2024/05/20 - 05/22",
-    daysLeft: 0,
-    category: "住宿",
-    partySize: "2大2小",
-    offers: 15,
-    purpose: "家庭週末小旅行，拍攝親子穿搭與飯店設施。",
-    needs: "親子友善飯店，希望能有溫泉設施與兒童遊戲室。",
-    status: "Matched",
-    tags: ["親子", "溫泉", "飯店"]
-  }
-];
+  // 自動計算邏輯 (監聽數值變更)
+  useEffect(() => {
+    // 1. 簡易權重計算 (Tier 判斷)
+    let score = followers * (engagement / 100);
+    if (platform === 'youtube') score *= 2.5;
 
-export default function TripsPage() {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('全部');
-  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null); // 控制邀請視窗
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [message, setMessage] = useState('');
+    // 根據分數判定等級與建議
+    if (score < 500) {
+      setTier('Level 1: 潛力體驗員 (Rising Star)');
+      setSuggestion('適合互惠：餐飲體驗 / 門票 / 單項商品 (價值約 $500-$1,500)');
+      setColor('from-slate-500 to-slate-700');
+    } else if (score < 1500) {
+      setTier('Level 2: 區域推廣大使 (Micro Influencer)');
+      setSuggestion('適合互惠：雙人下午茶 / 豪華晚餐 / 體驗課程 (價值約 $1,500-$3,000)');
+      setColor('from-green-500 to-teal-600');
+    } else if (score < 5000) {
+      setTier('Level 3: 專業體驗官 (Pro Creator)');
+      setSuggestion('適合互惠：平日雙人房住宿一晚 (含早餐) / 全套式體驗 (價值約 $3,000-$6,000)');
+      setColor('from-blue-500 to-indigo-600');
+    } else {
+      setTier('Level 4: 年度影響力夥伴 (Top Tier)');
+      setSuggestion('適合互惠：假日住宿 / 一泊二食 / 住宿 + 稿酬 (價值 $6,000 以上)');
+      setColor('from-purple-500 to-pink-600');
+    }
 
-  // 分類選項
-  const categories = [
-    { id: '全部', label: '全部', icon: Filter },
-    { id: '住宿', label: '求住宿', icon: Bed },
-    { id: '餐飲', label: '求美食', icon: Utensils },
-    { id: '體驗', label: '求體驗', icon: Ticket },
-  ];
+    // 2. ROI / CPM 計算邏輯 (新增)
+    // 假設自然觸及率：IG 約 60% 粉絲, YT 約 40%, TikTok 約 80% (粗估模型)
+    let reachRatio = 0.6;
+    if (platform === 'youtube') reachRatio = 0.4;
+    if (platform === 'tiktok') reachRatio = 0.8;
 
-  // 篩選邏輯
-  const filteredTrips = TRIPS_DATA.filter(trip => {
-    const matchesSearch = trip.destination.includes(searchTerm) || trip.tags.some(tag => tag.includes(searchTerm));
-    const matchesCategory = categoryFilter === '全部' || trip.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+    // 加上互動率加成 (互動越高，演算法推播越多)
+    const engagementBonus = 1 + (engagement / 100);
+    
+    const calculatedReach = Math.round(followers * reachRatio * engagementBonus);
+    setEstReach(calculatedReach);
 
-  // 開啟邀請視窗
-  const handleOpenInvite = (trip: Trip) => {
-    setSelectedTrip(trip);
-    // 自動帶入預設文案
-    setMessage(`哈囉 ${trip.creatorName}！\n\n我們是[您的店家名稱]，看到您預計前往${trip.destination}，誠摯邀請您來體驗我們的服務！\n\n我們可以提供：\n1. 免費體驗...\n2. 特別招待...\n\n期待您的回覆！`);
-    setIsSuccess(false);
-  };
+    // CPM = (成本 / 觸及人數) * 1000
+    const calculatedCpm = Math.round((cost / calculatedReach) * 1000);
+    setCpm(calculatedCpm);
 
-  // 確認發送
-  const confirmInvite = () => {
-    // 模擬發送延遲
-    setTimeout(() => {
-      setIsSuccess(true);
-      setTimeout(() => {
-        setSelectedTrip(null);
-        setIsSuccess(false);
-      }, 2000);
-    }, 800);
-  };
+    // 評語判定 (一般 FB 廣告 CPM 約 $300-$500)
+    if (calculatedCpm < 300) {
+      setVerdict({ text: '超划算！低於一般廣告行情', color: 'text-green-400' });
+    } else if (calculatedCpm <= 500) {
+      setVerdict({ text: '合理行情，與投放廣告相當', color: 'text-yellow-400' });
+    } else {
+      setVerdict({ text: '成本稍高，建議爭取更多授權(如圖片使用權)', color: 'text-orange-400' });
+    }
+
+  }, [followers, engagement, platform, cost]);
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">行程許願池 (Reverse Bidding)</h1>
-          <p className="text-slate-600">
-            網紅公佈行程，在地商家主動提供體驗機會。發現誰正要來你的城市？
-          </p>
-        </div>
-        <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-transform active:scale-95">
-          <Calendar size={18} />
-          發布新行程
-        </button>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="text-center mb-10">
+        <h1 className="text-3xl font-bold text-slate-900 mb-4">互惠標準參考工具</h1>
+        <p className="text-slate-600 max-w-2xl mx-auto">
+          避免報價爭議，建立市場共識。輸入您的社群數據與成本，系統將協助評估「互惠規格」與「ROI」。
+        </p>
       </div>
 
-      {/* Filter & Search Toolbar */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-8 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between sticky top-20 z-40">
-        
-        {/* Category Filters (需求精準分類) */}
-        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setCategoryFilter(cat.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-                categoryFilter === cat.id
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <cat.icon size={16} />
-              {cat.label}
-            </button>
-          ))}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+        {/* 左側：輸入面板 */}
+        <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div className="space-y-8">
+            {/* 平台選擇 */}
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-3">經營平台</label>
+              <div className="flex gap-2">
+                {[
+                  { id: 'instagram', icon: Instagram, label: 'Instagram' },
+                  { id: 'youtube', icon: Youtube, label: 'YouTube' },
+                  { id: 'tiktok', icon: Star, label: 'TikTok' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => setPlatform(p.id as any)}
+                    className={`flex-1 py-3 px-2 rounded-xl border flex items-center justify-center gap-2 transition-all ${
+                      platform === p.id 
+                        ? 'bg-indigo-50 border-indigo-600 text-indigo-700 font-bold ring-2 ring-indigo-200 ring-offset-1' 
+                        : 'border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    <p.icon size={18} />
+                    <span className="text-sm">{p.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Search Bar */}
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-          <input 
-            type="text"
-            placeholder="搜尋目的地 (例如：蘭嶼)..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-      </div>
+            {/* 粉絲數滑桿 */}
+            <div>
+              <label className="flex justify-between text-sm font-medium text-slate-700 mb-4">
+                <span>粉絲追蹤數 (Followers)</span>
+                <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded">
+                  {followers.toLocaleString()}
+                </span>
+              </label>
+              <input 
+                type="range" 
+                min="1000" 
+                max="100000" 
+                step="1000" 
+                value={followers} 
+                onChange={(e) => setFollowers(parseInt(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+              />
+            </div>
 
-      {/* Trips List */}
-      <div className="grid grid-cols-1 gap-6">
-        {filteredTrips.map(trip => (
-          <div key={trip.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-lg hover:border-indigo-200 transition-all duration-300 group relative overflow-hidden">
-            
-            {/* 急單倒數背景效果 (Urgency Effect) */}
-            {trip.daysLeft !== undefined && trip.daysLeft <= 3 && trip.status === 'Open' && (
-              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-red-500/10 to-transparent -mr-10 -mt-10 rounded-bl-full pointer-events-none"></div>
-            )}
+            {/* 互動率滑桿 */}
+            <div>
+              <label className="flex justify-between text-sm font-medium text-slate-700 mb-4">
+                <span className="flex items-center gap-1">
+                  平均互動率 (Engagement)
+                  <Info size={14} className="text-slate-400" />
+                </span>
+                <span className="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded">
+                  {engagement}%
+                </span>
+              </label>
+              <input 
+                type="range" 
+                min="0.5" 
+                max="10" 
+                step="0.1" 
+                value={engagement} 
+                onChange={(e) => setEngagement(parseFloat(e.target.value))}
+                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+              />
+            </div>
 
-            {/* Left: Creator Info */}
-            <div className="flex-shrink-0 flex flex-col items-center min-w-[120px] md:border-r md:border-slate-100 md:pr-6">
+            {/* 新增：互惠成本輸入 */}
+            <div className="pt-6 border-t border-slate-100">
+              <label className="block text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <DollarSign size={16} className="text-green-600" />
+                您的互惠成本估算 (NT$)
+              </label>
               <div className="relative">
-                <img 
-                  src={trip.creatorAvatar} 
-                  className="w-16 h-16 rounded-full mb-3 border-2 border-white shadow-sm" 
-                  alt={trip.creatorName} 
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                <input 
+                  type="number"
+                  value={cost}
+                  onChange={(e) => setCost(Number(e.target.value))}
+                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                 />
-                {/* Status Badge */}
-                <div className="absolute -bottom-1 -right-2">
-                   {trip.status === 'Matched' ? (
-                     <span className="bg-green-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold border-2 border-white">已媒合</span>
-                   ) : (
-                     <span className="bg-indigo-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold border-2 border-white">招募中</span>
-                   )}
-                </div>
               </div>
-              <p className="text-sm font-bold text-slate-900 mb-1">{trip.creatorName}</p>
-              
-              {/* Party Size (許願細節展開 - 人數) */}
-              <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded-full mt-1">
-                <Users size={12} />
-                {trip.partySize}
-              </div>
-            </div>
-            
-            {/* Middle: Trip Details */}
-            <div className="flex-grow space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-3">
-                  {/* Category Badge (分類標籤) */}
-                  <span className={`px-2.5 py-1 rounded-md text-xs font-bold flex items-center gap-1.5 ${
-                    trip.category === '住宿' ? 'bg-blue-100 text-blue-700' :
-                    trip.category === '餐飲' ? 'bg-orange-100 text-orange-700' :
-                    'bg-green-100 text-green-700'
-                  }`}>
-                    {trip.category === '住宿' && <Bed size={14} />}
-                    {trip.category === '餐飲' && <Utensils size={14} />}
-                    {trip.category === '體驗' && <Ticket size={14} />}
-                    {trip.category}
-                  </span>
-                  
-                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    {trip.destination}
-                  </h3>
-                </div>
-
-                {/* Urgency Countdown (急單倒數機制) */}
-                {trip.daysLeft !== undefined && trip.daysLeft <= 3 && trip.status === 'Open' && (
-                  <div className="flex items-center gap-1.5 text-red-600 bg-red-50 px-3 py-1 rounded-full text-xs font-bold animate-pulse">
-                    <Flame size={14} fill="currentColor" />
-                    僅剩 {trip.daysLeft} 天出發
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 text-sm text-slate-600 mb-2">
-                <Calendar size={16} className="text-indigo-500" />
-                <span className="font-medium">{trip.dates}</span>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <div className="mt-0.5 bg-white text-blue-600 p-1.5 rounded-full shadow-sm">
-                    <Camera size={14} />
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block mb-0.5">行程目的</span>
-                    <p className="text-sm text-slate-700 leading-relaxed">{trip.purpose}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  <div className="mt-0.5 bg-white text-pink-600 p-1.5 rounded-full shadow-sm">
-                    <Heart size={14} />
-                  </div>
-                  <div>
-                    <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider block mb-0.5">許願需求</span>
-                    <p className="text-sm text-slate-700 leading-relaxed">{trip.needs}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Action & Social Proof */}
-            <div className="flex-shrink-0 flex flex-col justify-between md:border-l border-slate-100 md:pl-6 pt-4 md:pt-0 min-w-[160px]">
-               {/* Offer Counter (競爭熱度顯示) */}
-               <div className="mb-4">
-                 <div className="flex items-center gap-1.5 text-slate-600 mb-1">
-                   <Zap size={16} className={trip.offers > 0 ? "text-amber-500 fill-amber-500" : "text-slate-300"} />
-                   <span className="text-xs font-medium">競爭熱度</span>
-                 </div>
-                 <p className="text-sm font-bold text-slate-900">
-                   已有 <span className="text-indigo-600 text-lg">{trip.offers}</span> 間報價
-                 </p>
-               </div>
-
-               <button 
-                 onClick={() => handleOpenInvite(trip)}
-                 disabled={trip.status !== 'Open'}
-                 className={`w-full md:w-auto px-4 py-3 rounded-lg font-bold flex items-center justify-center gap-2 whitespace-nowrap transition-all ${
-                   trip.status === 'Open'
-                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg active:scale-95'
-                     : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                 }`}
-               >
-                 {trip.status === 'Open' ? (
-                   <>提供邀請 <ArrowRight size={16} /></>
-                 ) : (
-                   '已結束媒合'
-                 )}
-               </button>
+              <p className="text-xs text-slate-500 mt-2">
+                * 請輸入房間定價、餐飲售價或體驗門票價值
+              </p>
             </div>
           </div>
-        ))}
+        </div>
 
-        {/* Empty State */}
-        {filteredTrips.length === 0 && (
-            <div className="text-center py-16 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                <Clock className="mx-auto h-12 w-12 text-slate-300 mb-3" />
-                <p className="text-slate-500 font-medium">找不到符合條件的行程</p>
-                <p className="text-sm text-slate-400">試試看調整篩選條件或關鍵字</p>
-            </div>
-        )}
-      </div>
-
-      {/* --- Send Invitation Modal (發送邀請視窗) --- */}
-      {selectedTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
-            {isSuccess ? (
-              <div className="p-8 text-center bg-slate-50">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-180 duration-500">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">邀請已發送！</h3>
-                <p className="text-slate-500 text-sm">
-                  {selectedTrip.creatorName} 將會收到您的邀請通知，<br/>祝您媒合成功！
+        {/* 右側：結果面板 */}
+        <div className={`text-white p-8 rounded-2xl shadow-xl relative overflow-hidden bg-gradient-to-br ${color} transition-colors duration-500 flex flex-col`}>
+          {/* 背景裝飾 */}
+          <div className="absolute top-0 right-0 w-48 h-48 bg-white opacity-10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+          
+          <div className="relative z-10 flex flex-col h-full">
+            {/* 上半部：等級與建議 */}
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center justify-center p-2 bg-white/20 backdrop-blur-md rounded-full mb-4 ring-1 ring-white/30">
+                <ShieldCheck className="w-6 h-6 text-white" />
+              </div>
+              <h3 className="text-xs font-bold text-white/80 uppercase tracking-widest mb-2">
+                System Assessment
+              </h3>
+              <div className="text-xl font-bold text-white mb-4">
+                {tier}
+              </div>
+              <div className="bg-black/20 p-4 rounded-xl backdrop-blur-sm border border-white/10 text-left">
+                <p className="text-xs text-indigo-200 font-bold uppercase mb-1 flex items-center gap-1">
+                  <Gift size={12} /> 建議規格
+                </p>
+                <p className="text-sm font-medium leading-relaxed shadow-sm">
+                  {suggestion}
                 </p>
               </div>
-            ) : (
-              <div className="flex flex-col h-full max-h-[90vh]">
-                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">發送合作邀請</h3>
-                    <p className="text-xs text-slate-500">給 {selectedTrip.creatorName}</p>
-                  </div>
-                  <button onClick={() => setSelectedTrip(null)} className="text-slate-400 hover:text-slate-600">
-                    <X size={24} />
-                  </button>
-                </div>
-                
-                <div className="p-6">
-                  {/* Trip Summary */}
-                  <div className="flex items-center gap-3 mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
-                    <img src={selectedTrip.creatorAvatar} className="w-10 h-10 rounded-full" alt="avatar" />
-                    <div className="flex-1">
-                       <p className="text-sm font-bold text-indigo-900">{selectedTrip.destination} 行程</p>
-                       <p className="text-xs text-indigo-600">{selectedTrip.dates}</p>
-                    </div>
-                  </div>
+            </div>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-bold text-slate-700 mb-2">
-                        邀請訊息
-                      </label>
-                      <textarea 
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        className="w-full h-40 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-                        placeholder="請撰寫您的邀請內容..."
-                      ></textarea>
-                      <p className="text-xs text-slate-400 mt-1 text-right">建議包含互惠內容與您的店家優勢</p>
-                    </div>
-                  </div>
+            {/* 下半部：ROI 分析 (新功能) */}
+            <div className="mt-auto bg-white/95 text-slate-900 rounded-xl p-5 shadow-lg backdrop-blur-sm">
+              <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-2">
+                <BarChart3 size={18} className="text-indigo-600" />
+                <h4 className="font-bold text-sm">行銷價值反推 (ROI Estimator)</h4>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">預估觸及人數</p>
+                  <p className="text-lg font-bold text-slate-900">{estReach.toLocaleString()}</p>
                 </div>
-
-                <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
-                  <button 
-                    onClick={() => setSelectedTrip(null)}
-                    className="flex-1 py-2.5 border border-slate-300 rounded-lg font-bold text-slate-600 hover:bg-white transition-colors"
-                  >
-                    取消
-                  </button>
-                  <button 
-                    onClick={confirmInvite}
-                    className="flex-1 py-2.5 bg-indigo-600 rounded-lg font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Send size={16} />
-                    確認發送
-                  </button>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">預估 CPM (每千次成本)</p>
+                  <p className="text-lg font-bold text-indigo-600">${cpm}</p>
                 </div>
               </div>
-            )}
+
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 flex items-start gap-2">
+                <TrendingUp size={16} className={`mt-0.5 shrink-0 ${
+                  cpm < 300 ? 'text-green-500' : cpm <= 500 ? 'text-yellow-500' : 'text-orange-500'
+                }`} />
+                <div>
+                   <p className={`text-sm font-bold ${verdict.color}`}>
+                     {verdict.text}
+                   </p>
+                   <p className="text-xs text-slate-400 mt-0.5">
+                     (一般 FB/IG 廣告 CPM 行情約 $300-$500)
+                   </p>
+                </div>
+              </div>
+            </div>
+            
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
