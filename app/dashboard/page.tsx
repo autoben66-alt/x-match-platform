@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
-  CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3
+  CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X
 } from 'lucide-react';
 
 // 定義後台分頁
@@ -113,7 +113,7 @@ export default function DashboardPage() {
     { id: 'trips', icon: Plane, label: '我的許願行程' },
     { id: 'projects', icon: FileText, label: '我的應徵' },
     { id: 'contracts', icon: FileSignature, label: '合約管理' },
-    { id: 'wallet', icon: DollarSign, label: '收益與收款' },
+    // 移除了收益與收款
     { id: 'settings', icon: User, label: '履歷 (Media Kit)' },
   ];
 
@@ -160,13 +160,34 @@ export default function DashboardPage() {
                     <h3 className="text-3xl font-bold text-slate-900">5 <span className="text-sm text-red-500 font-bold text-base">New!</span></h3>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-sm text-slate-500 mb-1">待領取稿酬</p>
-                    <h3 className="text-3xl font-bold text-green-600">$3,000</h3>
+                    <p className="text-sm text-slate-500 mb-1">待簽署合約</p>
+                    <h3 className="text-3xl font-bold text-amber-500">1</h3>
                   </div>
                 </>
               )}
             </div>
-            {/* ... 近期通知 (省略重複代碼) ... */}
+            {/* ... 近期通知 ... */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="font-bold text-slate-900">近期通知</h3>
+                <button className="text-sm text-sky-600 hover:underline">查看全部</button>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
+                    <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
+                    <div>
+                      <p className="text-sm text-slate-800">
+                        {role === 'business' 
+                          ? `創作者 @user${i} 已簽署了「暑期推廣合約」，合約正式生效。` 
+                          : `廠商「海角七號民宿」向您的「蘭嶼行程」發送了合作邀請。`}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">2 小時前</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         );
 
@@ -275,8 +296,9 @@ export default function DashboardPage() {
           </div>
         );
 
-      // --- E. 錢包/訂閱 (Wallet) ---
+      // --- E. 錢包/訂閱 (Wallet) - 僅限業者 ---
       case 'wallet':
+        // 創作者已移除此選項，理論上不會進入此 case，但保留業者邏輯
         return role === 'business' ? (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
@@ -300,31 +322,81 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">收益與收款</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-xl border border-slate-200">
-                <p className="text-sm text-slate-500 mb-2">可提領餘額</p>
-                <h3 className="text-3xl font-bold text-slate-900">$3,000</h3>
-                <button className="mt-4 w-full py-2 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700">申請提領</button>
-              </div>
-              <div className="bg-white p-6 rounded-xl border border-slate-200">
-                <p className="text-sm text-slate-500 mb-2">累積收益 (本年度)</p>
-                <h3 className="text-3xl font-bold text-slate-900">$12,500</h3>
-              </div>
-            </div>
-          </div>
-        );
+        ) : null;
 
       // --- F. 設定/履歷 (Settings/Media Kit) ---
       case 'settings':
         return role === 'business' ? (
            <div className="space-y-6">
-             <h2 className="text-2xl font-bold text-slate-900">商家設定</h2>
-             <div className="bg-white p-8 rounded-xl border border-slate-200 text-center text-slate-500">
-               <Settings size={48} className="mx-auto mb-4 text-slate-300"/>
-               <p>商家資料與付款設定功能開發中...</p>
+             <div className="flex justify-between items-center">
+               <h2 className="text-2xl font-bold text-slate-900">編輯商家檔案 (Business Profile)</h2>
+               <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700">
+                 <Save size={16}/> 儲存變更
+               </button>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               {/* Left Col: Images */}
+               <div className="lg:col-span-2 space-y-6">
+                 {/* 封面與相簿 */}
+                 <div className="bg-white p-6 rounded-xl border border-slate-200">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 商家封面圖</h3>
+                   <div className="relative h-48 bg-slate-100 rounded-lg mb-6 flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
+                     <div className="text-center text-slate-400">
+                       <Upload size={24} className="mx-auto mb-2"/>
+                       <span className="text-sm">點擊上傳封面大圖</span>
+                     </div>
+                   </div>
+                   
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 環境相簿 (Gallery)</h3>
+                   <div className="grid grid-cols-3 gap-4">
+                     {[1, 2, 3, 4, 5, 6].map((i) => (
+                       <div key={i} className="aspect-square bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
+                         <Plus size={24} className="text-slate-400"/>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               </div>
+
+               {/* Right Col: Basic Info */}
+               <div className="space-y-6">
+                 <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 基本資料</h3>
+                   
+                   <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-1">商家名稱</label>
+                     <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="海角七號民宿" />
+                   </div>
+                   
+                   <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-1">所在地 (縣市/區域)</label>
+                     <div className="flex items-center relative">
+                        <MapPin size={16} className="absolute left-3 text-slate-400"/>
+                        <input type="text" className="w-full pl-9 p-2 border border-slate-300 rounded-lg" defaultValue="屏東縣恆春鎮" />
+                     </div>
+                   </div>
+
+                   <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-1">類別</label>
+                     <select className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="住宿">
+                        <option>住宿</option>
+                        <option>餐飲</option>
+                        <option>體驗</option>
+                     </select>
+                   </div>
+
+                   <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-1">標籤 (用逗號分隔)</label>
+                     <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="海景, 早餐, 寵物友善" />
+                   </div>
+
+                   <div>
+                     <label className="block text-sm font-bold text-slate-700 mb-1">關於商家 (Description)</label>
+                     <textarea className="w-full p-2 border border-slate-300 rounded-lg h-32 resize-none" defaultValue="位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景..."></textarea>
+                   </div>
+                 </div>
+               </div>
              </div>
            </div>
         ) : (
