@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, ArrowRight, Users, CheckCircle, X, CheckCircle2 } from 'lucide-react';
+import { MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, ArrowRight, Users, CheckCircle, X, CheckCircle2, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 
 // 定義案源資料結構
 interface Opportunity {
@@ -14,6 +14,8 @@ interface Opportunity {
   valueBreakdown: string;    // 價值拆解 (住宿+餐飲...)
   requirements: string;
   image: string;
+  gallery: string[];         // New: 相簿
+  description: string;       // New: 商家介紹
   tags: string[];
   matchScore: number;        // 智能契合度
   spotsLeft?: number;        // 剩餘名額 (稀缺感)
@@ -32,9 +34,15 @@ const OPPORTUNITIES_DATA: Opportunity[] = [
     valueBreakdown: "海景房住宿($6800) + 早餐($800) + 接送($1200)",
     requirements: "IG 貼文 1 則 + 限動 3 則 (需標記地點)",
     image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1540541338287-41700207dee6?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    ],
+    description: "位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景。我們致力於提供旅人最放鬆的度假體驗，每個房間都設有獨立陽台，讓您在房內就能欣賞落日餘暉。早餐選用在地小農食材，健康又美味。",
     tags: ["海景", "早餐", "寵物友善"],
     matchScore: 98,
-    spotsLeft: 1, // 只剩 1 個名額！
+    spotsLeft: 1, 
     applicants: 12
   },
   {
@@ -47,6 +55,12 @@ const OPPORTUNITIES_DATA: Opportunity[] = [
     valueBreakdown: "稿酬($3000) + 免費營位($1200) + 烤肉組($800)",
     requirements: "Reels 短影音 1 支 (30-60秒) + 授權廣告",
     image: "https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1478131143081-80f7f84ca84d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1537225228614-56cc3556d7ed?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    ],
+    description: "遠離塵囂，擁抱山林。山林秘境露營區位於海拔 800 公尺處，擁有絕佳的雲海視野。營區設施完善，提供 24 小時熱水衛浴，並有專屬的烤肉區域。非常適合喜愛戶外生活、想要體驗懶人露營的朋友。",
     tags: ["露營", "雲海", "營火"],
     matchScore: 85,
     applicants: 24
@@ -61,6 +75,11 @@ const OPPORTUNITIES_DATA: Opportunity[] = [
     valueBreakdown: "雙人下午茶套餐($1200) + 伴手禮($300)",
     requirements: "Google 地圖評論 (附圖) + IG 限動打卡",
     image: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    ],
+    description: "改建自 60 年歷史的透天老宅，保留了磨石子地板與鐵花窗。我們主打手沖單品咖啡與每日現做的手工甜點。這裡不只是咖啡廳，更是一個能讓人放慢腳步、感受台南慢活氛圍的空間。",
     tags: ["咖啡", "甜點", "老宅"],
     matchScore: 92,
     spotsLeft: 3,
@@ -76,6 +95,11 @@ const OPPORTUNITIES_DATA: Opportunity[] = [
     valueBreakdown: "稿酬($2000) + 一對一教學($2500)",
     requirements: "YouTube 影片 (5-10分鐘) / Blog 文章",
     image: "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1505691938895-1cd58fb3e133?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    ],
+    description: "由專業衝浪教練創立，致力於推廣安全的衝浪運動。我們提供完整的新手教學課程，從陸地模擬到下水實戰，保證讓您第一次衝浪就上手。店內亦提供衝浪板租借與淋浴設施。",
     tags: ["衝浪", "海邊", "教學"],
     matchScore: 78,
     applicants: 8
@@ -83,31 +107,31 @@ const OPPORTUNITIES_DATA: Opportunity[] = [
 ];
 
 export default function OpportunitiesPage() {
-  const [selectedJob, setSelectedJob] = useState<Opportunity | null>(null);
+  const [applyJob, setApplyJob] = useState<Opportunity | null>(null); // 控制「快速應徵」視窗
+  const [viewJob, setViewJob] = useState<Opportunity | null>(null);   // 控制「詳情」視窗
   const [isSuccess, setIsSuccess] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState('全部'); // 新增分類篩選狀態
+  const [categoryFilter, setCategoryFilter] = useState('全部');
 
+  // 開啟快速應徵 (會關閉詳情視窗)
   const handleQuickApply = (job: Opportunity) => {
-    setSelectedJob(job);
+    setViewJob(null);
+    setApplyJob(job);
     setIsSuccess(false);
   };
 
   const confirmApply = () => {
-    // 模擬送出申請的 API 延遲
     setTimeout(() => {
       setIsSuccess(true);
-      // 2秒後自動關閉視窗
       setTimeout(() => {
-        setSelectedJob(null);
+        setApplyJob(null);
         setIsSuccess(false);
       }, 2000);
     }, 800);
   };
 
-  // 篩選邏輯
   const filteredOpportunities = OPPORTUNITIES_DATA.filter(job => {
     if (categoryFilter === '全部') return true;
-    if (categoryFilter === '美食') return job.category === '餐飲'; // 將「美食」按鈕對應到資料中的「餐飲」
+    if (categoryFilter === '美食') return job.category === '餐飲';
     return job.category === categoryFilter;
   });
 
@@ -128,7 +152,6 @@ export default function OpportunitiesPage() {
           </p>
         </div>
         
-        {/* Category Filters */}
         <div className="flex gap-2 overflow-x-auto pb-2 w-full md:w-auto no-scrollbar">
            {categories.map(cat => (
              <button
@@ -148,9 +171,12 @@ export default function OpportunitiesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {filteredOpportunities.map(job => (
-          <div key={job.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col sm:flex-row hover:shadow-xl hover:border-indigo-200 transition-all duration-300 group cursor-pointer h-full relative">
+          <div 
+            key={job.id} 
+            onClick={() => setViewJob(job)} // 點擊整張卡片開啟詳情
+            className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col sm:flex-row hover:shadow-xl hover:border-indigo-200 transition-all duration-300 group cursor-pointer h-full relative"
+          >
             
-            {/* Smart Match Score Badge (智能契合度) */}
             {job.matchScore >= 90 && (
               <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 animate-in fade-in zoom-in">
                 <Sparkles size={12} fill="currentColor" />
@@ -158,7 +184,6 @@ export default function OpportunitiesPage() {
               </div>
             )}
 
-            {/* Image Section */}
             <div className="sm:w-2/5 relative h-56 sm:h-auto overflow-hidden">
                <img 
                   src={job.image}
@@ -173,7 +198,6 @@ export default function OpportunitiesPage() {
                   </span>
                </div>
                
-               {/* Spots Left Overlay (剩餘名額倒數) */}
                {job.spotsLeft && job.spotsLeft <= 3 && (
                  <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
                     <div className="flex items-center gap-1 text-red-400 text-xs font-bold animate-pulse">
@@ -184,14 +208,12 @@ export default function OpportunitiesPage() {
                )}
             </div>
 
-            {/* Content Section */}
             <div className="sm:w-3/5 p-5 flex flex-col">
                <div className="flex justify-between items-start mb-2">
                   <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
                     <MapPin size={14} />
                     {job.location}
                   </div>
-                  {/* Category Icon */}
                   <div className="text-slate-300">
                     {job.category === '住宿' && <Hotel size={16} />}
                     {job.category === '餐飲' && <Utensils size={16} />}
@@ -204,7 +226,6 @@ export default function OpportunitiesPage() {
                </h3>
                
                <div className="mb-4 space-y-3 flex-grow">
-                 {/* Value Breakdown (互惠價值顯性化) */}
                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
                    <div className="flex items-center justify-between mb-1">
                      <p className="text-xs text-slate-500 font-medium">總價值</p>
@@ -232,9 +253,11 @@ export default function OpportunitiesPage() {
                     已應徵 {job.applicants} 人
                   </div>
                   
-                  {/* Quick Apply Button (快速應徵) */}
                   <button 
-                    onClick={() => handleQuickApply(job)}
+                    onClick={(e) => {
+                      e.stopPropagation(); // 避免觸發卡片點擊
+                      handleQuickApply(job);
+                    }}
                     className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all hover:shadow-md hover:scale-105 active:scale-95 group/btn"
                   >
                     <Zap size={14} className="fill-yellow-400 text-yellow-400 group-hover/btn:animate-pulse" />
@@ -245,7 +268,6 @@ export default function OpportunitiesPage() {
           </div>
         ))}
         
-        {/* Empty State */}
         {filteredOpportunities.length === 0 && (
           <div className="col-span-1 lg:col-span-2 text-center py-20 bg-slate-50 rounded-xl border border-dashed border-slate-300">
             <Filter className="mx-auto h-12 w-12 text-slate-300 mb-3" />
@@ -260,12 +282,129 @@ export default function OpportunitiesPage() {
         )}
       </div>
 
-      {/* Quick Apply Modal (彈出式應徵確認視窗) */}
-      {selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+      {/* --- 詳情頁面視窗 (Job Details Modal) --- */}
+      {viewJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-2xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+            
+            {/* Header Image / Gallery */}
+            <div className="relative h-64 sm:h-72 shrink-0 bg-slate-200">
+               <img 
+                 src={viewJob.image} 
+                 className="w-full h-full object-cover" 
+                 alt={viewJob.business} 
+               />
+               <button 
+                 onClick={() => setViewJob(null)}
+                 className="absolute top-4 right-4 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"
+               >
+                 <X size={20} />
+               </button>
+               <div className="absolute bottom-4 left-4 flex gap-2 overflow-x-auto max-w-[calc(100%-2rem)]">
+                 {[viewJob.image, ...viewJob.gallery].slice(0, 4).map((img, i) => (
+                   <img key={i} src={img} className="w-16 h-12 object-cover rounded-md border-2 border-white/50 cursor-pointer hover:border-white transition-colors" alt="Gallery" />
+                 ))}
+               </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 sm:p-8 flex-grow">
+               <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                 <div>
+                    <div className="flex items-center gap-2 mb-2">
+                       <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${
+                         viewJob.type === '付費推廣' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700'
+                       }`}>
+                         {viewJob.type}
+                       </span>
+                       <span className="flex items-center gap-1 text-xs text-slate-500">
+                         <MapPin size={12} /> {viewJob.location}
+                       </span>
+                    </div>
+                    <h2 className="text-3xl font-bold text-slate-900 mb-2">{viewJob.business}</h2>
+                    <div className="flex gap-2">
+                      {viewJob.tags.map(tag => (
+                        <span key={tag} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">#{tag}</span>
+                      ))}
+                    </div>
+                 </div>
+                 <div className="text-right hidden sm:block">
+                    <p className="text-xs text-slate-500 mb-1">合作總價值</p>
+                    <p className="text-2xl font-bold text-indigo-600">{viewJob.totalValue}</p>
+                 </div>
+               </div>
+
+               {/* Description */}
+               <div className="mb-8">
+                 <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                   <Info size={18} className="text-indigo-500"/> 關於商家
+                 </h3>
+                 <p className="text-slate-600 leading-relaxed text-sm sm:text-base">
+                   {viewJob.description}
+                 </p>
+               </div>
+
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                  {/* Value Breakdown */}
+                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-100">
+                     <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2 text-sm">
+                       <DollarSign size={16} className="text-green-600"/> 互惠價值詳情
+                     </h4>
+                     <ul className="space-y-2 text-sm text-slate-600">
+                       {viewJob.valueBreakdown.split('+').map((item, i) => (
+                         <li key={i} className="flex items-start gap-2">
+                           <CheckCircle2 size={14} className="text-green-500 mt-1 shrink-0"/>
+                           <span>{item.trim()}</span>
+                         </li>
+                       ))}
+                     </ul>
+                  </div>
+
+                  {/* Requirements */}
+                  <div className="bg-slate-50 p-5 rounded-xl border border-slate-100">
+                     <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2 text-sm">
+                       <Camera size={16} className="text-blue-600"/> 內容需求
+                     </h4>
+                     <p className="text-sm text-slate-600 mb-3">{viewJob.requirements}</p>
+                     <div className="flex items-center gap-2 text-xs text-slate-500 bg-white p-2 rounded border border-slate-200">
+                       <Users size={14}/>
+                       <span>目前已有 {viewJob.applicants} 人應徵 / 剩餘 {viewJob.spotsLeft || 5} 個名額</span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 sm:p-6 border-t border-slate-100 bg-slate-50 sticky bottom-0 flex justify-between items-center gap-4">
+               <div className="sm:hidden">
+                  <p className="text-xs text-slate-500">總價值</p>
+                  <p className="text-xl font-bold text-indigo-600">{viewJob.totalValue}</p>
+               </div>
+               <div className="flex gap-3 w-full sm:w-auto ml-auto">
+                 <button 
+                   onClick={() => setViewJob(null)}
+                   className="flex-1 sm:flex-none px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-50"
+                 >
+                   再看看
+                 </button>
+                 <button 
+                   onClick={() => handleQuickApply(viewJob)}
+                   className="flex-1 sm:flex-none px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
+                 >
+                   <Zap size={16} className="fill-yellow-400 text-yellow-400" />
+                   立即應徵
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- 快速應徵視窗 (Quick Apply Modal) --- */}
+      {applyJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
             {isSuccess ? (
-              // 成功狀態
               <div className="p-8 text-center bg-slate-50">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-180 duration-500">
                   <CheckCircle className="w-8 h-8 text-green-600" />
@@ -276,23 +415,21 @@ export default function OpportunitiesPage() {
                 </p>
               </div>
             ) : (
-              // 確認狀態
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="text-xl font-bold text-slate-900">確認快速應徵</h3>
-                  <button onClick={() => setSelectedJob(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                  <button onClick={() => setApplyJob(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
                     <X size={24} />
                   </button>
                 </div>
                 
-                {/* Job Summary */}
                 <div className="flex items-center gap-4 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <img src={selectedJob.image} className="w-16 h-16 rounded-lg object-cover" alt={selectedJob.business} />
+                  <img src={applyJob.image} className="w-16 h-16 rounded-lg object-cover" alt={applyJob.business} />
                   <div>
-                    <p className="font-bold text-slate-900 line-clamp-1">{selectedJob.business}</p>
+                    <p className="font-bold text-slate-900 line-clamp-1">{applyJob.business}</p>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                       <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{selectedJob.category}</span>
-                       <span className="font-bold text-indigo-600">{selectedJob.totalValue}</span>
+                       <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{applyJob.category}</span>
+                       <span className="font-bold text-indigo-600">{applyJob.totalValue}</span>
                     </div>
                   </div>
                 </div>
@@ -310,7 +447,7 @@ export default function OpportunitiesPage() {
 
                 <div className="flex gap-3">
                   <button 
-                    onClick={() => setSelectedJob(null)}
+                    onClick={() => setApplyJob(null)}
                     className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                   >
                     取消
