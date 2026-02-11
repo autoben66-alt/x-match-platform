@@ -1,12 +1,18 @@
 'use client';
 
-import { useState } from 'react';
-import { FileText, PenTool, CheckCircle, Download, Shield, ChevronRight, Calendar, User, Building2, Printer, ArrowLeft } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { FileText, PenTool, CheckCircle, Download, Shield, ChevronRight, Calendar, User, Building2, Printer, ArrowLeft, X, Eraser } from 'lucide-react';
 
 export default function SmartContractPage() {
   const [step, setStep] = useState(1); // 1: Input, 2: Preview, 3: Success
   const [isSigning, setIsSigning] = useState(false);
+  const [showSignModal, setShowSignModal] = useState(false); // 控制簽名板視窗
+  const [signatureImg, setSignatureImg] = useState<string | null>(null); // 儲存簽名圖片
   
+  // Canvas 相關 Refs
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawing = useRef(false);
+
   const [formData, setFormData] = useState({
     businessName: '',
     creatorName: '',
@@ -34,9 +40,101 @@ export default function SmartContractPage() {
     }));
   };
 
-  const handleSign = () => {
+  // --- 簽名板功能邏輯 ---
+  
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    isDrawing.current = true;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { offsetX, offsetY } = getCoordinates(e, canvas);
+    ctx.beginPath();
+    ctx.moveTo(offsetX, offsetY);
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const { offsetX, offsetY } = getCoordinates(e, canvas);
+    ctx.lineTo(offsetX, offsetY);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
+
+  const getCoordinates = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+    let clientX, clientY;
+    if ('touches' in e) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = (e as React.MouseEvent).clientX;
+      clientY = (e as React.MouseEvent).clientY;
+    }
+    const rect = canvas.getBoundingClientRect();
+    return {
+      offsetX: clientX - rect.left,
+      offsetY: clientY - rect.top
+    };
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  // 初始化 Canvas 設定
+  useEffect(() => {
+    if (showSignModal && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#000000';
+      }
+      
+      // 簡單的 RWD 處理：設定 Canvas 大小
+      const setCanvasSize = () => {
+        const parent = canvas.parentElement;
+        if(parent) {
+            canvas.width = parent.clientWidth;
+            canvas.height = 300; // 固定高度
+            // 重設樣式避免清空後線條變細
+            if(ctx) {
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#000';
+            }
+        }
+      }
+      setCanvasSize();
+      // 注意：實際專案可能需要監聽 resize 事件
+    }
+  }, [showSignModal]);
+
+  const handleConfirmSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // 檢查是否有內容 (簡單判斷：看轉出的 base64 長度，或是建立一個空白 canvas 比對，這裡從簡)
+    
+    const dataUrl = canvas.toDataURL('image/png');
+    setSignatureImg(dataUrl);
+    setShowSignModal(false);
+    
+    // 模擬送出簽名後進入完成頁
     setIsSigning(true);
-    // 模擬簽署過程
     setTimeout(() => {
       setIsSigning(false);
       setStep(3);
@@ -77,7 +175,7 @@ export default function SmartContractPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden min-h-[600px] flex flex-col relative">
         
         {/* --- Step 1: Input Form --- */}
         {step === 1 && (
@@ -233,7 +331,7 @@ export default function SmartContractPage() {
 
         {/* --- Step 2: Contract Preview --- */}
         {step === 2 && (
-          <div className="p-0 sm:p-8 h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-500">
+          <div className="p-0 sm:p-8 h-full flex flex-col animate-in fade-in slide-in-from-right-4 duration-500 relative">
              <div className="flex justify-between items-center mb-6 px-4 sm:px-0 mt-4 sm:mt-0">
                <button onClick={() => setStep(1)} className="text-slate-500 hover:text-slate-800 flex items-center gap-1 text-sm font-medium">
                  <ArrowLeft size={16} /> 返回修改
@@ -299,11 +397,17 @@ export default function SmartContractPage() {
                   <div className="pt-8 mt-8 border-t border-slate-200 grid grid-cols-2 gap-12">
                      <div>
                        <p className="mb-8">甲方簽署：</p>
-                       <div className="h-12 border-b border-slate-300"></div>
+                       <div className="h-16 border-b border-slate-300 relative">
+                         {/* 這裡目前留白，或可顯示商家的電子印章 */}
+                       </div>
                      </div>
                      <div>
                        <p className="mb-8">乙方簽署：</p>
-                       <div className="h-12 border-b border-slate-300"></div>
+                       <div className="h-16 border-b border-slate-300 relative">
+                         {signatureImg && (
+                           <img src={signatureImg} alt="Signature" className="absolute bottom-0 left-0 max-h-16 object-contain" />
+                         )}
+                       </div>
                      </div>
                   </div>
                 </div>
@@ -311,7 +415,7 @@ export default function SmartContractPage() {
 
              <div className="flex justify-center w-full mt-auto pb-8">
                <button 
-                 onClick={handleSign}
+                 onClick={() => setShowSignModal(true)}
                  disabled={isSigning}
                  className="w-full max-w-md py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center gap-2"
                >
@@ -324,6 +428,52 @@ export default function SmartContractPage() {
                  )}
                </button>
              </div>
+          </div>
+        )}
+
+        {/* --- Signature Modal (New) --- */}
+        {showSignModal && (
+          <div className="absolute inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                <h3 className="font-bold text-slate-900">請在下方區域簽名</h3>
+                <button onClick={() => setShowSignModal(false)} className="text-slate-400 hover:text-slate-600">
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="flex-grow bg-white relative cursor-crosshair touch-none">
+                <canvas
+                  ref={canvasRef}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full h-[300px] block"
+                />
+                <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
+                  <p className="text-slate-300 text-sm">在此處手寫簽名</p>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex gap-3">
+                <button 
+                  onClick={clearCanvas}
+                  className="flex-1 py-3 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-white flex items-center justify-center gap-2"
+                >
+                  <Eraser size={18} /> 清除
+                </button>
+                <button 
+                  onClick={handleConfirmSignature}
+                  className="flex-1 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg flex items-center justify-center gap-2"
+                >
+                  <CheckCircle size={18} /> 確認簽名
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -347,6 +497,7 @@ export default function SmartContractPage() {
                  onClick={() => {
                    setStep(1);
                    setFormData({...formData, businessName: '', creatorName: ''});
+                   setSignatureImg(null); // 重置簽名
                  }}
                  className="flex-1 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 flex items-center justify-center gap-2"
                >
