@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, ArrowRight } from 'lucide-react';
+import { Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, ArrowRight, X, CheckCircle, Send } from 'lucide-react';
 
 // 定義行程資料結構
 interface Trip {
@@ -87,6 +87,9 @@ const TRIPS_DATA: Trip[] = [
 export default function TripsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('全部');
+  const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null); // 控制邀請視窗
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [message, setMessage] = useState('');
 
   // 分類選項
   const categories = [
@@ -102,6 +105,26 @@ export default function TripsPage() {
     const matchesCategory = categoryFilter === '全部' || trip.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  // 開啟邀請視窗
+  const handleOpenInvite = (trip: Trip) => {
+    setSelectedTrip(trip);
+    // 自動帶入預設文案
+    setMessage(`哈囉 ${trip.creatorName}！\n\n我們是[您的店家名稱]，看到您預計前往${trip.destination}，誠摯邀請您來體驗我們的服務！\n\n我們可以提供：\n1. 免費體驗...\n2. 特別招待...\n\n期待您的回覆！`);
+    setIsSuccess(false);
+  };
+
+  // 確認發送
+  const confirmInvite = () => {
+    // 模擬發送延遲
+    setTimeout(() => {
+      setIsSuccess(true);
+      setTimeout(() => {
+        setSelectedTrip(null);
+        setIsSuccess(false);
+      }, 2000);
+    }, 800);
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -261,10 +284,11 @@ export default function TripsPage() {
                </div>
 
                <button 
+                 onClick={() => handleOpenInvite(trip)}
                  disabled={trip.status !== 'Open'}
                  className={`w-full md:w-auto px-4 py-3 rounded-lg font-bold flex items-center justify-center gap-2 whitespace-nowrap transition-all ${
                    trip.status === 'Open'
-                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
+                     ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg active:scale-95'
                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                  }`}
                >
@@ -287,6 +311,79 @@ export default function TripsPage() {
             </div>
         )}
       </div>
+
+      {/* --- Send Invitation Modal (發送邀請視窗) --- */}
+      {selectedTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+            {isSuccess ? (
+              <div className="p-8 text-center bg-slate-50">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-180 duration-500">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">邀請已發送！</h3>
+                <p className="text-slate-500 text-sm">
+                  {selectedTrip.creatorName} 將會收到您的邀請通知，<br/>祝您媒合成功！
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full max-h-[90vh]">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">發送合作邀請</h3>
+                    <p className="text-xs text-slate-500">給 {selectedTrip.creatorName}</p>
+                  </div>
+                  <button onClick={() => setSelectedTrip(null)} className="text-slate-400 hover:text-slate-600">
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="p-6">
+                  {/* Trip Summary */}
+                  <div className="flex items-center gap-3 mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <img src={selectedTrip.creatorAvatar} className="w-10 h-10 rounded-full" alt="avatar" />
+                    <div className="flex-1">
+                       <p className="text-sm font-bold text-indigo-900">{selectedTrip.destination} 行程</p>
+                       <p className="text-xs text-indigo-600">{selectedTrip.dates}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">
+                        邀請訊息
+                      </label>
+                      <textarea 
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        className="w-full h-40 p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                        placeholder="請撰寫您的邀請內容..."
+                      ></textarea>
+                      <p className="text-xs text-slate-400 mt-1 text-right">建議包含互惠內容與您的店家優勢</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
+                  <button 
+                    onClick={() => setSelectedTrip(null)}
+                    className="flex-1 py-2.5 border border-slate-300 rounded-lg font-bold text-slate-600 hover:bg-white transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    onClick={confirmInvite}
+                    className="flex-1 py-2.5 bg-indigo-600 rounded-lg font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Send size={16} />
+                    確認發送
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
