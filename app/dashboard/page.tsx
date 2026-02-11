@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket
+  Zap, Crown, Shield, Rocket, ListPlus
 } from 'lucide-react';
 
 // 定義後台分頁
@@ -18,6 +18,40 @@ export default function DashboardPage() {
   const [role, setRole] = useState<'business' | 'creator'>('business'); // 角色切換
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+
+  // --- 新增：案源管理相關狀態 ---
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [projects, setProjects] = useState([
+    { id: 1, title: '海景房開箱體驗招募', category: '住宿', type: '互惠體驗', status: '招募中', applicants: 12, date: '2024/06/01' },
+    { id: 2, title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', status: '已關閉', applicants: 8, date: '2024/05/15' },
+  ]);
+  const [newProject, setNewProject] = useState({
+    title: '',
+    category: '住宿',
+    type: '互惠體驗',
+    location: '屏東恆春',
+    totalValue: '',
+    valueBreakdown: '',
+    requirements: '',
+    spots: 1
+  });
+
+  const handleCreateProject = (e: React.FormEvent) => {
+    e.preventDefault();
+    const project = {
+      id: projects.length + 1,
+      title: newProject.title,
+      category: newProject.category,
+      type: newProject.type,
+      status: '招募中',
+      applicants: 0,
+      date: new Date().toLocaleDateString()
+    };
+    setProjects([project, ...projects]);
+    setShowCreateModal(false);
+    // 重置表單 (保留部分預設值)
+    setNewProject({ ...newProject, title: '', totalValue: '', valueBreakdown: '', requirements: '' });
+  };
 
   // 登入處理
   const handleAuth = (e: React.FormEvent) => {
@@ -197,17 +231,182 @@ export default function DashboardPage() {
         return role === 'business' ? (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-900">我的徵才 (發布案源)</h2>
-              <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800">
-                <Plus size={16}/> 新增職缺
+              <h2 className="text-2xl font-bold text-slate-900">我的徵才 (案源管理)</h2>
+              <button 
+                onClick={() => setShowCreateModal(true)}
+                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors"
+              >
+                <ListPlus size={16}/> 新增案源
               </button>
             </div>
-            {/* ... Table content ... */}
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div className="p-8 text-center text-slate-500">
-                目前沒有進行中的徵才活動
+            
+            {/* 案源列表 */}
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                    <tr>
+                      <th className="px-6 py-4 font-bold">標題</th>
+                      <th className="px-6 py-4 font-bold">分類</th>
+                      <th className="px-6 py-4 font-bold">狀態</th>
+                      <th className="px-6 py-4 font-bold">應徵人數</th>
+                      <th className="px-6 py-4 font-bold">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {projects.map((project) => (
+                      <tr key={project.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900">{project.title}</p>
+                          <p className="text-xs text-slate-500">{project.type}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs">
+                            {project.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                            project.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            {project.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 flex items-center gap-2 mt-1">
+                          <Users size={14}/> {project.applicants} 人
+                        </td>
+                        <td className="px-6 py-4">
+                          <button className="text-sky-600 font-bold hover:underline">查看名單</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+              {projects.length === 0 && (
+                <div className="p-8 text-center text-slate-500">
+                  目前沒有進行中的徵才活動
+                </div>
+              )}
             </div>
+
+            {/* --- 新增案源 Modal --- */}
+            {showCreateModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h3 className="font-bold text-xl text-slate-900">發布新案源</h3>
+                    <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={24} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 overflow-y-auto">
+                    <form className="space-y-4" onSubmit={handleCreateProject}>
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">案源標題</label>
+                        <input 
+                          type="text" 
+                          required
+                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" 
+                          placeholder="例如：海景房開箱體驗招募"
+                          value={newProject.title}
+                          onChange={(e) => setNewProject({...newProject, title: e.target.value})}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">類別</label>
+                          <select 
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                            value={newProject.category}
+                            onChange={(e) => setNewProject({...newProject, category: e.target.value})}
+                          >
+                            <option>住宿</option>
+                            <option>餐飲</option>
+                            <option>體驗</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">合作模式</label>
+                          <select 
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                            value={newProject.type}
+                            onChange={(e) => setNewProject({...newProject, type: e.target.value})}
+                          >
+                            <option>互惠體驗</option>
+                            <option>付費推廣</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">地點</label>
+                        <div className="flex items-center relative">
+                           <MapPin size={16} className="absolute left-3 text-slate-400"/>
+                           <input 
+                             type="text" 
+                             className="w-full pl-9 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                             value={newProject.location}
+                             onChange={(e) => setNewProject({...newProject, location: e.target.value})}
+                           />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">總價值</label>
+                          <input 
+                            type="text" 
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                            placeholder="NT$ 8,800"
+                            value={newProject.totalValue}
+                            onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">開放名額</label>
+                          <input 
+                            type="number" 
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                            value={newProject.spots}
+                            onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">價值拆解 (住宿+餐飲...)</label>
+                        <input 
+                          type="text" 
+                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                          placeholder="例如：住宿($3000) + 餐飲($1000)"
+                          value={newProject.valueBreakdown}
+                          onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1">內容需求</label>
+                        <textarea 
+                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none h-24 resize-none"
+                          placeholder="例如：IG 貼文 1 則 + 限動 3 則..."
+                          value={newProject.requirements}
+                          onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}
+                        ></textarea>
+                      </div>
+
+                      <div className="pt-2">
+                        <button type="submit" className="w-full py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 shadow-lg active:scale-95 transition-all">
+                          立即發布
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
@@ -316,7 +515,9 @@ export default function DashboardPage() {
                   </div>
                   <ul className="space-y-3 mb-6">
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 每月 3 次合作邀請</li>
-                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約</li>
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 查看所有公開行程許願池</li>
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約 (每月 1 份)</li>
+                    <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅深度數據</li>
                   </ul>
                   <button className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl cursor-not-allowed">使用中</button>
                 </div>
@@ -334,10 +535,12 @@ export default function DashboardPage() {
                     <span className="text-indigo-200 ml-2">/ 月</span>
                   </div>
                   <ul className="space-y-3 mb-6 text-indigo-100">
-                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送邀請 & 合約</li>
-                    <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 解鎖網紅深度數據</li>
-                    <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 贈送每月置頂推廣 ($300)</li>
-                    <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 贈送每月精準推播</li>
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送合作邀請</li>
+                    <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 網紅深度數據解鎖 (受眾分析)</li>
+                    <li className="flex items-center text-sm"><Shield className="w-4 h-4 text-white mr-2"/> 無限使用智能合約與數位簽署</li>
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 優先客服支援</li>
+                    <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 贈送每月置頂推廣 ($300) 每月一次</li>
+                    <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 贈送每月精準推播 每月一次</li>
                   </ul>
                   <button className="w-full py-2 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">立即升級</button>
                 </div>
