@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import CreatorCard, { Creator } from '@/components/CreatorCard';
-import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, DollarSign, Camera, Mail, CheckCircle2 } from 'lucide-react';
+import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, DollarSign, Camera, Mail, CheckCircle2, Filter } from 'lucide-react';
 
 // 擴充創作者資料結構，加入詳情頁所需的欄位
 interface CreatorDetail extends Creator {
