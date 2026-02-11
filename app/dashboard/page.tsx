@@ -395,6 +395,34 @@ export default function DashboardPage() {
                      <label className="block text-sm font-bold text-slate-700 mb-1">關於商家 (Description)</label>
                      <textarea className="w-full p-2 border border-slate-300 rounded-lg h-32 resize-none" defaultValue="位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景..."></textarea>
                    </div>
+
+                   {/* 新增：互惠合作詳情設定 */}
+                   <div className="pt-6 mt-2 border-t border-slate-100">
+                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18}/> 互惠合作詳情</h3>
+                     
+                     <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">合作總價值</label>
+                          <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="NT$ 8,800" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">開放名額</label>
+                          <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue={1} />
+                        </div>
+                     </div>
+
+                     <div className="mb-4">
+                       <label className="block text-sm font-bold text-slate-700 mb-1">價值拆解 (請用 + 號分隔)</label>
+                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="海景房住宿($6800) + 早餐($800) + 接送($1200)" />
+                       <p className="text-xs text-slate-500 mt-1">例如：住宿($3000) + 餐飲($1000)</p>
+                     </div>
+
+                     <div>
+                       <label className="block text-sm font-bold text-slate-700 mb-1">內容需求</label>
+                       <textarea className="w-full p-2 border border-slate-300 rounded-lg h-24 resize-none" defaultValue="IG 貼文 1 則 + 限動 3 則 (需標記地點)"></textarea>
+                     </div>
+                   </div>
+
                  </div>
                </div>
              </div>
