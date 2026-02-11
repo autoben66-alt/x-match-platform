@@ -56,7 +56,7 @@ export default function Home() {
             旅宿業 x 創作者 媒合新標準
           </span>
           <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight">
-            連結在地旅宿與風格創作者，<br/>讓體驗成為最有價值的貨幣
+            連結在地業者與風格創作者<br/>讓體驗成為最有價值的貨幣
           </h1>
           <p className="max-w-2xl text-lg text-slate-300 mb-10">
             全台首創「行程逆向媒合」平台。網紅用影響力換取深度旅遊，業者用閒置空房換取精準曝光。
