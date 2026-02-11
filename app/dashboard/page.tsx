@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
-  CreditCard, TrendingUp, User, Calendar
+  CreditCard, TrendingUp, User, Calendar, ArrowRight
 } from 'lucide-react';
 
 // 定義後台分頁
@@ -16,14 +16,18 @@ export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<'business' | 'creator'>('business'); // 角色切換
   const [activeTab, setActiveTab] = useState<Tab>('overview');
+  
+  // 新增：登入/註冊模式切換 ('login' | 'register')
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
-  // 登入處理
-  const handleLogin = (e: React.FormEvent) => {
+  // 處理登入/註冊
+  const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
+    // 這裡未來會區分 login 或 signup 的 API 呼叫
     setTimeout(() => setIsLoggedIn(true), 800);
   };
 
-  // --- 1. 登入/註冊頁面 (保持原樣，僅做微調) ---
+  // --- 1. 登入/註冊頁面 ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -33,7 +37,11 @@ export default function DashboardPage() {
             <div className="absolute inset-0 bg-gradient-to-br from-sky-600 to-indigo-900 opacity-50"></div>
             <div className="relative z-10">
               <h1 className="text-4xl font-extrabold mb-4">X-Match</h1>
-              <p className="text-lg text-slate-200 mb-8">連結在地旅宿與優質創作者，<br/>開啟您的互惠旅程。</p>
+              <p className="text-lg text-slate-200 mb-8">
+                {authMode === 'login' 
+                  ? '連結在地旅宿與優質創作者，開啟您的互惠旅程。' 
+                  : '加入全台最大互惠平台，立即開始媒合。'}
+              </p>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/20 rounded-lg"><Briefcase size={20}/></div>
@@ -49,14 +57,19 @@ export default function DashboardPage() {
           
           {/* 右側表單 */}
           <div className="md:w-1/2 p-12 flex flex-col justify-center">
-            <h2 className="text-2xl font-bold text-slate-900 mb-6">歡迎回來</h2>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+              {authMode === 'login' ? '歡迎回來' : '建立您的帳號'}
+            </h2>
+            <p className="text-slate-500 mb-6 text-sm">
+              {authMode === 'login' ? '請登入以繼續管理您的專案' : '免費加入，探索更多合作機會'}
+            </p>
             
             {/* 角色選擇 Tab */}
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-8">
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
               <button 
                 onClick={() => setRole('business')}
                 className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                  role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                  role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 <Briefcase size={16}/> 我是商家
@@ -64,33 +77,74 @@ export default function DashboardPage() {
               <button 
                 onClick={() => setRole('creator')}
                 className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                  role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'
+                  role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
                 <User size={16}/> 我是創作者
               </button>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4">
+            <form onSubmit={handleAuth} className="space-y-4">
+              {/* 註冊時多出的欄位 */}
+              {authMode === 'register' && (
+                <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">
+                    {role === 'business' ? '商家/品牌名稱' : '創作者暱稱'}
+                  </label>
+                  <input 
+                    type="text" 
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" 
+                    placeholder={role === 'business' ? "例如：海角七號民宿" : "例如：林小美"} 
+                    required 
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
-                <input type="email" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" placeholder="example@mail.com" />
+                <input type="email" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder="example@mail.com" required />
               </div>
+              
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">密碼</label>
-                <input type="password" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" placeholder="••••••••" />
+                <input type="password" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder="••••••••" required />
               </div>
-              <button type="submit" className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg transition-colors shadow-lg shadow-sky-200">
-                登入 {role === 'business' ? '商家後台' : '創作者中心'}
+
+              <button type="submit" className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg transition-colors shadow-lg shadow-sky-200 active:scale-95 transform duration-150">
+                {authMode === 'login' ? '登入' : '免費註冊'} {role === 'business' ? '商家後台' : '創作者中心'}
               </button>
             </form>
+
+            <div className="mt-6 text-center text-sm text-slate-600">
+              {authMode === 'login' ? (
+                <>
+                  還沒有帳號？{' '}
+                  <button 
+                    onClick={() => setAuthMode('register')} 
+                    className="text-sky-600 font-bold hover:underline focus:outline-none"
+                  >
+                    立即註冊
+                  </button>
+                </>
+              ) : (
+                <>
+                  已經有帳號了？{' '}
+                  <button 
+                    onClick={() => setAuthMode('login')} 
+                    className="text-sky-600 font-bold hover:underline focus:outline-none"
+                  >
+                    直接登入
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- 2. 後台主邏輯與內容渲染 ---
+  // --- 2. 後台主邏輯與內容渲染 (維持原樣) ---
 
   // 根據角色定義側邊欄選單
   const menuItems = role === 'business' ? [

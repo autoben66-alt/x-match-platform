@@ -96,6 +96,20 @@ export default function PricingPage() {
                   <CheckCircle2 className="h-5 w-5 text-indigo-500 shrink-0 mr-3" />
                   <span className="text-slate-600 text-sm">優先客服支援</span>
                 </li>
+                <li className="flex items-start bg-indigo-50 p-2 rounded-lg -mx-2">
+                  <Zap className="h-5 w-5 text-amber-500 shrink-0 mr-3 fill-amber-500" />
+                  <div>
+                    <span className="text-slate-900 font-bold text-sm block">贈送每月置頂推廣</span>
+                    <span className="text-slate-500 text-xs">(Featured Ad) 價值 $300</span>
+                  </div>
+                </li>
+                <li className="flex items-start bg-indigo-50 p-2 rounded-lg -mx-2 mt-2">
+                  <Rocket className="h-5 w-5 text-sky-500 shrink-0 mr-3 fill-sky-500" />
+                  <div>
+                    <span className="text-slate-900 font-bold text-sm block">贈送精準推播</span>
+                    <span className="text-slate-500 text-xs">(Smart Push) 每月 1 次</span>
+                  </div>
+                </li>
               </ul>
             </div>
             <div className="p-8 bg-indigo-50 border-t border-indigo-100 mt-auto">
