@@ -14,7 +14,7 @@ export default function Navbar() {
     { href: '/creators', label: '找網紅' },
     { href: '/trips', label: '行程許願池' },
     { href: '/opportunities', label: '廠商案源' },
-    { href: '/calculator', label: '互惠計算機' },
+    { href: '/calculator', label: '智能合約' }, // 已更新為「智能合約」
   ];
 
   // 判斷連結是否為當前頁面
