@@ -268,7 +268,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 點擊開啟案源詳情 Modal 的函式 (供發出的邀請與收到的邀請使用)
   const handleViewProject = (projectId?: string) => {
     if (!projectId) return;
     const proj = projects.find(p => p.id === projectId);
@@ -708,10 +707,17 @@ export default function DashboardPage() {
                          </div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
-                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                             inv.status === '已接受' ? 'bg-green-100 text-green-700' :
-                             inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                           }`}>{inv.status}</span>
+                           <div className="flex items-center gap-2">
+                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                               inv.status === '已接受' ? 'bg-green-100 text-green-700' :
+                               inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                             }`}>{inv.status}</span>
+                             {inv.status === '已接受' && (
+                               <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1">
+                                 <FileSignature size={14} /> 智能合約
+                               </Link>
+                             )}
+                           </div>
                          </div>
                       </div>
                     </div>
@@ -771,16 +777,23 @@ export default function DashboardPage() {
                          </div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
-                           <div className="flex gap-2">
+                           <div className="flex items-center gap-2">
                              {(inv.status === '待回覆' || inv.status === '招募中') ? (
                                <>
                                  <button onClick={() => handleUpdateInviteStatus(inv.id, '已婉拒')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
                                  <button onClick={() => handleUpdateInviteStatus(inv.id, '已接受')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">回覆並接受</button>
                                </>
                              ) : (
-                               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                 inv.status === '已接受' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                               }`}>{inv.status}</span>
+                               <div className="flex items-center gap-2">
+                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                   inv.status === '已接受' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                 }`}>{inv.status}</span>
+                                 {inv.status === '已接受' && (
+                                   <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1">
+                                     <FileSignature size={14} /> 智能合約
+                                   </Link>
+                                 )}
+                               </div>
                              )}
                            </div>
                          </div>
