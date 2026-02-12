@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { 
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
-  Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText
+  Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell
 } from 'lucide-react';
 
 type AdminTab = 'overview' | 'users' | 'revenue' | 'settings';
