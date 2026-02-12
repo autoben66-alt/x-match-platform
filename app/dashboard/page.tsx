@@ -116,7 +116,7 @@ export default function DashboardPage() {
 
   // 創作者相關狀態 (履歷設定 Profile)
   const [creatorProfile, setCreatorProfile] = useState({
-    name: '林小美', handle: '@may_travel', location: '台北市', tags: '旅遊, 美食, 親子',
+    name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
     coverImage: '', avatar: '', portfolio: [] as string[],
     rates: { post: 5000, story: 1500, reels: 8000 },
@@ -173,7 +173,7 @@ export default function DashboardPage() {
         if (d.role === '創作者') {
           setCreatorProfile(prev => ({
             ...prev,
-            name: d.name || prev.name, handle: d.handle || prev.handle,
+            name: d.name || prev.name, handle: d.handle || prev.handle, lineId: d.lineId || prev.lineId,
             location: d.location || prev.location, tags: d.tags ? d.tags.join(', ') : prev.tags,
             bio: d.bio || prev.bio, coverImage: d.coverImage || '',
             avatar: d.avatar || '', portfolio: d.portfolio || [],
@@ -327,6 +327,7 @@ export default function DashboardPage() {
         plan: 'Free',
         joinDate: new Date().toLocaleDateString('zh-TW'),
         handle: creatorProfile.handle,
+        lineId: creatorProfile.lineId,
         location: creatorProfile.location,
         tags: creatorProfile.tags.split(',').map(t => t.trim()).filter(Boolean),
         bio: creatorProfile.bio,
@@ -1079,6 +1080,12 @@ export default function DashboardPage() {
                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Handle (社群 ID)</label>
                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
                               value={creatorProfile.handle} onChange={(e) => setCreatorProfile(p => ({...p, handle: e.target.value}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">LINE ID (聯絡用)</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+                              placeholder="例如：may_travel"
+                              value={creatorProfile.lineId} onChange={(e) => setCreatorProfile(p => ({...p, lineId: e.target.value}))} />
                      </div>
                      <div>
                        <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">主要所在地</label>

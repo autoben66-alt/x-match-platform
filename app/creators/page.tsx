@@ -41,12 +41,13 @@ interface CreatorDetail extends Creator {
   rates: { post: string; story: string; reels: string; };
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
+  lineId?: string;
 }
 
 // 當創作者尚未在後台完善履歷時，系統自動填補的優質展示資料 (補上 name, handle, avatar 解決編譯報錯)
 const ENRICH_DATA = [
   {
-    name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
+    name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
     tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
     bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", completedJobs: 42, rating: 4.9,
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
@@ -55,7 +56,7 @@ const ENRICH_DATA = [
     portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
   },
   {
-    name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason",
+    name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
     tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁",
     bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", completedJobs: 85, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
@@ -99,6 +100,7 @@ export default function CreatorsPage() {
             id: Number(u.id) || Date.now() + index,
             name: u.name || enrich.name,
             handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
+            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
             avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
             location: u.location || enrich.location,
             bio: u.bio || enrich.bio,
@@ -370,7 +372,7 @@ export default function CreatorsPage() {
                <div className="flex gap-3 w-full sm:w-auto">
                  {/* LINE 聯繫按鈕 */}
                  <a 
-                   href={`https://line.me/ti/p/~${selectedCreator.handle.replace('@', '')}`}
+                   href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
                    target="_blank"
                    rel="noopener noreferrer"
                    className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
