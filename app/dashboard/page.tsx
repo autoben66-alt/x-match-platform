@@ -268,7 +268,7 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 點擊開啟案源詳情 Modal
+  // ✨ 點擊開啟案源詳情 Modal 的函式 (供發出的邀請與收到的邀請使用)
   const handleViewProject = (projectId?: string) => {
     if (!projectId) return;
     const proj = projects.find(p => p.id === projectId);
@@ -276,7 +276,7 @@ export default function DashboardPage() {
       setViewProject(proj);
       setActiveImage(proj.image || (proj.gallery && proj.gallery.length > 0 ? proj.gallery[0] : ''));
     } else {
-      alert("此案源已關閉或被移除。");
+      alert("此案源可能已關閉或被移除。");
     }
   };
 
@@ -673,7 +673,6 @@ export default function DashboardPage() {
           </div>
         );
 
-      // ✨ invitations 區塊，負責處理雙方對於「邀請」的檢視，並加入可點擊的案源卡片
       case 'invitations':
         if (role === 'business') {
           return (
@@ -1245,18 +1244,6 @@ export default function DashboardPage() {
         );
 
       default: return null;
-    }
-  };
-
-  // 點擊開啟案源詳情 Modal 的函式 (供發出的邀請與收到的邀請使用)
-  const handleViewProject = (projectId?: string) => {
-    if (!projectId) return;
-    const proj = projects.find(p => p.id === projectId);
-    if (proj) {
-      setViewProject(proj);
-      setActiveImage(proj.image || (proj.gallery && proj.gallery.length > 0 ? proj.gallery[0] : ''));
-    } else {
-      alert("此案源可能已關閉或被移除。");
     }
   };
 
