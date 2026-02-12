@@ -13,7 +13,12 @@ type AdminTab = 'overview' | 'users' | 'revenue' | 'settings';
 export default function AdminDashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  
+  // 搜尋與篩選狀態
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('全部角色');
+  const [filterStatus, setFilterStatus] = useState('全部狀態');
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   // 模擬登入
   const handleLogin = (e: React.FormEvent) => {
@@ -28,6 +33,24 @@ export default function AdminDashboardPage() {
     { id: 3, name: '山林秘境露營區', email: 'mountain@example.com', role: '商家', plan: 'Free', status: '待審核', joinDate: '2024/06/01' },
     { id: 4, name: 'Jason 攝影', email: 'jason@example.com', role: '創作者', plan: 'Free', status: '停權', joinDate: '2023/11/20' },
   ]);
+
+  // 過濾後的用戶名單
+  const filteredUsers = users.filter(user => {
+    const matchSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchRole = filterRole === '全部角色' || user.role === filterRole;
+    const matchStatus = filterStatus === '全部狀態' || user.status === filterStatus;
+    
+    return matchSearch && matchRole && matchStatus;
+  });
+
+  // 變更用戶狀態功能
+  const handleStatusChange = (userId: number, newStatus: string) => {
+    setUsers(users.map(user => 
+      user.id === userId ? { ...user, status: newStatus } : user
+    ));
+    setOpenMenuId(null); // 關閉選單
+  };
 
   // 模擬交易紀錄
   const transactions = [
@@ -84,7 +107,7 @@ export default function AdminDashboardPage() {
                   <span className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-2 py-1 rounded-full"><TrendingUp size={12} className="mr-1"/> +12%</span>
                 </div>
                 <p className="text-sm text-slate-500 mb-1">總註冊用戶數</p>
-                <h3 className="text-3xl font-bold text-slate-900">1,852</h3>
+                <h3 className="text-3xl font-bold text-slate-900">{users.length + 1848}</h3>
               </div>
               
               <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -156,38 +179,47 @@ export default function AdminDashboardPage() {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">用戶與權限管理</h2>
             
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+              {/* 篩選工具列 */}
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50">
                 <div className="flex gap-2 w-full sm:w-auto">
                   <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                     <input 
                       type="text"
                       placeholder="搜尋名稱或 Email..."
-                      className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <select className="p-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none">
-                    <option>全部角色</option>
-                    <option>商家</option>
-                    <option>創作者</option>
+                  <select 
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none shadow-sm cursor-pointer"
+                    value={filterRole}
+                    onChange={(e) => setFilterRole(e.target.value)}
+                  >
+                    <option value="全部角色">全部角色</option>
+                    <option value="商家">商家</option>
+                    <option value="創作者">創作者</option>
                   </select>
-                  <select className="p-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none">
-                    <option>全部狀態</option>
-                    <option>活躍</option>
-                    <option>待審核</option>
-                    <option>停權</option>
+                  <select 
+                    className="p-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none shadow-sm cursor-pointer"
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                  >
+                    <option value="全部狀態">全部狀態</option>
+                    <option value="活躍">活躍</option>
+                    <option value="待審核">待審核</option>
+                    <option value="停權">停權</option>
                   </select>
                 </div>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
+                  <thead className="bg-white text-slate-500 border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-4 font-bold">用戶資訊</th>
                       <th className="px-6 py-4 font-bold">角色 / 方案</th>
@@ -196,41 +228,87 @@ export default function AdminDashboardPage() {
                       <th className="px-6 py-4 font-bold text-right">操作</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-slate-900">{user.name}</p>
-                          <p className="text-xs text-slate-500">{user.email}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${user.role === '商家' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
-                              {user.role}
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredUsers.length > 0 ? (
+                      filteredUsers.map((user) => (
+                        <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-slate-900">{user.name}</p>
+                            <p className="text-xs text-slate-500">{user.email}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${user.role === '商家' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                                {user.role}
+                              </span>
+                              {user.plan === 'Pro' && (
+                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">PRO</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-bold ${
+                              user.status === '活躍' ? 'bg-green-100 text-green-700' : 
+                              user.status === '待審核' ? 'bg-orange-100 text-orange-700' : 
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {user.status === '活躍' ? <CheckCircle2 size={12}/> : user.status === '待審核' ? <ShieldAlert size={12}/> : <XCircle size={12}/>}
+                              {user.status}
                             </span>
-                            {user.plan === 'Pro' && (
-                              <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">PRO</span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-500">{user.joinDate}</td>
+                          <td className="px-6 py-4 text-right relative">
+                            {/* 操作按鈕 */}
+                            <button 
+                              onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors focus:outline-none"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            {/* 彈出操作選單 */}
+                            {openMenuId === user.id && (
+                              <>
+                                {/* 點擊背景關閉選單 */}
+                                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)}></div>
+                                <div className="absolute right-6 top-10 w-36 bg-white rounded-lg shadow-xl border border-slate-200 z-20 py-1 text-left overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                  {user.status !== '活躍' && (
+                                    <button 
+                                      onClick={() => handleStatusChange(user.id, '活躍')} 
+                                      className="w-full px-4 py-2.5 text-sm text-green-700 font-medium hover:bg-green-50 flex items-center gap-2 transition-colors"
+                                    >
+                                      <CheckCircle2 size={14}/> 設為活躍
+                                    </button>
+                                  )}
+                                  {user.status !== '停權' && (
+                                    <button 
+                                      onClick={() => handleStatusChange(user.id, '停權')} 
+                                      className="w-full px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-2 transition-colors"
+                                    >
+                                      <XCircle size={14}/> 停權帳號
+                                    </button>
+                                  )}
+                                  {user.status !== '待審核' && (
+                                    <button 
+                                      onClick={() => handleStatusChange(user.id, '待審核')} 
+                                      className="w-full px-4 py-2.5 text-sm text-orange-600 font-medium hover:bg-orange-50 flex items-center gap-2 transition-colors border-t border-slate-100"
+                                    >
+                                      <ShieldAlert size={14}/> 退回審核
+                                    </button>
+                                  )}
+                                </div>
+                              </>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-bold ${
-                            user.status === '活躍' ? 'bg-green-100 text-green-700' : 
-                            user.status === '待審核' ? 'bg-orange-100 text-orange-700' : 
-                            'bg-red-100 text-red-700'
-                          }`}>
-                            {user.status === '活躍' ? <CheckCircle2 size={12}/> : user.status === '待審核' ? <ShieldAlert size={12}/> : <XCircle size={12}/>}
-                            {user.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-500">{user.joinDate}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors">
-                            <MoreVertical size={16} />
-                          </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                          找不到符合條件的用戶
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -388,7 +466,7 @@ export default function AdminDashboardPage() {
         </header>
 
         {/* 渲染內容 */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
           <div className="max-w-7xl mx-auto">
             {renderContent()}
           </div>
