@@ -6,13 +6,14 @@ import {
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
   Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell,
-  AlertTriangle, Quote, Plus, Loader2
+  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 // --- Firebase 初始化 (終極防護版) ---
 const firebaseConfig = {
@@ -27,14 +28,15 @@ const firebaseConfig = {
 let app: any = null;
 let auth: any = null;
 let db: any = null;
+let storage: any = null;
 
 // 防護機制：只有在瀏覽器端，且「確實有讀取到 API Key」時才進行初始化
-// 這可以完美避免 Next.js 在 npm run build 時因為找不到環境變數而崩潰
 if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
+    storage = getStorage(app); // 初始化 Storage
   } catch (error) {
     console.error("Firebase 初始化失敗:", error);
   }
@@ -94,6 +96,8 @@ export default function AdminDashboardPage() {
   // 首頁評價 CMS 控制狀態
   const [newTestimonial, setNewTestimonial] = useState({ quote: '', authorName: '', metricLabel: '' });
   const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
+  const [testimonialImage, setTestimonialImage] = useState<string>(''); // 照片上傳狀態
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   // Firestore 真實資料狀態
   const [users, setUsers] = useState<UserData[]>([]);
@@ -174,6 +178,31 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // 處理評價配圖上傳
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!storage || !fbUser) {
+      alert("Firebase Storage 尚未準備好或身分驗證未完成，請稍後再試。");
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const fileRef = ref(storage, `artifacts/${internalAppId}/public/data/testimonials/${Date.now()}_${file.name}`);
+      const uploadTask = await uploadBytesResumable(fileRef, file);
+      const downloadURL = await getDownloadURL(uploadTask.ref);
+      setTestimonialImage(downloadURL);
+    } catch (error) {
+      console.error("上傳失敗:", error);
+      alert("照片上傳失敗，請確認 Firebase Storage 已開啟並設定為測試模式。");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   // 新增首頁評價 (CMS) 至 Firebase
   const handleAddTestimonial = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,11 +225,12 @@ export default function AdminDashboardPage() {
         metricIcon: 'TrendingUp', // 預設圖示
         metricLabel: newTestimonial.metricLabel,
         rating: 5, // 預設 5 星好評
-        image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" // 預設美觀背景圖
+        image: testimonialImage || "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" // 若有上傳圖片則使用，否則給預設
       });
       
       alert("🎉 評價新增成功！前台首頁已即時同步更新。");
       setNewTestimonial({ quote: '', authorName: '', metricLabel: '' }); // 清空表單
+      setTestimonialImage(''); // 清空圖片
     } catch (err) {
       console.error("新增評價失敗:", err);
       alert("新增失敗，請檢查 Firebase 權限設定。");
@@ -474,6 +504,49 @@ export default function AdminDashboardPage() {
                   </p>
 
                   <form onSubmit={handleAddTestimonial} className="space-y-5">
+                    
+                    {/* 真實照片上傳功能 */}
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價配圖 (Image)</label>
+                      <div className="flex items-center gap-4">
+                        <label className="shrink-0 w-24 h-24 bg-slate-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors relative overflow-hidden">
+                          {isUploadingImage ? (
+                            <Loader2 className="w-6 h-6 animate-spin text-sky-500" />
+                          ) : (
+                            <>
+                              <Upload size={20} className="mb-1 text-slate-400" />
+                              <span className="text-[10px] font-bold">上傳照片</span>
+                            </>
+                          )}
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={handleImageUpload} 
+                            disabled={isUploadingImage}
+                          />
+                        </label>
+                        
+                        {testimonialImage ? (
+                          <div className="shrink-0 w-24 h-24 bg-slate-200 rounded-xl overflow-hidden relative group shadow-sm border border-slate-200">
+                            <img src={testimonialImage} alt="Preview" className="w-full h-full object-cover" />
+                            <button 
+                              type="button" 
+                              onClick={() => setTestimonialImage('')} 
+                              className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-400 leading-relaxed font-medium">
+                            <p className="mb-1 flex items-center gap-1"><ImageIcon size={12}/> 支援 JPG, PNG 格式圖片。</p>
+                            <p>若不上傳，系統會自動帶入預設的環境背景圖。</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                     <div>
                       <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價內容 (Quote) <span className="text-red-500">*</span></label>
                       <textarea 
@@ -511,9 +584,9 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <button 
-                      disabled={isSubmittingTestimonial}
+                      disabled={isSubmittingTestimonial || isUploadingImage}
                       type="submit" 
-                      className="w-full py-4 mt-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70"
+                      className="w-full py-4 mt-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                       {isSubmittingTestimonial ? <Loader2 className="animate-spin" size={18}/> : <Plus size={18} />}
                       {isSubmittingTestimonial ? '正在寫入雲端...' : '發布至前台首頁'}
