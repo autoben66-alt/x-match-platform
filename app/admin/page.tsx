@@ -6,13 +6,13 @@ import {
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
   Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell,
-  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon
+  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit2, Save
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 // --- Firebase 初始化 (終極防護版) ---
@@ -67,7 +67,19 @@ interface TransactionData {
   date: string;
 }
 
-// 初始模擬資料 (當資料庫為空時，自動寫入 Firebase 作為測試資料)
+interface TestimonialData {
+  id: string;
+  image: string;
+  quote: string;
+  authorInitial: string;
+  authorName: string;
+  authorLocation: string;
+  metricIcon: string;
+  metricLabel: string;
+  rating: number;
+}
+
+// 初始模擬資料
 const MOCK_USERS: UserData[] = [
   { id: '1', name: '海角七號民宿', email: 'cape7@example.com', role: '商家', plan: 'Pro', status: '活躍', joinDate: '2024/02/15' },
   { id: '2', name: '林小美', email: 'may_travel@example.com', role: '創作者', plan: 'Free', status: '活躍', joinDate: '2024/01/10' },
@@ -93,15 +105,17 @@ export default function AdminDashboardPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{userId: string, userName: string, newStatus: string} | null>(null);
 
-  // 首頁評價 CMS 控制狀態
-  const [newTestimonial, setNewTestimonial] = useState({ quote: '', authorName: '', metricLabel: '' });
-  const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
-  const [testimonialImage, setTestimonialImage] = useState<string>(''); // 照片上傳狀態
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-
   // Firestore 真實資料狀態
   const [users, setUsers] = useState<UserData[]>([]);
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
+  const [testimonials, setTestimonials] = useState<TestimonialData[]>([]);
+
+  // 首頁評價 CMS 控制狀態
+  const [newTestimonial, setNewTestimonial] = useState({ quote: '', authorName: '', metricLabel: '' });
+  const [testimonialImage, setTestimonialImage] = useState<string>(''); 
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
+  const [editingTestimonialId, setEditingTestimonialId] = useState<string | null>(null);
 
   // 登入模擬
   const handleLogin = (e: React.FormEvent) => {
@@ -111,7 +125,7 @@ export default function AdminDashboardPage() {
 
   // 1. 處理身份驗證 (取得資料庫讀寫權限)
   useEffect(() => {
-    if (!auth) return; // 確保 Firebase 已在 Client 端初始化成功
+    if (!auth) return; 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setFbUser(user);
@@ -128,13 +142,12 @@ export default function AdminDashboardPage() {
 
   // 2. 監聽 Firestore 實時資料
   useEffect(() => {
-    if (!db || !fbUser || !isLoggedIn) return; // 確保取得 DB 實體才執行監聽
+    if (!db || !fbUser || !isLoggedIn) return; 
 
     // 監聽用戶列表
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (snapshot.empty) {
-        // 如果您的新資料庫目前是空的，自動植入種子資料方便測試
         MOCK_USERS.forEach(u => setDoc(doc(usersCol, u.id), u));
       } else {
         const data = snapshot.docs.map(d => d.data() as UserData);
@@ -153,10 +166,20 @@ export default function AdminDashboardPage() {
       }
     }, (err) => console.error("無法讀取交易資料:", err));
 
-    return () => { unsubUsers(); unsubTx(); };
+    // 監聽首頁評價清單
+    const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
+    const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
+      if (!snapshot.empty) {
+        const data = snapshot.docs.map(d => d.data() as TestimonialData);
+        setTestimonials(data);
+      } else {
+        setTestimonials([]);
+      }
+    }, (err) => console.error("無法讀取評價資料:", err));
+
+    return () => { unsubUsers(); unsubTx(); unsubTestimonials(); };
   }, [fbUser, isLoggedIn]);
 
-  // 搜尋與篩選邏輯
   const filteredUsers = users.filter(u => {
     const matchSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchRole = filterRole === '全部角色' || u.role === filterRole;
@@ -164,7 +187,6 @@ export default function AdminDashboardPage() {
     return matchSearch && matchRole && matchStatus;
   });
 
-  // 更新用戶狀態至 Firebase
   const handleStatusChange = async (userId: string, newStatus: string) => {
     if (!db || !fbUser) return;
     try {
@@ -203,8 +225,8 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 新增首頁評價 (CMS) 至 Firebase
-  const handleAddTestimonial = async (e: React.FormEvent) => {
+  // 新增/修改首頁評價 (CMS) 至 Firebase
+  const handleSubmitTestimonial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!db || !fbUser) {
       alert("尚未連線至資料庫，請稍候再試。");
@@ -213,30 +235,74 @@ export default function AdminDashboardPage() {
     setIsSubmittingTestimonial(true);
     
     try {
-      const newId = `case-${Date.now()}`;
-      const testimonialRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', newId);
-      
-      await setDoc(testimonialRef, {
-        id: newId,
-        quote: newTestimonial.quote,
-        authorName: newTestimonial.authorName,
-        authorInitial: newTestimonial.authorName.charAt(0), // 自動抓取第一個字作為頭像代號
-        authorLocation: "台灣優質用戶", // 預設地區
-        metricIcon: 'TrendingUp', // 預設圖示
-        metricLabel: newTestimonial.metricLabel,
-        rating: 5, // 預設 5 星好評
-        image: testimonialImage || "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" // 若有上傳圖片則使用，否則給預設
-      });
-      
-      alert("🎉 評價新增成功！前台首頁已即時同步更新。");
-      setNewTestimonial({ quote: '', authorName: '', metricLabel: '' }); // 清空表單
-      setTestimonialImage(''); // 清空圖片
+      if (editingTestimonialId) {
+        // 修改模式
+        const ref = doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', editingTestimonialId);
+        await updateDoc(ref, {
+          quote: newTestimonial.quote,
+          authorName: newTestimonial.authorName,
+          authorInitial: newTestimonial.authorName.charAt(0),
+          metricLabel: newTestimonial.metricLabel,
+          // 如果有上傳新圖片，才覆寫圖片欄位
+          ...(testimonialImage ? { image: testimonialImage } : {})
+        });
+        alert("🎉 評價修改成功！");
+      } else {
+        // 新增模式
+        const newId = `case-${Date.now()}`;
+        const ref = doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', newId);
+        await setDoc(ref, {
+          id: newId,
+          quote: newTestimonial.quote,
+          authorName: newTestimonial.authorName,
+          authorInitial: newTestimonial.authorName.charAt(0), 
+          authorLocation: "台灣優質用戶", 
+          metricIcon: 'TrendingUp', 
+          metricLabel: newTestimonial.metricLabel,
+          rating: 5, 
+          image: testimonialImage || "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" 
+        });
+        alert("🎉 評價新增成功！前台首頁已即時同步更新。");
+      }
+      handleCancelEdit(); // 清空狀態
     } catch (err) {
-      console.error("新增評價失敗:", err);
-      alert("新增失敗，請檢查 Firebase 權限設定。");
+      console.error("處理評價失敗:", err);
+      alert("操作失敗，請檢查 Firebase 權限設定。");
     } finally {
       setIsSubmittingTestimonial(false);
     }
+  };
+
+  // 點擊編輯按鈕
+  const handleEditTestimonial = (t: TestimonialData) => {
+    setEditingTestimonialId(t.id);
+    setNewTestimonial({ quote: t.quote, authorName: t.authorName, metricLabel: t.metricLabel });
+    setTestimonialImage(t.image);
+    // 捲動到頂部方便編輯
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // 刪除評價
+  const handleDeleteTestimonial = async (id: string) => {
+    if (!db || !fbUser) return;
+    if (!confirm("確定要永久刪除這筆評價嗎？")) return;
+    
+    try {
+      await deleteDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', id));
+      if (editingTestimonialId === id) {
+        handleCancelEdit(); // 如果正在編輯該筆，則清空表單
+      }
+    } catch (err) {
+      console.error("刪除評價失敗:", err);
+      alert("刪除失敗");
+    }
+  };
+
+  // 取消編輯並重置表單
+  const handleCancelEdit = () => {
+    setEditingTestimonialId(null);
+    setNewTestimonial({ quote: '', authorName: '', metricLabel: '' });
+    setTestimonialImage('');
   };
 
   const totalRevenue = transactions.reduce((sum, tx) => sum + tx.amount, 0) + 141101;
@@ -491,21 +557,22 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Testimonials CMS */}
-              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl relative overflow-hidden">
+              
+              {/* Testimonials CMS Form */}
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl relative overflow-hidden flex flex-col">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-sky-100 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
-                <div className="relative z-10">
+                <div className="relative z-10 flex-grow">
                   <h3 className="text-xl font-black text-slate-900 mb-2 flex items-center gap-2">
                     <Quote className="text-sky-500" size={24} />
-                    首頁評價管理 (Testimonials)
+                    {editingTestimonialId ? '編輯首頁評價' : '新增首頁評價 (Testimonials)'}
                   </h3>
-                  <p className="text-sm text-slate-500 mb-8 font-medium">
-                    在此新增的成功案例將會「即時同步」顯示於前台首頁的「聽聽他們怎麼說」區塊。
+                  <p className="text-sm text-slate-500 mb-6 font-medium">
+                    在此操作的內容將會「即時同步」顯示於前台首頁的「聽聽他們怎麼說」區塊。
                   </p>
 
-                  <form onSubmit={handleAddTestimonial} className="space-y-5">
+                  <form onSubmit={handleSubmitTestimonial} className="space-y-5">
                     
-                    {/* 真實照片上傳功能 */}
+                    {/* 照片上傳 */}
                     <div>
                       <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價配圖 (Image)</label>
                       <div className="flex items-center gap-4">
@@ -551,7 +618,7 @@ export default function AdminDashboardPage() {
                       <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價內容 (Quote) <span className="text-red-500">*</span></label>
                       <textarea 
                         required
-                        placeholder="例如：自從使用了 X-Match，我們的訂房率提升了 30%！"
+                        placeholder="例如：自從使用了 X-Match，我們的訂單提升了 30%！"
                         className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all font-medium text-slate-700 h-28 resize-none"
                         value={newTestimonial.quote}
                         onChange={(e) => setNewTestimonial({...newTestimonial, quote: e.target.value})}
@@ -583,27 +650,75 @@ export default function AdminDashboardPage() {
                       </div>
                     </div>
 
-                    <button 
-                      disabled={isSubmittingTestimonial || isUploadingImage}
-                      type="submit" 
-                      className="w-full py-4 mt-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                    >
-                      {isSubmittingTestimonial ? <Loader2 className="animate-spin" size={18}/> : <Plus size={18} />}
-                      {isSubmittingTestimonial ? '正在寫入雲端...' : '發布至前台首頁'}
-                    </button>
+                    <div className="flex gap-3 pt-2">
+                      {editingTestimonialId && (
+                        <button 
+                          type="button"
+                          onClick={handleCancelEdit}
+                          className="w-1/3 py-4 bg-slate-100 text-slate-500 font-black rounded-xl hover:bg-slate-200 transition-all text-xs uppercase tracking-widest active:scale-95"
+                        >
+                          取消
+                        </button>
+                      )}
+                      <button 
+                        disabled={isSubmittingTestimonial || isUploadingImage}
+                        type="submit" 
+                        className="flex-1 py-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-xs sm:text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                      >
+                        {isSubmittingTestimonial ? <Loader2 className="animate-spin" size={18}/> : (editingTestimonialId ? <Save size={18} /> : <Plus size={18} />)}
+                        {isSubmittingTestimonial ? '寫入雲端...' : (editingTestimonialId ? '儲存修改' : '發布至前台首頁')}
+                      </button>
+                    </div>
                   </form>
                 </div>
               </div>
 
-              {/* Other Settings (Placeholder) */}
-              <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200 border-dashed flex flex-col items-center justify-center text-center">
-                <Settings size={40} className="text-slate-300 mb-4 animate-[spin_6s_linear_infinite]" />
-                <h3 className="font-black text-slate-900 mb-2 uppercase tracking-widest">進階系統設定</h3>
-                <p className="text-slate-500 text-sm max-w-xs font-medium">
-                  全域參數、API 限制與安全規則，目前於開發模式中鎖定。
-                </p>
-                <span className="mt-6 px-4 py-1.5 bg-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-widest rounded-full">Locked</span>
+              {/* Testimonials List */}
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl flex flex-col h-[700px]">
+                <h3 className="text-xl font-black text-slate-900 mb-6 flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <LayoutDashboard className="text-indigo-500" size={24} />
+                    已發布評價 ({testimonials.length})
+                  </span>
+                </h3>
+                
+                <div className="flex-1 overflow-y-auto space-y-4 pr-2 no-scrollbar">
+                  {testimonials.length > 0 ? testimonials.map(t => (
+                    <div key={t.id} className={`p-4 border rounded-2xl flex gap-4 transition-all bg-slate-50 hover:shadow-md ${editingTestimonialId === t.id ? 'border-sky-500 shadow-md bg-sky-50' : 'border-slate-200'}`}>
+                      <img src={t.image} alt={t.authorName} className="w-16 h-16 rounded-xl object-cover shrink-0 shadow-sm border border-slate-200" />
+                      <div className="flex-1 flex flex-col min-w-0">
+                        <div className="flex justify-between items-start mb-1 gap-2">
+                          <p className="font-bold text-slate-900 truncate">{t.authorName}</p>
+                          <span className="text-[10px] font-bold text-sky-600 bg-sky-100 px-2 py-0.5 rounded whitespace-nowrap">{t.metricLabel}</span>
+                        </div>
+                        <p className="text-xs text-slate-500 line-clamp-2 mb-3 leading-relaxed">"{t.quote}"</p>
+                        
+                        <div className="mt-auto flex justify-end gap-2">
+                          <button 
+                            onClick={() => handleEditTestimonial(t)}
+                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                          >
+                            <Edit2 size={12}/> 編輯
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteTestimonial(t.id)}
+                            className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-300 hover:bg-red-50 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                          >
+                            <Trash2 size={12}/> 刪除
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )) : (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                      <Quote className="mx-auto h-12 w-12 text-slate-200 mb-3" />
+                      <p className="font-bold text-slate-500">雲端尚無任何評價</p>
+                      <p className="text-xs mt-1">請從左側表單進行新增</p>
+                    </div>
+                  )}
+                </div>
               </div>
+
             </div>
           </div>
         );
