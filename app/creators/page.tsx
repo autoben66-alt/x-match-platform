@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link'; 
 import CreatorCard, { Creator } from '@/components/CreatorCard';
-import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2 } from 'lucide-react';
+import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -363,8 +363,28 @@ export default function CreatorsPage() {
               </div>
             </div>
             
-            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-between items-center gap-4 z-20">
-               <button className="w-full px-8 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2" onClick={() => alert("功能開發中：將開啟聊天室或合約發送介面")}><Mail size={18} /> 發送合作邀請</button>
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex flex-col sm:flex-row justify-between items-center gap-4 z-20">
+               <div className="hidden sm:block shrink-0">
+                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
+               </div>
+               <div className="flex gap-3 w-full sm:w-auto">
+                 {/* LINE 聯繫按鈕 */}
+                 <a 
+                   href={`https://line.me/ti/p/~${selectedCreator.handle.replace('@', '')}`}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 >
+                   <MessageCircle size={18} /> LINE 聯繫
+                 </a>
+                 {/* 導向後台按鈕 */}
+                 <Link 
+                   href="/dashboard"
+                   className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 >
+                   <Mail size={18} /> 前往後台發送邀請
+                 </Link>
+               </div>
             </div>
           </div>
         </div>
