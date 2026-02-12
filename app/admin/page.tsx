@@ -14,20 +14,31 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
 
-// --- Firebase 初始化 (讀取您的 .env.local) ---
+// --- Firebase 初始化 (終極防護版) ---
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
 };
 
-// 確保在 Next.js 中只初始化一次 Firebase (Singleton)
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
-const db = getFirestore(app);
+let app: any = null;
+let auth: any = null;
+let db: any = null;
+
+// 防護機制：只有在瀏覽器端，且「確實有讀取到 API Key」時才進行初始化
+// 這可以完美避免 Next.js 在 npm run build 時因為找不到環境變數而崩潰
+if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (error) {
+    console.error("Firebase 初始化失敗:", error);
+  }
+}
 
 // 依照 Firebase 規範定義資料儲存路徑的 ID
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
@@ -84,7 +95,7 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
 
-  // 登入模擬 (這裡僅作介面展示，未來可替換為 Firebase Auth 管理員登入)
+  // 登入模擬
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setTimeout(() => setIsLoggedIn(true), 800);
@@ -92,6 +103,7 @@ export default function AdminDashboardPage() {
 
   // 1. 處理身份驗證 (取得資料庫讀寫權限)
   useEffect(() => {
+    if (!auth) return; // 確保 Firebase 已在 Client 端初始化成功
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setFbUser(user);
@@ -108,9 +120,9 @@ export default function AdminDashboardPage() {
 
   // 2. 監聽 Firestore 實時資料
   useEffect(() => {
-    if (!fbUser || !isLoggedIn) return;
+    if (!db || !fbUser || !isLoggedIn) return; // 確保取得 DB 實體才執行監聽
 
-    // 監聽用戶列表 (指定存取路徑 artifacts/{appId}/public/data/users)
+    // 監聽用戶列表
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (snapshot.empty) {
@@ -146,7 +158,7 @@ export default function AdminDashboardPage() {
 
   // 更新用戶狀態至 Firebase
   const handleStatusChange = async (userId: string, newStatus: string) => {
-    if (!fbUser) return;
+    if (!db || !fbUser) return;
     try {
       const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', userId);
       await updateDoc(userRef, { status: newStatus });
@@ -163,21 +175,21 @@ export default function AdminDashboardPage() {
   // --- UI: 登入頁面 ---
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
         <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 text-center animate-in fade-in zoom-in duration-300">
           <div className="bg-indigo-100 p-3 rounded-xl inline-block mb-6 shadow-inner">
             <ShieldAlert className="w-8 h-8 text-indigo-600" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">X-Match 系統總後台</h1>
-          <p className="text-slate-500 mb-8 text-sm font-medium">資料庫連線代號：<br/><span className="text-indigo-600 font-bold">{internalAppId}</span></p>
-          <form onSubmit={handleLogin} className="space-y-5 text-left">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">X-Match Admin</h1>
+          <p className="text-slate-500 mb-8 text-sm italic underline">已連接至專案：{internalAppId}</p>
+          <form onSubmit={handleLogin} className="space-y-4 text-left">
             <div>
-              <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">管理員帳號</label>
-              <input type="text" placeholder="admin" defaultValue="admin" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700" />
+              <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">系統管理員帳號</label>
+              <input type="text" placeholder="admin" defaultValue="admin" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700" />
             </div>
             <div>
-              <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">安全存取密碼</label>
-              <input type="password" placeholder="••••••••" defaultValue="password" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700" />
+              <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest">安全存取密碼</label>
+              <input type="password" placeholder="••••••••" defaultValue="password" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700" />
             </div>
             <button className="w-full py-3.5 mt-2 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-sm uppercase tracking-widest">安全登入</button>
           </form>
@@ -428,7 +440,7 @@ export default function AdminDashboardPage() {
             <div className="p-2 bg-indigo-600 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-indigo-600/20">
               <ShieldCheck className="text-white w-5 h-5" />
             </div>
-            <span className="font-black text-xl text-white tracking-tighter uppercase italic">X-Match <span className="text-indigo-400 text-[10px] block font-black tracking-[0.3em] not-italic mt-0.5">Control</span></span>
+            <span className="font-black text-xl text-white tracking-tighter uppercase italic">X-Match <span className="text-indigo-400 text-[10px] block font-black tracking-[0.3em] not-italic mt-0.5">Control Panel</span></span>
           </Link>
         </div>
         <nav className="flex-1 p-6 space-y-2">
@@ -450,9 +462,7 @@ export default function AdminDashboardPage() {
           ))}
         </nav>
         <div className="p-6 border-t border-slate-800/50">
-           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/20 rounded-xl transition-all">
-             <LogOut size={16}/> 登出系統
-           </button>
+           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
         </div>
       </aside>
 
