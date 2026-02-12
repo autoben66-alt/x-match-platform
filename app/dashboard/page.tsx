@@ -35,7 +35,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
-    storage = getStorage(app);
+    storage = getStorage(app); // 初始化 Storage
   } catch (error) {
     console.error("Firebase 初始化失敗:", error);
   }
@@ -82,20 +82,14 @@ interface PaymentItem {
   type: 'subscription' | 'one-time';
 }
 
-// 初始模擬案源資料 (用於第一次寫入 Firebase)
-const MOCK_PROJECTS: ProjectData[] = [
-  { id: '1', title: '海景房開箱體驗招募', category: '住宿', type: '互惠體驗', location: '屏東恆春', totalValue: 'NT$ 8,800', valueBreakdown: '海景房住宿($6800) + 早餐($800) + 接送($1200)', requirements: 'IG 貼文 1 則 + 限動 3 則 (需標記地點)', spots: 1, status: '招募中', applicants: 12, date: '2024/06/01' },
-  { id: '2', title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', location: '台北大安', totalValue: 'NT$ 3,000', valueBreakdown: '餐點($1000) + 車馬費($2000)', requirements: 'Reels 短影音 1 支', spots: 3, status: '已關閉', applicants: 8, date: '2024/05/15' },
-];
-
-const MOCK_TRIPS: TripData[] = [
-  { id: 't1', creatorName: '林小美', destination: '宜蘭礁溪', dates: '2024/05/20 - 05/22', partySize: '2大2小', purpose: '家庭週末小旅行', needs: '尋找親子友善飯店，希望有泳池', status: '招募中', offers: 5 }
-];
+// 初始模擬資料
+const MOCK_PROJECTS: ProjectData[] = [];
+const MOCK_TRIPS: TripData[] = [];
 
 export default function DashboardPage() {
   // 狀態管理
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [role, setRole] = useState<'business' | 'creator'>('business'); // 角色切換
+  const [role, setRole] = useState<'business' | 'creator'>('business');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
@@ -112,8 +106,9 @@ export default function DashboardPage() {
     valueBreakdown: '',
     requirements: '',
     spots: 1,
-    gallery: [] as string[] // 加入相簿狀態
+    gallery: [] as string[]
   });
+  const [isUploading, setIsUploading] = useState(false);
 
   // 許願行程相關狀態 (創作者)
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
@@ -125,9 +120,6 @@ export default function DashboardPage() {
     purpose: '',
     needs: ''
   });
-
-  // 新增：照片上傳的載入狀態
-  const [isUploading, setIsUploading] = useState(false);
 
   // 金流付款相關狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
@@ -161,26 +153,16 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
 
-    // 監聽案源 (Projects)
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
-      if (snapshot.empty) {
-        MOCK_PROJECTS.forEach(p => setDoc(doc(projectsCol, String(p.id)), p));
-      } else {
-        const data = snapshot.docs.map(d => d.data() as ProjectData);
-        setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
-      }
+      const data = snapshot.docs.map(d => d.data() as ProjectData);
+      setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     }, (err) => console.error("無法讀取案源資料:", err));
 
-    // 監聽許願行程 (Trips)
     const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
     const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
-      if (snapshot.empty) {
-        MOCK_TRIPS.forEach(t => setDoc(doc(tripsCol, String(t.id)), t));
-      } else {
-        const data = snapshot.docs.map(d => d.data() as TripData);
-        setTrips(data.sort((a, b) => b.id.localeCompare(a.id))); // 依ID降序
-      }
+      const data = snapshot.docs.map(d => d.data() as TripData);
+      setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     }, (err) => console.error("無法讀取行程資料:", err));
 
     return () => {
@@ -194,8 +176,13 @@ export default function DashboardPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    if (!storage || !fbUser) {
-      alert("Storage 尚未準備好或身分驗證未完成，請稍後再試。");
+    // 精準的錯誤提示
+    if (!storage) {
+      alert("Firebase Storage 尚未初始化！\n\n請至 Firebase 後台左側選單點擊「Storage」>「Get Started」並啟用服務。");
+      return;
+    }
+    if (!fbUser) {
+      alert("系統正在為您取得寫入權限，請等候幾秒鐘再試。");
       return;
     }
 
@@ -205,7 +192,6 @@ export default function DashboardPage() {
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // 建立 Storage 參照路徑 (對應 artifacts 規則)
         const fileRef = ref(storage, `artifacts/${internalAppId}/public/data/images/${Date.now()}_${file.name}`);
         const uploadTask = await uploadBytesResumable(fileRef, file);
         const downloadURL = await getDownloadURL(uploadTask.ref);
@@ -218,7 +204,7 @@ export default function DashboardPage() {
       }));
     } catch (error) {
       console.error("上傳失敗:", error);
-      alert("照片上傳失敗，請確認 Firebase Storage 已開啟並設定為測試模式。");
+      alert("照片上傳失敗！\n請確認您的 Firebase Storage 是否已開啟，且規則設為「測試模式」。");
     } finally {
       setIsUploading(false);
     }
@@ -231,24 +217,12 @@ export default function DashboardPage() {
     }));
   };
 
-  // 將新案源寫入 Firebase (業者)
+  // 將新案源寫入 Firebase
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 自定義防呆檢查，取代原生 required 避免靜默失敗
-    if (!newProject.title) {
-      alert("請輸入「案源標題」！");
-      return;
-    }
-    if (!newProject.location) {
-      alert("請輸入「地點」！");
-      return;
-    }
-    
-    if (!db || !fbUser) {
-      alert("尚未連線至資料庫或身分驗證未完成，請稍候再試。");
-      return;
-    }
+    if (!newProject.title) { alert("請輸入「案源標題」！"); return; }
+    if (!newProject.location) { alert("請輸入「地點」！"); return; }
+    if (!db || !fbUser) { alert("尚未連線至資料庫，請稍候再試。"); return; }
 
     const newId = Date.now().toString();
     const projectToSave: ProjectData = {
@@ -272,32 +246,23 @@ export default function DashboardPage() {
       const projectRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId);
       await setDoc(projectRef, projectToSave);
       setShowCreateModal(false);
-      // 重置表單
       setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
     } catch (err) {
       console.error("新增案源失敗:", err);
-      alert("新增失敗，請檢查網路連線或 Firebase 權限。");
+      alert("新增失敗，請檢查 Firebase 權限。");
     }
   };
 
-  // 將新許願行程寫入 Firebase (創作者)
+  // 將新許願行程寫入 Firebase
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!newTrip.destination) {
-      alert("請填寫目的地！");
-      return;
-    }
-
-    if (!db || !fbUser) {
-      alert("尚未連線至資料庫或身分驗證未完成，請稍候再試。");
-      return;
-    }
+    if (!newTrip.destination) { alert("請填寫目的地！"); return; }
+    if (!db || !fbUser) { alert("尚未連線至資料庫，請稍候再試。"); return; }
 
     const newId = `t${Date.now()}`;
     const tripToSave: TripData = {
       id: newId,
-      creatorName: '林小美', // 模擬當前創作者名稱
+      creatorName: '林小美',
       destination: newTrip.destination,
       dates: newTrip.dates,
       partySize: newTrip.partySize,
@@ -314,14 +279,11 @@ export default function DashboardPage() {
       setNewTrip({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
     } catch (err) {
       console.error("新增行程失敗:", err);
-      alert("新增行程失敗，請重試。");
     }
   };
 
-  // 處理金流付款程序
   const handlePaymentSubmit = async () => {
     setPaymentStep('processing');
-    
     setTimeout(async () => {
       if (db && fbUser && purchaseItem) {
         try {
@@ -346,7 +308,8 @@ export default function DashboardPage() {
   // --- 1. 登入/註冊頁面 ---
   if (!isLoggedIn) {
     return (
-      <div className="fixed inset-0 z-[100] bg-slate-50 flex items-center justify-center p-4 overflow-y-auto">
+      // 改用 z-[9999] 確保絕對置頂，覆蓋掉任何外部的 Navbar
+      <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row my-auto">
           <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-center relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-600 to-indigo-900 opacity-50"></div>
@@ -586,7 +549,7 @@ export default function DashboardPage() {
 
             {/* --- 新增案源 Modal (寫入 Firebase) 包含互惠詳情與相簿 --- */}
             {showCreateModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
@@ -646,8 +609,8 @@ export default function DashboardPage() {
                           {/* 真實照片上傳功能 */}
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
-                            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                              <label className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors">
+                            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar items-center">
+                              <label className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors relative overflow-hidden">
                                 {isUploading ? (
                                   <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
                                 ) : (
@@ -666,7 +629,7 @@ export default function DashboardPage() {
                                 />
                               </label>
                               {newProject.gallery.map((img, idx) => (
-                                <div key={idx} className="shrink-0 w-20 h-20 bg-slate-200 rounded-lg overflow-hidden relative group">
+                                <div key={idx} className="shrink-0 w-20 h-20 bg-slate-200 rounded-lg overflow-hidden relative group shadow-sm">
                                   <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
                                   <button 
                                     type="button" 
@@ -678,7 +641,9 @@ export default function DashboardPage() {
                                 </div>
                               ))}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">支援多圖上傳，第一張將預設為前台封面主圖</p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              支援多圖上傳，第一張將預設為前台封面主圖。(需在 Firebase 後台開啟 Storage 服務)
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -852,7 +817,7 @@ export default function DashboardPage() {
 
             {/* --- 新增許願行程 Modal (寫入 Firebase) --- */}
             {showCreateTripModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
@@ -1262,8 +1227,8 @@ export default function DashboardPage() {
   };
 
   return (
-    // 使用 fixed inset-0 覆蓋掉 layout.tsx 的公用導覽列，達到完全獨立的後台介面
-    <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col overflow-y-auto">
+    // 改用 z-[9999] 確保絕對置頂，覆蓋掉任何外部的 Navbar
+    <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col overflow-y-auto m-0 p-0">
       
       {/* 頂部導覽 (後台專用) */}
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
