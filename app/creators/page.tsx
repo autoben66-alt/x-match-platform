@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link'; // 加入 Link 路由導覽
 import CreatorCard, { Creator } from '@/components/CreatorCard';
 import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2 } from 'lucide-react';
 
@@ -205,18 +206,27 @@ export default function CreatorsPage() {
                 </div>
               </div>
               
-              <div className="shrink-0 w-full md:w-64 text-center md:text-right">
+              <div className="shrink-0 w-full md:w-72 text-center md:text-right">
                 <div className="inline-flex items-center gap-2 bg-black/40 px-4 py-2 rounded-full text-white mb-3 border border-white/10">
                    <Users size={16} className="text-amber-300"/>
                    <span className="text-sm font-bold tracking-widest">目前加入：{founderCount} / {founderMax}</span>
                 </div>
-                <div className="w-full bg-black/40 rounded-full h-2.5 shadow-inner border border-white/5">
+                <div className="w-full bg-black/40 rounded-full h-2.5 shadow-inner border border-white/5 mb-2">
                   <div 
                     className="bg-gradient-to-r from-yellow-300 to-amber-400 h-2.5 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(252,211,77,0.8)]" 
                     style={{ width: `${founderPercentage}%` }}
                   ></div>
                 </div>
-                <p className="text-[10px] text-white/60 mt-2 tracking-widest uppercase">名額倒數，額滿即止</p>
+                <p className="text-[10px] text-white/60 mt-2 tracking-widest uppercase mb-4 md:mb-1">名額倒數，額滿即止</p>
+                
+                {/* 立即加入按鈕 (引導至 /dashboard 註冊) */}
+                <Link 
+                  href="/dashboard"
+                  className="block w-full py-3 bg-gradient-to-r from-yellow-300 to-amber-400 text-slate-900 font-black text-sm rounded-xl shadow-[0_0_15px_rgba(252,211,77,0.4)] hover:shadow-[0_0_25px_rgba(252,211,77,0.6)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={16} className="fill-slate-900" />
+                  立即卡位加入創作者
+                </Link>
               </div>
             </div>
           </div>
