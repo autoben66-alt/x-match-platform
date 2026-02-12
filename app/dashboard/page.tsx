@@ -58,6 +58,18 @@ interface ProjectData {
   date: string;
 }
 
+interface TripData {
+  id: string;
+  creatorName: string;
+  destination: string;
+  dates: string;
+  partySize: string;
+  purpose: string;
+  needs: string;
+  status: string;
+  offers: number;
+}
+
 interface PaymentItem {
   id: string;
   name: string;
@@ -71,6 +83,10 @@ const MOCK_PROJECTS: ProjectData[] = [
   { id: '2', title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', location: '台北大安', totalValue: 'NT$ 3,000', valueBreakdown: '餐點($1000) + 車馬費($2000)', requirements: 'Reels 短影音 1 支', spots: 3, status: '已關閉', applicants: 8, date: '2024/05/15' },
 ];
 
+const MOCK_TRIPS: TripData[] = [
+  { id: 't1', creatorName: '林小美', destination: '宜蘭礁溪', dates: '2024/05/20 - 05/22', partySize: '2大2小', purpose: '家庭週末小旅行', needs: '尋找親子友善飯店，希望有泳池', status: '招募中', offers: 5 }
+];
+
 export default function DashboardPage() {
   // 狀態管理
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -79,7 +95,7 @@ export default function DashboardPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // 案源管理相關狀態
+  // 案源管理相關狀態 (業者)
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
@@ -91,6 +107,17 @@ export default function DashboardPage() {
     valueBreakdown: '',
     requirements: '',
     spots: 1
+  });
+
+  // 許願行程相關狀態 (創作者)
+  const [showCreateTripModal, setShowCreateTripModal] = useState(false);
+  const [trips, setTrips] = useState<TripData[]>([]);
+  const [newTrip, setNewTrip] = useState({
+    destination: '',
+    dates: '',
+    partySize: '1人',
+    purpose: '',
+    needs: ''
   });
 
   // 金流付款相關狀態
@@ -121,31 +148,43 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  // 2. 監聽 Firestore 案源實時資料
+  // 2. 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
 
+    // 監聽案源 (Projects)
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
       if (snapshot.empty) {
-        // 如果資料庫是空的，自動植入初始案源資料
         MOCK_PROJECTS.forEach(p => setDoc(doc(projectsCol, String(p.id)), p));
       } else {
         const data = snapshot.docs.map(d => d.data() as ProjectData);
-        // 依據 ID (時間戳或數字) 排序，確保最新的在最上面
         setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
       }
     }, (err) => console.error("無法讀取案源資料:", err));
 
-    return () => unsubProjects();
+    // 監聽許願行程 (Trips)
+    const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
+    const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
+      if (snapshot.empty) {
+        MOCK_TRIPS.forEach(t => setDoc(doc(tripsCol, String(t.id)), t));
+      } else {
+        const data = snapshot.docs.map(d => d.data() as TripData);
+        setTrips(data.sort((a, b) => b.id.localeCompare(a.id))); // 依ID降序
+      }
+    }, (err) => console.error("無法讀取行程資料:", err));
+
+    return () => {
+      unsubProjects();
+      unsubTrips();
+    };
   }, [fbUser, isLoggedIn]);
 
-  // 將新案源寫入 Firebase
+  // 將新案源寫入 Firebase (業者)
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!db || !fbUser) return;
 
-    // 使用當下時間戳作為唯一 ID
     const newId = Date.now().toString();
     const projectToSave: ProjectData = {
       id: newId,
@@ -166,7 +205,6 @@ export default function DashboardPage() {
       const projectRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId);
       await setDoc(projectRef, projectToSave);
       setShowCreateModal(false);
-      // 重置表單
       setNewProject({ ...newProject, title: '', totalValue: '', valueBreakdown: '', requirements: '' });
     } catch (err) {
       console.error("新增案源失敗:", err);
@@ -174,13 +212,40 @@ export default function DashboardPage() {
     }
   };
 
+  // 將新許願行程寫入 Firebase (創作者)
+  const handleCreateTrip = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!db || !fbUser) return;
+
+    const newId = `t${Date.now()}`;
+    const tripToSave: TripData = {
+      id: newId,
+      creatorName: '林小美', // 模擬當前創作者名稱
+      destination: newTrip.destination,
+      dates: newTrip.dates,
+      partySize: newTrip.partySize,
+      purpose: newTrip.purpose,
+      needs: newTrip.needs,
+      status: '招募中',
+      offers: 0
+    };
+
+    try {
+      const tripRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'trips', newId);
+      await setDoc(tripRef, tripToSave);
+      setShowCreateTripModal(false);
+      setNewTrip({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
+    } catch (err) {
+      console.error("新增行程失敗:", err);
+      alert("新增行程失敗，請重試。");
+    }
+  };
+
   // 處理金流付款程序
   const handlePaymentSubmit = async () => {
     setPaymentStep('processing');
     
-    // 模擬 API 處理延遲
     setTimeout(async () => {
-      // 成功後將交易寫入 Firestore (讓 Admin 後台可以即時看到)
       if (db && fbUser && purchaseItem) {
         try {
           const newTxId = `TX-${Date.now().toString().slice(-6)}`;
@@ -228,7 +293,6 @@ export default function DashboardPage() {
           </div>
           
           <div className="md:w-1/2 p-12 flex flex-col justify-center">
-             {/* 加入返回首頁的按鈕 */}
             <div className="mb-8">
               <Link href="/" className="text-sm font-bold text-slate-400 hover:text-sky-600 transition-colors">
                 &larr; 返回前台首頁
@@ -444,116 +508,147 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* --- 新增案源 Modal (寫入 Firebase) --- */}
+            {/* --- 新增案源 Modal (寫入 Firebase) 包含互惠詳情與相簿 --- */}
             {showCreateModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+                <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <h3 className="font-bold text-xl text-slate-900">發布新案源 (Cloud Sync)</h3>
+                    <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
+                      <ListPlus size={20} className="text-sky-500"/> 發布新案源 (Cloud Sync)
+                    </h3>
                     <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                       <X size={24} />
                     </button>
                   </div>
                   
                   <div className="p-6 overflow-y-auto">
-                    <form className="space-y-4" onSubmit={handleCreateProject}>
+                    <form className="space-y-6" onSubmit={handleCreateProject}>
+                      
+                      {/* Section 1: 基本設定 */}
                       <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">案源標題</label>
-                        <input 
-                          type="text" 
-                          required
-                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none" 
-                          placeholder="例如：海景房開箱體驗招募"
-                          value={newProject.title}
-                          onChange={(e) => setNewProject({...newProject, title: e.target.value})}
-                        />
-                      </div>
+                        <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-sky-500 pl-2">基本設定</h4>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">案源標題</label>
+                            <input 
+                              type="text" 
+                              required
+                              className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" 
+                              placeholder="例如：海景房開箱體驗招募"
+                              value={newProject.title}
+                              onChange={(e) => setNewProject({...newProject, title: e.target.value})}
+                            />
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">類別</label>
+                              <select 
+                                className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm"
+                                value={newProject.category}
+                                onChange={(e) => setNewProject({...newProject, category: e.target.value})}
+                              >
+                                <option>住宿</option>
+                                <option>餐飲</option>
+                                <option>體驗</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">地點</label>
+                              <div className="flex items-center relative">
+                                 <MapPin size={16} className="absolute left-3 text-slate-400"/>
+                                 <input 
+                                   type="text" 
+                                   className="w-full pl-9 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm"
+                                   placeholder="例如：屏東恆春"
+                                   value={newProject.location}
+                                   onChange={(e) => setNewProject({...newProject, location: e.target.value})}
+                                 />
+                              </div>
+                            </div>
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">類別</label>
-                          <select 
-                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                            value={newProject.category}
-                            onChange={(e) => setNewProject({...newProject, category: e.target.value})}
-                          >
-                            <option>住宿</option>
-                            <option>餐飲</option>
-                            <option>體驗</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">合作模式</label>
-                          <select 
-                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                            value={newProject.type}
-                            onChange={(e) => setNewProject({...newProject, type: e.target.value})}
-                          >
-                            <option>互惠體驗</option>
-                            <option>付費推廣</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">地點</label>
-                        <div className="flex items-center relative">
-                           <MapPin size={16} className="absolute left-3 text-slate-400"/>
-                           <input 
-                             type="text" 
-                             className="w-full pl-9 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                             value={newProject.location}
-                             onChange={(e) => setNewProject({...newProject, location: e.target.value})}
-                           />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">總價值</label>
-                          <input 
-                            type="text" 
-                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                            placeholder="NT$ 8,800"
-                            value={newProject.totalValue}
-                            onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">開放名額</label>
-                          <input 
-                            type="number" 
-                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                            value={newProject.spots}
-                            onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})}
-                          />
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
+                            <div className="grid grid-cols-5 gap-3">
+                              <div className="aspect-square bg-slate-50 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400">
+                                <Plus size={24} />
+                              </div>
+                              {/* 模擬的已上傳相片 placeholder */}
+                              <div className="aspect-square bg-slate-200 rounded-lg"></div>
+                              <div className="aspect-square bg-slate-200 rounded-lg"></div>
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">建議上傳 3-5 張環境照片以吸引創作者</p>
+                          </div>
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">價值拆解 (住宿+餐飲...)</label>
-                        <input 
-                          type="text" 
-                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                          placeholder="例如：住宿($3000) + 餐飲($1000)"
-                          value={newProject.valueBreakdown}
-                          onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-bold text-slate-700 mb-1">內容需求</label>
-                        <textarea 
-                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none h-24 resize-none"
-                          placeholder="例如：IG 貼文 1 則 + 限動 3 則..."
-                          value={newProject.requirements}
-                          onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}
-                        ></textarea>
-                      </div>
-
+                      {/* Section 2: 互惠合作詳情 */}
                       <div className="pt-2">
-                        <button type="submit" className="w-full py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                          立即同步發布
+                        <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-indigo-500 pl-2">互惠合作詳情</h4>
+                        <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">合作模式</label>
+                              <select 
+                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                value={newProject.type}
+                                onChange={(e) => setNewProject({...newProject, type: e.target.value})}
+                              >
+                                <option>互惠體驗</option>
+                                <option>付費推廣</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">開放名額</label>
+                              <input 
+                                type="number" min="1"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                value={newProject.spots}
+                                onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值 (前台顯示金額)</label>
+                              <input 
+                                type="text" 
+                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600 placeholder:font-normal"
+                                placeholder="例如：NT$ 8,800"
+                                value={newProject.totalValue}
+                                onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解 (請用 + 號分隔)</label>
+                              <input 
+                                type="text" 
+                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
+                                placeholder="例如：住宿($6800) + 早餐($800)"
+                                value={newProject.valueBreakdown}
+                                onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">交付內容需求</label>
+                            <textarea 
+                              className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
+                              placeholder="例如：IG 貼文 1 則 + 限動 3 則 (需標記地點)..."
+                              value={newProject.requirements}
+                              onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}
+                            ></textarea>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-200">
+                        <button type="submit" className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
+                          <CheckCircle2 size={18} /> 立即同步發布
                         </button>
                       </div>
                     </form>
@@ -566,17 +661,19 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">我的應徵紀錄</h2>
             <div className="grid gap-4">
-              <div className="bg-white p-6 rounded-xl border border-slate-200 flex items-center justify-between">
+              <div className="bg-white p-6 rounded-xl border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center"><Briefcase size={20} className="text-slate-500"/></div>
+                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center">
+                    <Briefcase size={20} />
+                  </div>
                   <div>
-                    <h3 className="font-bold text-slate-900">海景房開箱體驗</h3>
+                    <h3 className="font-bold text-slate-900">海景房開箱體驗招募</h3>
                     <p className="text-sm text-slate-500">海角七號民宿 • 屏東恆春</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">審核中</span>
-                  <p className="text-xs text-slate-400 mt-1">2 天前申請</p>
+                  <p className="text-xs text-slate-400 mt-2">2 天前申請</p>
                 </div>
               </div>
             </div>
@@ -588,38 +685,152 @@ export default function DashboardPage() {
         return role === 'business' ? (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <p className="text-sm text-slate-600">暫無邀請記錄</p>
+            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+              <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
+              <button className="mt-3 text-sm text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</button>
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">我的許願行程</h2>
-              <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700">
+              <button 
+                onClick={() => setShowCreateTripModal(true)}
+                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-md active:scale-95 transition-all"
+              >
                 <Plus size={16}/> 發布新行程
               </button>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6">
-               <div className="flex-1">
-                 <div className="flex items-center gap-2 mb-2">
-                   <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">招募中</span>
-                   <h3 className="text-lg font-bold text-slate-900">宜蘭礁溪親子遊</h3>
+            
+            {/* 創作者行程列表 (連接 Firebase) */}
+            <div className="grid grid-cols-1 gap-6">
+               {trips.length > 0 ? (
+                 trips.map(trip => (
+                  <div key={trip.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          trip.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {trip.status}
+                        </span>
+                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                          <MapPin size={18} className="text-indigo-500" />
+                          {trip.destination}
+                        </h3>
+                      </div>
+                      
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg inline-flex border border-slate-100">
+                        <span className="flex items-center gap-1"><Calendar size={14} className="text-slate-400"/> {trip.dates}</span>
+                        <span className="text-slate-300">|</span>
+                        <span className="flex items-center gap-1"><Users size={14} className="text-slate-400"/> {trip.partySize}</span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <p className="text-sm text-slate-700"><span className="text-xs font-bold text-slate-400 mr-2 bg-slate-100 px-1.5 py-0.5 rounded">目的</span> {trip.purpose}</p>
+                        <p className="text-sm text-slate-700"><span className="text-xs font-bold text-slate-400 mr-2 bg-slate-100 px-1.5 py-0.5 rounded">許願</span> {trip.needs}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center items-center min-w-[150px]">
+                      <p className="text-xs text-slate-500 mb-1">目前收到</p>
+                      <p className="text-4xl font-black text-indigo-600 mb-1">{trip.offers}</p>
+                      <p className="text-xs text-slate-500 font-medium">間廠商邀請</p>
+                      <button className="mt-4 w-full py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors">查看邀請</button>
+                    </div>
+                  </div>
+                 ))
+               ) : (
+                 <div className="bg-white rounded-xl border border-slate-200 p-12 text-center flex flex-col items-center">
+                    <Plane size={32} className="text-slate-300 mb-3" />
+                    <p className="font-bold text-slate-700">尚未發布任何行程</p>
+                    <p className="text-sm text-slate-500 mt-1">主動告訴廠商您的旅遊計畫，獲取更多專屬贊助機會！</p>
                  </div>
-                 <p className="text-sm text-slate-500 mb-4"><Calendar size={14} className="inline mr-1"/> 2024/05/20 - 05/22</p>
-                 <div className="flex items-center gap-2 text-sm text-slate-600">
-                   <Users size={16}/> 2大2小
-                   <span className="text-slate-300">|</span>
-                   <MapPin size={16}/> 尋找親子友善飯店
-                 </div>
-               </div>
-               <div className="flex-shrink-0 border-l border-slate-100 pl-6 flex flex-col justify-center items-center min-w-[150px]">
-                 <p className="text-xs text-slate-500 mb-1">目前收到</p>
-                 <p className="text-3xl font-bold text-indigo-600 mb-2">5</p>
-                 <p className="text-xs text-slate-500">間廠商邀請</p>
-                 <button className="mt-3 w-full py-2 bg-indigo-50 text-indigo-600 text-xs font-bold rounded hover:bg-indigo-100">查看邀請</button>
-               </div>
+               )}
             </div>
+
+            {/* --- 新增許願行程 Modal (寫入 Firebase) --- */}
+            {showCreateTripModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
+                      <Plane size={20} className="text-indigo-500" /> 發布許願行程
+                    </h3>
+                    <button onClick={() => setShowCreateTripModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={24} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 overflow-y-auto">
+                    <form className="space-y-4" onSubmit={handleCreateTrip}>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">目的地 (城市/區域)</label>
+                        <input 
+                          type="text" required
+                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium" 
+                          placeholder="例如：宜蘭礁溪、台南中西區"
+                          value={newTrip.destination}
+                          onChange={(e) => setNewTrip({...newTrip, destination: e.target.value})}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1">預計日期</label>
+                          <input 
+                            type="text" required
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
+                            placeholder="例如：2024/07/15 - 07/17"
+                            value={newTrip.dates}
+                            onChange={(e) => setNewTrip({...newTrip, dates: e.target.value})}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1">隨行人數</label>
+                          <input 
+                            type="text" required
+                            className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
+                            placeholder="例如：2大1小、單人"
+                            value={newTrip.partySize}
+                            onChange={(e) => setNewTrip({...newTrip, partySize: e.target.value})}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">行程目的 (將產出什麼內容？)</label>
+                        <textarea 
+                          required
+                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
+                          placeholder="例如：家庭暑假旅遊，預計會拍攝兩支短影音介紹親子友善設施。"
+                          value={newTrip.purpose}
+                          onChange={(e) => setNewTrip({...newTrip, purpose: e.target.value})}
+                        ></textarea>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">許願需求 (希望廠商提供什麼？)</label>
+                        <textarea 
+                          required
+                          className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
+                          placeholder="例如：尋求有溫泉設施的飯店住宿贊助兩晚，或周邊親子餐廳體驗。"
+                          value={newTrip.needs}
+                          onChange={(e) => setNewTrip({...newTrip, needs: e.target.value})}
+                        ></textarea>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-100">
+                        <button type="submit" className="w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 active:scale-95 transition-all flex justify-center items-center gap-2">
+                          確認發布
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -763,101 +974,74 @@ export default function DashboardPage() {
            <div className="space-y-6">
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">編輯商家檔案 (Business Profile)</h2>
-               <button className="hidden sm:flex bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-indigo-700">
+               <button 
+                 onClick={() => alert("儲存成功！")}
+                 className="hidden sm:flex bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-slate-800 transition-colors shadow-sm"
+               >
                  <Save size={16}/> 儲存變更
                </button>
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-               <div className="lg:col-span-2 space-y-6">
+               <div className="lg:col-span-1 space-y-6">
+                 {/* 移除了環境相簿，僅保留封面圖 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 商家封面圖</h3>
-                   <div className="relative h-48 bg-slate-100 rounded-lg mb-6 flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
+                   <div className="relative h-48 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
                      <div className="text-center text-slate-400">
                        <Upload size={24} className="mx-auto mb-2"/>
-                       <span className="text-sm">點擊上傳封面大圖</span>
+                       <span className="text-sm font-bold">點擊上傳封面大圖</span>
                      </div>
-                   </div>
-                   
-                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 環境相簿 (Gallery)</h3>
-                   <div className="grid grid-cols-3 gap-4">
-                     {[1, 2, 3, 4, 5, 6].map((i) => (
-                       <div key={i} className="aspect-square bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
-                         <Plus size={24} className="text-slate-400"/>
-                       </div>
-                     ))}
                    </div>
                  </div>
                </div>
 
-               <div className="space-y-6">
-                 <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
-                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 基本資料</h3>
+               <div className="lg:col-span-2 space-y-6">
+                 <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-5">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 基本資料設定</h3>
                    
-                   <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">商家名稱</label>
-                     <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="海角七號民宿" />
-                   </div>
-                   
-                   <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">所在地 (縣市/區域)</label>
-                     <div className="flex items-center relative">
-                        <MapPin size={16} className="absolute left-3 text-slate-400"/>
-                        <input type="text" className="w-full pl-9 p-2 border border-slate-300 rounded-lg" defaultValue="屏東縣恆春鎮" />
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">商家名稱</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="海角七號民宿" />
                      </div>
-                   </div>
-
-                   <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">類別</label>
-                     <select className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="住宿">
-                        <option>住宿</option>
-                        <option>餐飲</option>
-                        <option>體驗</option>
-                     </select>
-                   </div>
-
-                   <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">標籤 (用逗號分隔)</label>
-                     <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="海景, 早餐, 寵物友善" />
-                   </div>
-
-                   <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">關於商家 (Description)</label>
-                     <textarea className="w-full p-2 border border-slate-300 rounded-lg h-32 resize-none" defaultValue="位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景..."></textarea>
-                   </div>
-
-                   <div className="pt-6 mt-2 border-t border-slate-100">
-                     <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18}/> 互惠合作詳情</h3>
                      
-                     <div className="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">合作總價值</label>
-                          <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="NT$ 8,800" />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold text-slate-700 mb-1">開放名額</label>
-                          <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue={1} />
-                        </div>
-                     </div>
-
-                     <div className="mb-4">
-                       <label className="block text-sm font-bold text-slate-700 mb-1">價值拆解 (請用 + 號分隔)</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="海景房住宿($6800) + 早餐($800) + 接送($1200)" />
-                       <p className="text-xs text-slate-500 mt-1">例如：住宿($3000) + 餐飲($1000)</p>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">所在地 (縣市/區域)</label>
+                       <div className="flex items-center relative">
+                          <MapPin size={16} className="absolute left-3 text-slate-400"/>
+                          <input type="text" className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="屏東縣恆春鎮" />
+                       </div>
                      </div>
 
                      <div>
-                       <label className="block text-sm font-bold text-slate-700 mb-1">內容需求</label>
-                       <textarea className="w-full p-2 border border-slate-300 rounded-lg h-24 resize-none" defaultValue="IG 貼文 1 則 + 限動 3 則 (需標記地點)"></textarea>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">主營類別</label>
+                       <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                          <option>住宿</option>
+                          <option>餐飲</option>
+                          <option>體驗</option>
+                       </select>
+                     </div>
+
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">特色標籤 (用逗號分隔)</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="海景, 早餐, 寵物友善" />
                      </div>
                    </div>
 
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">關於商家 (品牌介紹)</label>
+                     <textarea className="w-full p-3 border border-slate-300 rounded-lg h-32 resize-none text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景。我們致力於提供旅人最放鬆的度假體驗..."></textarea>
+                   </div>
                  </div>
                </div>
              </div>
 
              <div className="block sm:hidden mt-6 pb-6">
-                <button className="w-full bg-indigo-600 text-white px-4 py-3 rounded-xl text-base font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg">
+                <button 
+                  onClick={() => alert("儲存成功！")}
+                  className="w-full bg-slate-900 text-white px-4 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-800 shadow-lg"
+                >
                   <Save size={18}/> 儲存所有變更
                 </button>
              </div>
@@ -866,7 +1050,10 @@ export default function DashboardPage() {
            <div className="space-y-6">
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">編輯履歷 (Media Kit)</h2>
-               <button className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700">
+               <button 
+                 onClick={() => alert("履歷更新成功！")}
+                 className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-sm"
+               >
                  <Save size={16}/> 儲存變更
                </button>
              </div>
@@ -878,7 +1065,7 @@ export default function DashboardPage() {
                    <div className="relative h-48 bg-slate-100 rounded-lg mb-4 flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
                      <div className="text-center text-slate-400">
                        <Upload size={24} className="mx-auto mb-2"/>
-                       <span className="text-sm">點擊上傳封面圖</span>
+                       <span className="text-sm font-bold">點擊上傳封面圖</span>
                      </div>
                    </div>
                    <div className="flex items-center gap-4">
@@ -896,25 +1083,25 @@ export default function DashboardPage() {
                    <h3 className="font-bold text-slate-900 mb-4">基本資料</h3>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
-                       <label className="block text-sm font-bold text-slate-700 mb-1">顯示名稱</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="林小美" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">顯示名稱</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" defaultValue="林小美" />
                      </div>
                      <div>
-                       <label className="block text-sm font-bold text-slate-700 mb-1">Handle (ID)</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="@may_travel" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">Handle (ID)</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" defaultValue="@may_travel" />
                      </div>
                      <div>
-                       <label className="block text-sm font-bold text-slate-700 mb-1">所在地</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="台北市" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">所在地</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" defaultValue="台北市" />
                      </div>
                      <div>
-                       <label className="block text-sm font-bold text-slate-700 mb-1">風格標籤 (用逗號分隔)</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="旅遊, 美食, 親子" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">風格標籤 (用逗號分隔)</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" defaultValue="旅遊, 美食, 親子" />
                      </div>
                    </div>
                    <div>
-                     <label className="block text-sm font-bold text-slate-700 mb-1">個人簡介 (Bio)</label>
-                     <textarea className="w-full p-2 border border-slate-300 rounded-lg h-24 resize-none" defaultValue="專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。"></textarea>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">個人簡介 (Bio)</label>
+                     <textarea className="w-full p-3 border border-slate-300 rounded-lg h-24 resize-none text-sm outline-none focus:ring-2 focus:ring-indigo-500" defaultValue="專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。"></textarea>
                    </div>
                  </div>
 
@@ -922,7 +1109,7 @@ export default function DashboardPage() {
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 作品集展示</h3>
                    <div className="grid grid-cols-3 gap-4">
                      {[1, 2, 3].map((i) => (
-                       <div key={i} className="aspect-square bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
+                       <div key={i} className="aspect-square bg-slate-50 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100">
                          <Plus size={24} className="text-slate-400"/>
                        </div>
                      ))}
@@ -931,38 +1118,38 @@ export default function DashboardPage() {
                </div>
 
                <div className="space-y-6">
-                 <div className="bg-white p-6 rounded-xl border border-slate-200">
-                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18}/> 參考報價 (NT$)</h3>
-                   <div className="space-y-3">
+                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18} className="text-green-600"/> 參考報價 (NT$)</h3>
+                   <div className="space-y-4">
                      <div>
-                       <label className="block text-xs font-bold text-slate-600 mb-1">圖文貼文 (Post)</label>
-                       <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue={5000} />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">圖文貼文 (Post)</label>
+                       <input type="number" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 outline-none" defaultValue={5000} />
                      </div>
                      <div>
-                       <label className="block text-xs font-bold text-slate-600 mb-1">限時動態 (Story)</label>
-                       <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue={1500} />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">限時動態 (Story)</label>
+                       <input type="number" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 outline-none" defaultValue={1500} />
                      </div>
                      <div>
-                       <label className="block text-xs font-bold text-slate-600 mb-1">Reels 短影音</label>
-                       <input type="number" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue={8000} />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">Reels 短影音</label>
+                       <input type="number" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm font-bold text-slate-700 outline-none" defaultValue={8000} />
                      </div>
                    </div>
                  </div>
 
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
-                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart3 size={18}/> 受眾概況</h3>
-                   <div className="space-y-3">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart3 size={18} className="text-indigo-500"/> 受眾概況</h3>
+                   <div className="space-y-4">
                      <div>
-                       <label className="block text-xs font-bold text-slate-600 mb-1">性別分佈</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="女性 85%" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">性別分佈</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none" defaultValue="女性 85%" />
                      </div>
                      <div>
-                       <label className="block text-xs font-bold text-slate-600 mb-1">主力年齡層</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="25-34歲" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">主力年齡層</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none" defaultValue="25-34歲" />
                      </div>
                      <div>
-                       <label className="block text-xs font-bold text-slate-600 mb-1">熱門城市</label>
-                       <input type="text" className="w-full p-2 border border-slate-300 rounded-lg" defaultValue="台北/新北" />
+                       <label className="block text-xs font-bold text-slate-500 mb-1">熱門城市</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm outline-none" defaultValue="台北/新北" />
                      </div>
                    </div>
                  </div>
