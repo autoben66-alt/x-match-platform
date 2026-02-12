@@ -59,15 +59,12 @@ interface TripData {
 interface InvitationData {
   id: string; fromName: string; toName: string; toHandle: string; toAvatar: string;
   message: string; status: string; date: string;
-  projectId?: string; projectTitle?: string; projectValue?: string; // 新增案源綁定欄位
+  projectId?: string; projectTitle?: string; projectValue?: string; 
 }
 
 interface PaymentItem {
   id: string; name: string; price: number; type: 'subscription' | 'one-time';
 }
-
-const MOCK_PROJECTS: ProjectData[] = [];
-const MOCK_TRIPS: TripData[] = [];
 
 export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -89,6 +86,10 @@ export default function DashboardPage() {
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
+  
+  // ✨ 點開案源詳情相關狀態
+  const [viewProject, setViewProject] = useState<ProjectData | null>(null);
+  const [activeImage, setActiveImage] = useState<string>('');
 
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
@@ -255,7 +256,6 @@ export default function DashboardPage() {
     finally { setIsSavingProfile(false); }
   };
 
-  // --- 更新邀請狀態 (創作者操作) ---
   const handleUpdateInviteStatus = async (invId: string, newStatus: string) => {
     if (!db) return;
     try {
@@ -265,6 +265,18 @@ export default function DashboardPage() {
     } catch (e) {
       console.error("更新狀態失敗:", e);
       alert("更新狀態失敗，請稍後再試。");
+    }
+  };
+
+  // ✨ 點擊開啟案源詳情 Modal
+  const handleViewProject = (projectId?: string) => {
+    if (!projectId) return;
+    const proj = projects.find(p => p.id === projectId);
+    if (proj) {
+      setViewProject(proj);
+      setActiveImage(proj.image || (proj.gallery && proj.gallery.length > 0 ? proj.gallery[0] : ''));
+    } else {
+      alert("此案源已關閉或被移除。");
     }
   };
 
@@ -295,7 +307,7 @@ export default function DashboardPage() {
             <div className="relative z-10">
               <h1 className="text-4xl font-extrabold mb-4">X-Match</h1>
               <p className="text-lg text-slate-200 mb-8">
-                {authMode === 'login' ? '連結在地旅宿與優質創作者，開啟您的互惠旅程。' : '加入全台最大互惠平台，立即開始媒合。'}
+                連結在地旅宿與優質創作者，開啟您的互惠旅程。
               </p>
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -661,7 +673,7 @@ export default function DashboardPage() {
           </div>
         );
 
-      // ✨ 新增的 invitations 區塊，負責處理雙方對於「邀請」的檢視
+      // ✨ invitations 區塊，負責處理雙方對於「邀請」的檢視，並加入可點擊的案源卡片
       case 'invitations':
         if (role === 'business') {
           return (
@@ -679,12 +691,17 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="md:w-2/3 flex flex-col justify-center">
-                         {/* 案源小卡 */}
+                         {/* 案源小卡 (可點擊) */}
                          {inv.projectTitle && (
-                           <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold">
-                             <Briefcase size={16} /> 附件案源：{inv.projectTitle}
-                             {inv.projectValue && <span className="ml-auto text-xs bg-white px-2 py-0.5 rounded text-indigo-600 border border-indigo-100">{inv.projectValue}</span>}
-                           </div>
+                           <button 
+                             onClick={() => handleViewProject(inv.projectId)}
+                             className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group"
+                           >
+                             <Briefcase size={16} className="shrink-0" /> 
+                             <span className="truncate">附件案源：{inv.projectTitle}</span>
+                             <span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
+                             {inv.projectValue && <span className="ml-auto shrink-0 text-xs bg-white px-2 py-0.5 rounded text-indigo-600 border border-indigo-100">{inv.projectValue}</span>}
+                           </button>
                          )}
 
                          <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
@@ -738,12 +755,17 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="md:w-3/4 flex flex-col justify-center">
-                         {/* 案源小卡 */}
+                         {/* 案源小卡 (可點擊) */}
                          {inv.projectTitle && (
-                           <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold">
-                             <Briefcase size={16} /> 附件案源：{inv.projectTitle}
-                             {inv.projectValue && <span className="ml-auto text-xs bg-white px-2 py-0.5 rounded text-indigo-600 border border-indigo-100">{inv.projectValue}</span>}
-                           </div>
+                           <button 
+                             onClick={() => handleViewProject(inv.projectId)}
+                             className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group"
+                           >
+                             <Briefcase size={16} className="shrink-0" /> 
+                             <span className="truncate">附件案源：{inv.projectTitle}</span>
+                             <span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
+                             {inv.projectValue && <span className="ml-auto shrink-0 text-xs bg-white px-2 py-0.5 rounded text-indigo-600 border border-indigo-100">{inv.projectValue}</span>}
+                           </button>
                          )}
                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700 mb-4 whitespace-pre-wrap leading-relaxed">
                            {inv.message}
@@ -751,7 +773,6 @@ export default function DashboardPage() {
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
                            <div className="flex gap-2">
-                             {/* 透過 onClick 調用資料庫更新邏輯 */}
                              {(inv.status === '待回覆' || inv.status === '招募中') ? (
                                <>
                                  <button onClick={() => handleUpdateInviteStatus(inv.id, '已婉拒')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
@@ -780,7 +801,6 @@ export default function DashboardPage() {
         }
 
       case 'trips':
-        // 現在 trips 只有創作者會有這個選單項目 (我的許願行程)
         return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
@@ -1228,6 +1248,18 @@ export default function DashboardPage() {
     }
   };
 
+  // 點擊開啟案源詳情 Modal 的函式 (供發出的邀請與收到的邀請使用)
+  const handleViewProject = (projectId?: string) => {
+    if (!projectId) return;
+    const proj = projects.find(p => p.id === projectId);
+    if (proj) {
+      setViewProject(proj);
+      setActiveImage(proj.image || (proj.gallery && proj.gallery.length > 0 ? proj.gallery[0] : ''));
+    } else {
+      alert("此案源可能已關閉或被移除。");
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col overflow-y-auto m-0 p-0 font-sans">
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
@@ -1252,7 +1284,8 @@ export default function DashboardPage() {
             ))}
           </nav>
         </div>
-        <div className="flex-1 pb-32">
+        <div className="flex-1 pb-32 relative">
+          
           {/* 金流 Modal */}
           {purchaseItem && (
             <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
@@ -1280,6 +1313,69 @@ export default function DashboardPage() {
             </div>
           )}
           
+          {/* 案源詳情 Modal */}
+          {viewProject && (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
+                <button onClick={() => setViewProject(null)} className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"><X size={20} /></button>
+                
+                <div className="relative h-64 sm:h-72 shrink-0 bg-slate-200">
+                  <img src={activeImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} className="w-full h-full object-cover transition-opacity duration-300" alt="Cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                  {viewProject.gallery && viewProject.gallery.length > 0 && (
+                    <div className="absolute bottom-4 left-4 flex gap-2 overflow-x-auto max-w-[calc(100%-2rem)]">
+                      {viewProject.gallery.map((img, i) => (
+                        <img key={i} src={img} onClick={() => setActiveImage(img)} className={`w-16 h-12 object-cover rounded-md border-2 cursor-pointer transition-colors ${activeImage === img ? 'border-indigo-500' : 'border-white/50 hover:border-white'}`} alt="Gallery" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="p-6 sm:p-8 flex-grow bg-slate-50/50">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${viewProject.type === '付費推廣' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700'}`}>{viewProject.type}</span>
+                        <span className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} /> {viewProject.location}</span>
+                      </div>
+                      <h2 className="text-2xl font-bold text-slate-900 mb-2">{viewProject.title}</h2>
+                      <div className="flex gap-2">
+                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">{viewProject.category}</span>
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right w-full sm:w-auto bg-white sm:bg-transparent p-4 sm:p-0 rounded-xl border sm:border-0 border-slate-100">
+                      <p className="text-xs text-slate-500 mb-1">合作總價值</p>
+                      <p className="text-2xl font-black text-indigo-600">{viewProject.totalValue}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm"><DollarSign size={18} className="text-green-600"/> 互惠價值詳情</h4>
+                      <ul className="space-y-3 text-sm text-slate-600">
+                        {viewProject.valueBreakdown?.split('+').map((item, i) => (
+                          <li key={i} className="flex items-start gap-2"><CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0"/><span className="font-medium">{item.trim()}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm"><Camera size={18} className="text-blue-600"/> 內容需求</h4>
+                      <p className="text-sm text-slate-600 mb-4 leading-relaxed font-medium">{viewProject.requirements}</p>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <Users size={16} className="text-indigo-500"/>
+                        <span>剩餘 <span className="text-indigo-600 text-base">{viewProject.spots || 0}</span> 個名額</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
+                   <button onClick={() => setViewProject(null)} className="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉詳情</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {renderContent()}
         </div>
       </div>
