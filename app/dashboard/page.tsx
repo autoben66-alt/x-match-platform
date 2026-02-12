@@ -13,6 +13,7 @@ import {
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 // --- Firebase 初始化 (終極防護版) ---
 const firebaseConfig = {
@@ -27,12 +28,14 @@ const firebaseConfig = {
 let app: any = null;
 let auth: any = null;
 let db: any = null;
+let storage: any = null;
 
 if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
+    storage = getStorage(app);
   } catch (error) {
     console.error("Firebase 初始化失敗:", error);
   }
@@ -123,6 +126,9 @@ export default function DashboardPage() {
     needs: ''
   });
 
+  // 新增：照片上傳的載入狀態
+  const [isUploading, setIsUploading] = useState(false);
+
   // 金流付款相關狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
@@ -183,16 +189,39 @@ export default function DashboardPage() {
     };
   }, [fbUser, isLoggedIn]);
 
-  // 模擬上傳照片邏輯
-  const handleAddPhoto = () => {
-    const mockImages = [
-      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
-    ];
-    const randomImg = mockImages[Math.floor(Math.random() * mockImages.length)];
-    setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, randomImg] }));
+  // 處理真實照片上傳至 Firebase Storage
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (!storage || !fbUser) {
+      alert("Storage 尚未準備好或身分驗證未完成，請稍後再試。");
+      return;
+    }
+
+    setIsUploading(true);
+    const uploadedUrls: string[] = [];
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        // 建立 Storage 參照路徑 (對應 artifacts 規則)
+        const fileRef = ref(storage, `artifacts/${internalAppId}/public/data/images/${Date.now()}_${file.name}`);
+        const uploadTask = await uploadBytesResumable(fileRef, file);
+        const downloadURL = await getDownloadURL(uploadTask.ref);
+        uploadedUrls.push(downloadURL);
+      }
+      
+      setNewProject(prev => ({ 
+        ...prev, 
+        gallery: [...prev.gallery, ...uploadedUrls] 
+      }));
+    } catch (error) {
+      console.error("上傳失敗:", error);
+      alert("照片上傳失敗，請確認 Firebase Storage 已開啟並設定為測試模式。");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleRemovePhoto = (indexToRemove: number) => {
@@ -614,17 +643,28 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          {/* 新增上傳照片功能 */}
+                          {/* 真實照片上傳功能 */}
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
                             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-                              <button 
-                                type="button" 
-                                onClick={handleAddPhoto} 
-                                className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors"
-                              >
-                                <Plus size={24} />
-                              </button>
+                              <label className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors">
+                                {isUploading ? (
+                                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                                ) : (
+                                  <>
+                                    <Plus size={24} />
+                                    <span className="text-[10px] mt-1 font-bold">選擇照片</span>
+                                  </>
+                                )}
+                                <input 
+                                  type="file" 
+                                  multiple 
+                                  accept="image/*" 
+                                  className="hidden" 
+                                  onChange={handleFileUpload} 
+                                  disabled={isUploading}
+                                />
+                              </label>
                               {newProject.gallery.map((img, idx) => (
                                 <div key={idx} className="shrink-0 w-20 h-20 bg-slate-200 rounded-lg overflow-hidden relative group">
                                   <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
@@ -638,7 +678,7 @@ export default function DashboardPage() {
                                 </div>
                               ))}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">點擊 + 號可模擬上傳照片 (首張照片將自動設為前台封面)</p>
+                            <p className="text-[10px] text-slate-400 mt-1">支援多圖上傳，第一張將預設為前台封面主圖</p>
                           </div>
                         </div>
                       </div>
