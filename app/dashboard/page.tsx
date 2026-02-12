@@ -81,6 +81,17 @@ interface PaymentItem {
   type: 'subscription' | 'one-time';
 }
 
+interface InvitationData {
+  id: string;
+  fromName: string;
+  toName: string;
+  toHandle: string;
+  toAvatar: string;
+  message: string;
+  status: string;
+  date: string;
+}
+
 const MOCK_PROJECTS: ProjectData[] = [
   { id: '1', title: '海景房開箱體驗招募', category: '住宿', type: '互惠體驗', location: '屏東恆春', totalValue: 'NT$ 8,800', valueBreakdown: '海景房住宿($6800) + 早餐($800) + 接送($1200)', requirements: 'IG 貼文 1 則 + 限動 3 則 (需標記地點)', spots: 1, status: '招募中', applicants: 12, date: '2024/06/01' },
   { id: '2', title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', location: '台北大安', totalValue: 'NT$ 3,000', valueBreakdown: '餐點($1000) + 車馬費($2000)', requirements: 'Reels 短影音 1 支', spots: 3, status: '已關閉', applicants: 8, date: '2024/05/15' },
@@ -127,6 +138,9 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // 邀請相關狀態
+  const [invitations, setInvitations] = useState<InvitationData[]>([]);
+
   // 金流付款相關狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
@@ -165,6 +179,13 @@ export default function DashboardPage() {
       }
     });
 
+    // 讀取邀請資料
+    const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
+    const unsubInv = onSnapshot(invCol, (snapshot) => {
+      const data = snapshot.docs.map(d => d.data() as InvitationData);
+      setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
+    });
+
     // 讀取當前創作者的履歷資料
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
@@ -183,7 +204,7 @@ export default function DashboardPage() {
       }
     });
 
-    return () => { unsubProjects(); unsubTrips(); unsubUser(); };
+    return () => { unsubProjects(); unsubTrips(); unsubUser(); unsubInv(); };
   }, [fbUser, isLoggedIn, role]);
 
   // 業者: 上傳照片
@@ -508,7 +529,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500 mb-1">收到的邀請</p>
-                    <h3 className="text-3xl font-bold text-slate-900">5 <span className="text-sm text-red-500 font-bold text-base">New!</span></h3>
+                    <h3 className="text-3xl font-bold text-slate-900">{invitations.length} <span className="text-sm text-red-500 font-bold text-base">New!</span></h3>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500 mb-1">待簽署合約</p>
@@ -523,19 +544,33 @@ export default function DashboardPage() {
                 <button className="text-sm text-sky-600 hover:underline">查看全部</button>
               </div>
               <div className="divide-y divide-slate-50">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                    <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
-                    <div>
-                      <p className="text-sm text-slate-800">
-                        {role === 'business' 
-                          ? `創作者 @user${i} 已簽署了「暑期推廣合約」，合約正式生效。` 
-                          : `廠商「海角七號民宿」向您的「蘭嶼行程」發送了合作邀請。`}
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">2 小時前</p>
+                {role === 'creator' && invitations.length > 0 ? (
+                  invitations.slice(0, 3).map((inv) => (
+                    <div key={inv.id} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
+                      <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
+                      <div>
+                        <p className="text-sm text-slate-800">
+                          廠商「{inv.fromName}」向您發送了合作邀請！
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">{inv.date}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))
+                ) : (
+                  [1, 2, 3].map((i) => (
+                    <div key={i} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
+                      <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
+                      <div>
+                        <p className="text-sm text-slate-800">
+                          {role === 'business' 
+                            ? `創作者 @user${i} 已簽署了「暑期推廣合約」，合約正式生效。` 
+                            : `廠商「海角七號民宿」向您的「蘭嶼行程」發送了合作邀請。`}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">2 小時前</p>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -812,19 +847,44 @@ export default function DashboardPage() {
         return role === 'business' ? (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
-            <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-              <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
-                <Link href="/creators" className="text-indigo-600 font-bold hover:underline">
-                  前往「找網紅」尋找適合的對象
-                </Link>
-                <span className="hidden sm:block text-slate-300">|</span>
-                <Link href="/trips" className="text-indigo-600 font-bold hover:underline">
-                  前往「行程許願池」尋找適合的對象
-                </Link>
+            {invitations.length > 0 ? (
+              <div className="grid gap-4">
+                {invitations.map((inv) => (
+                  <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                    <div className="flex items-center gap-4 md:w-1/3 shrink-0">
+                      <img src={inv.toAvatar} className="w-12 h-12 rounded-full border border-slate-200" alt="avatar" />
+                      <div>
+                        <p className="font-bold text-slate-900">{inv.toName}</p>
+                        <p className="text-xs text-slate-500">{inv.toHandle}</p>
+                      </div>
+                    </div>
+                    <div className="md:w-2/3 flex flex-col justify-center">
+                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
+                         "{inv.message}"
+                       </div>
+                       <div className="flex justify-between items-center">
+                         <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
+                         <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">{inv.status}</span>
+                       </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+                <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
+                  <Link href="/creators" className="text-indigo-600 font-bold hover:underline">
+                    前往「找網紅」尋找適合的對象
+                  </Link>
+                  <span className="hidden sm:block text-slate-300">|</span>
+                  <Link href="/trips" className="text-indigo-600 font-bold hover:underline">
+                    前往「行程許願池」尋找適合的對象
+                  </Link>
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">

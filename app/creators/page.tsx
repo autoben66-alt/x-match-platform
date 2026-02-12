@@ -9,7 +9,7 @@ import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtub
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 // --- Firebase 初始化 ---
 const firebaseConfig = {
@@ -181,17 +181,39 @@ export default function CreatorsPage() {
     setSendSuccess(false);
   };
 
-  const confirmSendInvite = () => {
+  const confirmSendInvite = async () => {
+    if (!db) {
+      alert("尚未連線至資料庫，請稍候再試。");
+      return;
+    }
     setIsSending(true);
-    // 模擬發送延遲與後端 API 請求
-    setTimeout(() => {
+
+    try {
+      const newId = `inv-${Date.now()}`;
+      const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', newId);
+      
+      await setDoc(invRef, {
+        id: newId,
+        fromName: '海角七號民宿', // 模擬業者名稱
+        toName: selectedCreator?.name || '創作者',
+        toHandle: selectedCreator?.handle || '',
+        toAvatar: selectedCreator?.avatar || '',
+        message: inviteMessage,
+        status: '待回覆',
+        date: new Date().toLocaleString('zh-TW', { hour12: false })
+      });
+
       setIsSending(false);
       setSendSuccess(true);
       // 發送成功後，2 秒後自動關閉視窗
       setTimeout(() => {
         setShowInviteModal(false);
       }, 2000);
-    }, 1200);
+    } catch (error) {
+      console.error("發送邀請失敗:", error);
+      alert("發送失敗，請確認網路連線與資料庫權限。");
+      setIsSending(false);
+    }
   };
 
   return (
