@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link'; 
+// 引入 useRouter 來處理未登入時的頁面跳轉
+import { useRouter } from 'next/navigation'; 
 import CreatorCard, { Creator } from '@/components/CreatorCard';
-import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle } from 'lucide-react';
+import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -67,12 +69,20 @@ const ENRICH_DATA = [
 ];
 
 export default function CreatorsPage() {
+  const router = useRouter(); // 使用 Next.js Router 來處理跳轉
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'relevance' | 'followers' | 'jobs' | 'engagement'>('relevance');
+  
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null); 
   const [creators, setCreators] = useState<CreatorDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- 直接發送邀請相關狀態 ---
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
 
   useEffect(() => {
     if (!db) { 
@@ -89,7 +99,6 @@ export default function CreatorsPage() {
           const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
           const isFounder = index < 50; 
           
-          // ✨ 優先讀取雲端用戶自己上傳的「真實資料」，若無則退回使用 enrich 預設資料
           const formatRates = (rates: any) => ({
             post: rates?.post ? `NT$ ${rates.post.toLocaleString()}` : enrich.rates.post,
             story: rates?.story ? `NT$ ${rates.story.toLocaleString()}` : enrich.rates.story,
@@ -146,10 +155,44 @@ export default function CreatorsPage() {
 
   const categories = [ { id: '全部', label: '全部' }, { id: '旅遊', label: '旅遊 Travel' }, { id: '美食', label: '美食 Foodie' }, { id: '親子', label: '親子 Family' }, { id: '攝影', label: '攝影 Photography' } ];
   
-  // 計算創始會員人數
   const founderCount = creators.length;
   const founderMax = 50;
   const founderPercentage = Math.min((founderCount / founderMax) * 100, 100);
+
+  // --- 發送邀請邏輯處理 ---
+  const handleOpenInvite = () => {
+    // 【身分驗證邏輯】：
+    // 在真實全端環境中，我們會檢查全域的 AuthContext (例如 fbUser)。
+    // const isLoggedIn = !!fbUser; 
+    
+    // 為了在此原型展示流暢的「已註冊」流程，我們預設開啟視窗。
+    // 若要測試「未註冊導入」功能，只要把下方模擬變數設為 false 即可觸發 router.push。
+    const simulateIsLoggedIn = true; 
+
+    if (!simulateIsLoggedIn) {
+      // 邏輯一：未登入/未註冊，導向後台登入頁
+      router.push('/dashboard');
+      return;
+    }
+
+    // 邏輯二：已登入業者，直接在當前頁面開啟發送視窗
+    setInviteMessage(`哈囉 ${selectedCreator?.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您來體驗我們的服務，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
+    setShowInviteModal(true);
+    setSendSuccess(false);
+  };
+
+  const confirmSendInvite = () => {
+    setIsSending(true);
+    // 模擬發送延遲與後端 API 請求
+    setTimeout(() => {
+      setIsSending(false);
+      setSendSuccess(true);
+      // 發送成功後，2 秒後自動關閉視窗
+      setTimeout(() => {
+        setShowInviteModal(false);
+      }, 2000);
+    }, 1200);
+  };
 
   return (
     <div className="min-h-screen bg-slate-50/50 pb-20 font-sans">
@@ -379,15 +422,89 @@ export default function CreatorsPage() {
                  >
                    <MessageCircle size={18} /> LINE 聯繫
                  </a>
-                 {/* 導向後台按鈕 */}
-                 <Link 
-                   href="/dashboard"
+                 {/* 導向發送邀請 Modal 按鈕 */}
+                 <button 
+                   onClick={handleOpenInvite}
                    className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
                  >
-                   <Mail size={18} /> 前往後台發送邀請
-                 </Link>
+                   <Mail size={18} /> 發送合作邀請
+                 </button>
                </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- 發送邀請視窗 (Direct Invite Modal) --- */}
+      {showInviteModal && selectedCreator && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+            {sendSuccess ? (
+              <div className="p-8 text-center bg-slate-50">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-180 duration-500">
+                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">邀請已成功送出！</h3>
+                <p className="text-slate-500 text-sm">
+                  {selectedCreator.name} 將會收到您的合作邀請，<br/>並透過站內訊息或 LINE 與您聯繫。
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full max-h-[90vh]">
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">發送合作邀請</h3>
+                    <p className="text-xs text-slate-500">給 {selectedCreator.name}</p>
+                  </div>
+                  <button onClick={() => setShowInviteModal(false)} className="text-slate-400 hover:text-slate-600">
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="p-6">
+                  {/* Creator Summary */}
+                  <div className="flex items-center gap-3 mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                    <img src={selectedCreator.avatar} className="w-12 h-12 rounded-full border border-white shadow-sm" alt="avatar" />
+                    <div className="flex-1">
+                       <p className="font-bold text-indigo-900">{selectedCreator.name}</p>
+                       <p className="text-xs text-indigo-600 font-medium">{selectedCreator.handle}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">
+                        邀請訊息內容
+                      </label>
+                      <textarea 
+                        value={inviteMessage}
+                        onChange={(e) => setInviteMessage(e.target.value)}
+                        className="w-full h-40 p-4 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none font-medium leading-relaxed bg-slate-50 focus:bg-white transition-colors outline-none"
+                        placeholder="請撰寫您的邀請內容..."
+                      ></textarea>
+                      <p className="text-xs text-slate-400 mt-2 text-right font-medium">建議主動說明您能提供的互惠內容與條件</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3">
+                  <button 
+                    onClick={() => setShowInviteModal(false)}
+                    className="flex-1 py-3 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-white transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button 
+                    onClick={confirmSendInvite}
+                    disabled={isSending}
+                    className="flex-1 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {isSending ? <Loader2 size={18} className="animate-spin"/> : <Send size={18} />}
+                    {isSending ? '發送中...' : '確認發送'}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

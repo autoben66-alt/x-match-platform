@@ -544,171 +544,6 @@ export default function DashboardPage() {
       case 'projects':
         return role === 'business' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-900">我的徵才 (案源管理)</h2>
-              <button 
-                onClick={() => setShowCreateModal(true)}
-                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-md"
-              >
-                <ListPlus size={16}/> 新增案源
-              </button>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 font-bold">標題</th>
-                      <th className="px-6 py-4 font-bold">分類</th>
-                      <th className="px-6 py-4 font-bold">狀態</th>
-                      <th className="px-6 py-4 font-bold">應徵人數</th>
-                      <th className="px-6 py-4 font-bold">發布日期</th>
-                      <th className="px-6 py-4 font-bold text-right">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {projects.map((project) => (
-                      <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-slate-900">{project.title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{project.type} · {project.location}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">
-                            {project.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            project.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {project.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                            <Users size={14} className="text-slate-400"/> {project.applicants}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="text-sky-600 font-bold hover:underline">管理名單</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {projects.length === 0 && (
-                <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-                  <Briefcase size={32} className="text-slate-300 mb-3" />
-                  <p className="font-bold text-slate-700">尚未發布任何合作案源</p>
-                  <p className="text-sm mt-1">點擊右上角「新增案源」開始招募創作者！</p>
-                </div>
-              )}
-            </div>
-
-            {showCreateModal && (
-              <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
-                      <ListPlus size={20} className="text-sky-500"/> 發布新案源 (Cloud Sync)
-                    </h3>
-                    <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
-                      <X size={24} />
-                    </button>
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto">
-                    <form className="space-y-6" onSubmit={handleCreateProject}>
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-sky-500 pl-2">基本設定</h4>
-                        <div className="space-y-4">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">案源標題 <span className="text-red-500">*</span></label>
-                            <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" placeholder="例如：海景房開箱體驗招募" value={newProject.title} onChange={(e) => setNewProject({...newProject, title: e.target.value})} />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">類別</label>
-                              <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={newProject.category} onChange={(e) => setNewProject({...newProject, category: e.target.value})}>
-                                <option>住宿</option><option>餐飲</option><option>體驗</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">地點 <span className="text-red-500">*</span></label>
-                              <div className="flex items-center relative">
-                                 <MapPin size={16} className="absolute left-3 text-slate-400"/>
-                                 <input type="text" className="w-full pl-9 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" placeholder="例如：屏東恆春" value={newProject.location} onChange={(e) => setNewProject({...newProject, location: e.target.value})} />
-                              </div>
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
-                            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar items-center">
-                              <label className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors relative overflow-hidden">
-                                {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-indigo-500" /> : <><Plus size={24} /><span className="text-[10px] mt-1 font-bold">選擇照片</span></>}
-                                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
-                              </label>
-                              {newProject.gallery.map((img, idx) => (
-                                <div key={idx} className="shrink-0 w-20 h-20 bg-slate-200 rounded-lg overflow-hidden relative group shadow-sm">
-                                  <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
-                                  <button type="button" onClick={() => handleRemovePhoto(idx)} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"><X size={12} /></button>
-                                </div>
-                              ))}
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-1">支援多圖上傳，第一張將預設為前台封面主圖。(需在 Firebase 後台開啟 Storage 服務)</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-2">
-                        <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-indigo-500 pl-2">互惠合作詳情</h4>
-                        <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">合作模式</label>
-                              <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" value={newProject.type} onChange={(e) => setNewProject({...newProject, type: e.target.value})}>
-                                <option>互惠體驗</option><option>付費推廣</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">開放名額</label>
-                              <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" value={newProject.spots} onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})} />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值 (前台顯示金額)</label>
-                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600 placeholder:font-normal" placeholder="例如：NT$ 8,800" value={newProject.totalValue} onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})} />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解 (請用 + 號分隔)</label>
-                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="例如：住宿($6800) + 早餐($800)" value={newProject.valueBreakdown} onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})} />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">交付內容需求</label>
-                            <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：IG 貼文 1 則 + 限動 3 則 (需標記地點)..." value={newProject.requirements} onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}></textarea>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="pt-4 border-t border-slate-200">
-                        <button type="submit" className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                          <CheckCircle2 size={18} /> 立即同步發布
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">我的應徵紀錄</h2>
             <div className="grid gap-4">
               <div className="bg-white p-6 rounded-xl border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
@@ -737,7 +572,15 @@ export default function DashboardPage() {
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
               <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
-              <button className="mt-3 text-sm text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</button>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
+                <Link href="/creators" className="text-indigo-600 font-bold hover:underline">
+                  前往「找網紅」尋找適合的對象
+                </Link>
+                <span className="hidden sm:block text-slate-300">|</span>
+                <Link href="/trips" className="text-indigo-600 font-bold hover:underline">
+                  前往「行程許願池」尋找適合的對象
+                </Link>
+              </div>
             </div>
           </div>
         ) : (
