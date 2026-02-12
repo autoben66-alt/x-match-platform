@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
@@ -9,8 +9,60 @@ import {
   Zap, Crown, Shield, Rocket, ListPlus
 } from 'lucide-react';
 
+// --- Firebase 核心引入 ---
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+
+// --- Firebase 初始化 (終極防護版) ---
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
+};
+
+let app: any = null;
+let auth: any = null;
+let db: any = null;
+
+if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
+  try {
+    app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
+    db = getFirestore(app);
+  } catch (error) {
+    console.error("Firebase 初始化失敗:", error);
+  }
+}
+
+const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
+
 // 定義後台分頁
 type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings';
+
+interface ProjectData {
+  id: string;
+  title: string;
+  category: string;
+  type: string;
+  location: string;
+  totalValue: string;
+  valueBreakdown: string;
+  requirements: string;
+  spots: number;
+  status: string;
+  applicants: number;
+  date: string;
+}
+
+// 初始模擬案源資料 (用於第一次寫入 Firebase)
+const MOCK_PROJECTS: ProjectData[] = [
+  { id: '1', title: '海景房開箱體驗招募', category: '住宿', type: '互惠體驗', location: '屏東恆春', totalValue: 'NT$ 8,800', valueBreakdown: '海景房住宿($6800) + 早餐($800) + 接送($1200)', requirements: 'IG 貼文 1 則 + 限動 3 則 (需標記地點)', spots: 1, status: '招募中', applicants: 12, date: '2024/06/01' },
+  { id: '2', title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', location: '台北大安', totalValue: 'NT$ 3,000', valueBreakdown: '餐點($1000) + 車馬費($2000)', requirements: 'Reels 短影音 1 支', spots: 3, status: '已關閉', applicants: 8, date: '2024/05/15' },
+];
 
 export default function DashboardPage() {
   // 狀態管理
@@ -18,13 +70,11 @@ export default function DashboardPage() {
   const [role, setRole] = useState<'business' | 'creator'>('business'); // 角色切換
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // --- 新增：案源管理相關狀態 ---
+  // 案源管理相關狀態
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [projects, setProjects] = useState([
-    { id: 1, title: '海景房開箱體驗招募', category: '住宿', type: '互惠體驗', status: '招募中', applicants: 12, date: '2024/06/01' },
-    { id: 2, title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', status: '已關閉', applicants: 8, date: '2024/05/15' },
-  ]);
+  const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
     title: '',
     category: '住宿',
@@ -36,27 +86,80 @@ export default function DashboardPage() {
     spots: 1
   });
 
-  const handleCreateProject = (e: React.FormEvent) => {
-    e.preventDefault();
-    const project = {
-      id: projects.length + 1,
-      title: newProject.title,
-      category: newProject.category,
-      type: newProject.type,
-      status: '招募中',
-      applicants: 0,
-      date: new Date().toLocaleDateString()
-    };
-    setProjects([project, ...projects]);
-    setShowCreateModal(false);
-    // 重置表單 (保留部分預設值)
-    setNewProject({ ...newProject, title: '', totalValue: '', valueBreakdown: '', requirements: '' });
-  };
-
   // 登入處理
   const handleAuth = (e: React.FormEvent) => {
     e.preventDefault();
     setTimeout(() => setIsLoggedIn(true), 800);
+  };
+
+  // 1. 處理 Firebase 身份驗證
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setFbUser(user);
+      } else {
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.error("Firebase 匿名登入失敗:", e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. 監聽 Firestore 案源實時資料
+  useEffect(() => {
+    if (!db || !fbUser || !isLoggedIn) return;
+
+    const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
+    const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
+      if (snapshot.empty) {
+        // 如果資料庫是空的，自動植入初始案源資料
+        MOCK_PROJECTS.forEach(p => setDoc(doc(projectsCol, String(p.id)), p));
+      } else {
+        const data = snapshot.docs.map(d => d.data() as ProjectData);
+        // 依據 ID (時間戳或數字) 排序，確保最新的在最上面
+        setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
+      }
+    }, (err) => console.error("無法讀取案源資料:", err));
+
+    return () => unsubProjects();
+  }, [fbUser, isLoggedIn]);
+
+  // 將新案源寫入 Firebase
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!db || !fbUser) return;
+
+    // 使用當下時間戳作為唯一 ID
+    const newId = Date.now().toString();
+    const projectToSave: ProjectData = {
+      id: newId,
+      title: newProject.title,
+      category: newProject.category,
+      type: newProject.type,
+      location: newProject.location,
+      totalValue: newProject.totalValue,
+      valueBreakdown: newProject.valueBreakdown,
+      requirements: newProject.requirements,
+      spots: newProject.spots,
+      status: '招募中',
+      applicants: 0,
+      date: new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
+    };
+
+    try {
+      const projectRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId);
+      await setDoc(projectRef, projectToSave);
+      setShowCreateModal(false);
+      // 重置表單
+      setNewProject({ ...newProject, title: '', totalValue: '', valueBreakdown: '', requirements: '' });
+    } catch (err) {
+      console.error("新增案源失敗:", err);
+      alert("新增失敗，請檢查網路連線或 Firebase 權限。");
+    }
   };
 
   // --- 1. 登入/註冊頁面 ---
@@ -148,7 +251,6 @@ export default function DashboardPage() {
     { id: 'trips', icon: Plane, label: '我的許願行程' },
     { id: 'projects', icon: FileText, label: '我的應徵' },
     { id: 'contracts', icon: FileSignature, label: '合約管理' },
-    // 移除了收益與收款
     { id: 'settings', icon: User, label: '履歷 (Media Kit)' },
   ];
 
@@ -173,8 +275,8 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-sm text-slate-500 mb-1">進行中合約</p>
-                    <h3 className="text-3xl font-bold text-slate-900">3</h3>
+                    <p className="text-sm text-slate-500 mb-1">進行中案源</p>
+                    <h3 className="text-3xl font-bold text-slate-900">{projects.length}</h3>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500 mb-1">剩餘急單點數</p>
@@ -201,7 +303,7 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            {/* ... 近期通知 ... */}
+            {/* 近期通知 */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="font-bold text-slate-900">近期通知</h3>
@@ -229,18 +331,18 @@ export default function DashboardPage() {
       // --- B. 案源/徵才管理 (Projects) ---
       case 'projects':
         return role === 'business' ? (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">我的徵才 (案源管理)</h2>
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors"
+                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-md"
               >
                 <ListPlus size={16}/> 新增案源
               </button>
             </div>
             
-            {/* 案源列表 */}
+            {/* 案源列表 (連接 Firebase) */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -250,7 +352,8 @@ export default function DashboardPage() {
                       <th className="px-6 py-4 font-bold">分類</th>
                       <th className="px-6 py-4 font-bold">狀態</th>
                       <th className="px-6 py-4 font-bold">應徵人數</th>
-                      <th className="px-6 py-4 font-bold">操作</th>
+                      <th className="px-6 py-4 font-bold">發布日期</th>
+                      <th className="px-6 py-4 font-bold text-right">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -258,10 +361,10 @@ export default function DashboardPage() {
                       <tr key={project.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-6 py-4">
                           <p className="font-bold text-slate-900">{project.title}</p>
-                          <p className="text-xs text-slate-500">{project.type}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{project.type} · {project.location}</p>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-slate-100 text-slate-600 text-xs">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">
                             {project.category}
                           </span>
                         </td>
@@ -272,11 +375,14 @@ export default function DashboardPage() {
                             {project.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 flex items-center gap-2 mt-1">
-                          <Users size={14}/> {project.applicants} 人
-                        </td>
                         <td className="px-6 py-4">
-                          <button className="text-sky-600 font-bold hover:underline">查看名單</button>
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                            <Users size={14} className="text-slate-400"/> {project.applicants}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
+                        <td className="px-6 py-4 text-right">
+                          <button className="text-sky-600 font-bold hover:underline">管理名單</button>
                         </td>
                       </tr>
                     ))}
@@ -284,18 +390,20 @@ export default function DashboardPage() {
                 </table>
               </div>
               {projects.length === 0 && (
-                <div className="p-8 text-center text-slate-500">
-                  目前沒有進行中的徵才活動
+                <div className="p-12 text-center text-slate-500 flex flex-col items-center">
+                  <Briefcase size={32} className="text-slate-300 mb-3" />
+                  <p className="font-bold text-slate-700">尚未發布任何合作案源</p>
+                  <p className="text-sm mt-1">點擊右上角「新增案源」開始招募創作者！</p>
                 </div>
               )}
             </div>
 
-            {/* --- 新增案源 Modal --- */}
+            {/* --- 新增案源 Modal (寫入 Firebase) --- */}
             {showCreateModal && (
               <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <h3 className="font-bold text-xl text-slate-900">發布新案源</h3>
+                    <h3 className="font-bold text-xl text-slate-900">發布新案源 (Cloud Sync)</h3>
                     <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
                       <X size={24} />
                     </button>
@@ -398,8 +506,8 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="pt-2">
-                        <button type="submit" className="w-full py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 shadow-lg active:scale-95 transition-all">
-                          立即發布
+                        <button type="submit" className="w-full py-3 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
+                          立即同步發布
                         </button>
                       </div>
                     </form>
@@ -496,13 +604,12 @@ export default function DashboardPage() {
           </div>
         );
 
-      // --- E. 錢包/訂閱 (Wallet) - 僅限業者 (更新：加入升級與推廣選項) ---
+      // --- E. 錢包/訂閱 (Wallet) - 僅限業者 ---
       case 'wallet':
         return role === 'business' ? (
           <div className="space-y-8">
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
             
-            {/* Current Plan & Upgrade */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Free Plan Card */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
@@ -580,7 +687,6 @@ export default function DashboardPage() {
       case 'settings':
         return role === 'business' ? (
            <div className="space-y-6">
-             {/* Header with Save Button (Hidden on Mobile) */}
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">編輯商家檔案 (Business Profile)</h2>
                <button className="hidden sm:flex bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-indigo-700">
@@ -589,9 +695,7 @@ export default function DashboardPage() {
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-               {/* Left Col: Images */}
                <div className="lg:col-span-2 space-y-6">
-                 {/* 封面與相簿 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 商家封面圖</h3>
                    <div className="relative h-48 bg-slate-100 rounded-lg mb-6 flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
@@ -612,7 +716,6 @@ export default function DashboardPage() {
                  </div>
                </div>
 
-               {/* Right Col: Basic Info */}
                <div className="space-y-6">
                  <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 基本資料</h3>
@@ -649,7 +752,6 @@ export default function DashboardPage() {
                      <textarea className="w-full p-2 border border-slate-300 rounded-lg h-32 resize-none" defaultValue="位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景..."></textarea>
                    </div>
 
-                   {/* 新增：互惠合作詳情設定 */}
                    <div className="pt-6 mt-2 border-t border-slate-100">
                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18}/> 互惠合作詳情</h3>
                      
@@ -680,7 +782,6 @@ export default function DashboardPage() {
                </div>
              </div>
 
-             {/* Mobile Save Button (Shown at the bottom) */}
              <div className="block sm:hidden mt-6 pb-6">
                 <button className="w-full bg-indigo-600 text-white px-4 py-3 rounded-xl text-base font-bold flex items-center justify-center gap-2 hover:bg-indigo-700 shadow-lg">
                   <Save size={18}/> 儲存所有變更
@@ -697,9 +798,7 @@ export default function DashboardPage() {
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-               {/* Left Col: Basic Info */}
                <div className="lg:col-span-2 space-y-6">
-                 {/* 封面與頭像 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 形象照片</h3>
                    <div className="relative h-48 bg-slate-100 rounded-lg mb-4 flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
@@ -719,7 +818,6 @@ export default function DashboardPage() {
                    </div>
                  </div>
 
-                 {/* 基本資料 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-4">
                    <h3 className="font-bold text-slate-900 mb-4">基本資料</h3>
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -746,7 +844,6 @@ export default function DashboardPage() {
                    </div>
                  </div>
 
-                 {/* 作品集 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 作品集展示</h3>
                    <div className="grid grid-cols-3 gap-4">
@@ -759,9 +856,7 @@ export default function DashboardPage() {
                  </div>
                </div>
 
-               {/* Right Col: Rates & Audience */}
                <div className="space-y-6">
-                 {/* 參考報價 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18}/> 參考報價 (NT$)</h3>
                    <div className="space-y-3">
@@ -780,7 +875,6 @@ export default function DashboardPage() {
                    </div>
                  </div>
 
-                 {/* 受眾分析 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart3 size={18}/> 受眾概況</h3>
                    <div className="space-y-3">
@@ -808,7 +902,6 @@ export default function DashboardPage() {
     }
   };
 
-  // --- 3. 主頁面佈局 ---
   return (
     <div className="min-h-screen bg-slate-50">
       {/* 頂部導覽 */}
@@ -852,7 +945,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">
             <nav className="space-y-1 sticky top-24">
@@ -884,6 +977,14 @@ export default function DashboardPage() {
             {renderContent()}
           </div>
         </div>
+        
+        {/* Firebase 連線狀態指示器 (對齊 Admin) */}
+        {isLoggedIn && (
+          <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200 shadow-xl text-[9px] font-black text-slate-500 animate-in slide-in-from-bottom-5 z-50">
+             <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+             DB Sync: <span className="text-indigo-600 tracking-wider ml-1">{internalAppId.toUpperCase()}</span>
+          </div>
+        )}
       </div>
     </div>
   );
