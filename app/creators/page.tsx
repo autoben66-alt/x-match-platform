@@ -2,10 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link'; 
-// 引入 useRouter 來處理未登入時的頁面跳轉
 import { useRouter } from 'next/navigation'; 
 import CreatorCard, { Creator } from '@/components/CreatorCard';
-import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send } from 'lucide-react';
+import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -46,7 +45,12 @@ interface CreatorDetail extends Creator {
   lineId?: string;
 }
 
-// 當創作者尚未在後台完善履歷時，系統自動填補的優質展示資料 (補上 name, handle, avatar 解決編譯報錯)
+interface ProjectMinimal {
+  id: string;
+  title: string;
+  totalValue: string;
+}
+
 const ENRICH_DATA = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
@@ -55,7 +59,7 @@ const ENRICH_DATA = [
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
-    portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
+    portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3" ]
   },
   {
     name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
@@ -64,12 +68,12 @@ const ENRICH_DATA = [
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
-    portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
+    portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ]
   }
 ];
 
 export default function CreatorsPage() {
-  const router = useRouter(); // 使用 Next.js Router 來處理跳轉
+  const router = useRouter(); 
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'relevance' | 'followers' | 'jobs' | 'engagement'>('relevance');
@@ -78,11 +82,15 @@ export default function CreatorsPage() {
   const [creators, setCreators] = useState<CreatorDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- 直接發送邀請相關狀態 ---
+  // 發送邀請相關狀態
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteMessage, setInviteMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
+
+  // 廠商案源清單 (用於下拉選單)
+  const [projects, setProjects] = useState<ProjectMinimal[]>([]);
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   useEffect(() => {
     if (!db) { 
@@ -90,15 +98,14 @@ export default function CreatorsPage() {
       return; 
     }
 
+    // 監聽創作者
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
-    const unsubscribe = onSnapshot(usersCol, (snapshot) => {
+    const unsubscribeUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
         const creatorUsers = snapshot.docs.map(doc => doc.data()).filter(u => u.role === '創作者');
-        
         const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
           const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
           const isFounder = index < 50; 
-          
           const formatRates = (rates: any) => ({
             post: rates?.post ? `NT$ ${rates.post.toLocaleString()}` : enrich.rates.post,
             story: rates?.story ? `NT$ ${rates.story.toLocaleString()}` : enrich.rates.story,
@@ -125,17 +132,22 @@ export default function CreatorsPage() {
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
           };
         });
-        
         setCreators(mappedCreators);
       } else {
         setCreators([]);
       }
       setIsLoading(false);
-    }, (err) => {
-      console.error("讀取創作者失敗:", err);
-      setIsLoading(false);
     });
-    return () => unsubscribe();
+
+    // 監聽廠商自己的案源 (提供下拉選單選擇)
+    const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
+    const unsubscribeProjects = onSnapshot(projectsCol, (snapshot) => {
+      if (!snapshot.empty) {
+        setProjects(snapshot.docs.map(doc => doc.data() as ProjectMinimal));
+      }
+    });
+
+    return () => { unsubscribeUsers(); unsubscribeProjects(); };
   }, []);
 
   const topCreators = [...creators].sort((a, b) => b.completedJobs - a.completedJobs).slice(0, 3);
@@ -154,43 +166,32 @@ export default function CreatorsPage() {
   });
 
   const categories = [ { id: '全部', label: '全部' }, { id: '旅遊', label: '旅遊 Travel' }, { id: '美食', label: '美食 Foodie' }, { id: '親子', label: '親子 Family' }, { id: '攝影', label: '攝影 Photography' } ];
-  
   const founderCount = creators.length;
   const founderMax = 50;
   const founderPercentage = Math.min((founderCount / founderMax) * 100, 100);
 
-  // --- 發送邀請邏輯處理 ---
+  // 開啟發送邀請 Modal
   const handleOpenInvite = () => {
-    // 【身分驗證邏輯】：
-    // 在真實全端環境中，我們會檢查全域的 AuthContext (例如 fbUser)。
-    // const isLoggedIn = !!fbUser; 
-    
-    // 為了在此原型展示流暢的「已註冊」流程，我們預設開啟視窗。
-    // 若要測試「未註冊導入」功能，只要把下方模擬變數設為 false 即可觸發 router.push。
     const simulateIsLoggedIn = true; 
-
     if (!simulateIsLoggedIn) {
-      // 邏輯一：未登入/未註冊，導向後台登入頁
       router.push('/dashboard');
       return;
     }
-
-    // 邏輯二：已登入業者，直接在當前頁面開啟發送視窗
     setInviteMessage(`哈囉 ${selectedCreator?.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您來體驗我們的服務，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
+    setSelectedProjectId('');
     setShowInviteModal(true);
     setSendSuccess(false);
   };
 
+  // 確認發送
   const confirmSendInvite = async () => {
-    if (!db) {
-      alert("尚未連線至資料庫，請稍候再試。");
-      return;
-    }
+    if (!db) { alert("尚未連線至資料庫，請稍候再試。"); return; }
     setIsSending(true);
 
     try {
       const newId = `inv-${Date.now()}`;
       const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', newId);
+      const proj = projects.find(p => p.id === selectedProjectId);
       
       await setDoc(invRef, {
         id: newId,
@@ -200,15 +201,15 @@ export default function CreatorsPage() {
         toAvatar: selectedCreator?.avatar || '',
         message: inviteMessage,
         status: '待回覆',
-        date: new Date().toLocaleString('zh-TW', { hour12: false })
+        date: new Date().toLocaleString('zh-TW', { hour12: false }),
+        projectId: proj?.id || '',
+        projectTitle: proj?.title || '',
+        projectValue: proj?.totalValue || ''
       });
 
       setIsSending(false);
       setSendSuccess(true);
-      // 發送成功後，2 秒後自動關閉視窗
-      setTimeout(() => {
-        setShowInviteModal(false);
-      }, 2000);
+      setTimeout(() => setShowInviteModal(false), 2000);
     } catch (error) {
       console.error("發送邀請失敗:", error);
       alert("發送失敗，請確認網路連線與資料庫權限。");
@@ -349,7 +350,7 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* --- Creator Details Modal (創作者詳細履歷) --- */}
+      {/* --- Creator Details Modal --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-5xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -435,7 +436,6 @@ export default function CreatorsPage() {
                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
                </div>
                <div className="flex gap-3 w-full sm:w-auto">
-                 {/* LINE 聯繫按鈕 */}
                  <a 
                    href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
                    target="_blank"
@@ -444,7 +444,6 @@ export default function CreatorsPage() {
                  >
                    <MessageCircle size={18} /> LINE 聯繫
                  </a>
-                 {/* 導向發送邀請 Modal 按鈕 */}
                  <button 
                    onClick={handleOpenInvite}
                    className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
@@ -494,6 +493,31 @@ export default function CreatorsPage() {
                   </div>
 
                   <div className="space-y-4">
+                    {/* 選擇附帶案源下拉選單 */}
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                        <Briefcase size={16} className="text-indigo-600"/> 選擇附帶案源 (選填)
+                      </label>
+                      <select 
+                        value={selectedProjectId}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setSelectedProjectId(val);
+                          const proj = projects.find(p => p.id === val);
+                          if (proj) {
+                            // 動態修改邀請訊息
+                            setInviteMessage(`哈囉 ${selectedCreator.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源「${proj.title}」，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
+                          }
+                        }}
+                        className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors outline-none"
+                      >
+                        <option value="">不附帶案源，直接發送訊息</option>
+                        {projects.map(p => (
+                          <option key={p.id} value={p.id}>{p.title} ({p.totalValue})</option>
+                        ))}
+                      </select>
+                    </div>
+
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2">
                         邀請訊息內容

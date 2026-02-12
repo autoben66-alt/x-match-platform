@@ -12,7 +12,7 @@ import {
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 // --- Firebase 初始化 ---
@@ -43,7 +43,6 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義新增了 'invitations' 的 Tab
 type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings' | 'invitations';
 
 interface ProjectData {
@@ -60,6 +59,7 @@ interface TripData {
 interface InvitationData {
   id: string; fromName: string; toName: string; toHandle: string; toAvatar: string;
   message: string; status: string; date: string;
+  projectId?: string; projectTitle?: string; projectValue?: string; // 新增案源綁定欄位
 }
 
 interface PaymentItem {
@@ -70,14 +70,12 @@ const MOCK_PROJECTS: ProjectData[] = [];
 const MOCK_TRIPS: TripData[] = [];
 
 export default function DashboardPage() {
-  // 狀態管理
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<'business' | 'creator'>('business');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // 案源管理相關狀態 (業者)
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
@@ -86,17 +84,12 @@ export default function DashboardPage() {
   });
   const [isUploading, setIsUploading] = useState(false);
 
-  // 許願行程相關狀態 (創作者)
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
-  const [newTrip, setNewTrip] = useState({
-    destination: '', dates: '', partySize: '1人', purpose: '', needs: ''
-  });
+  const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
-  // 邀請相關狀態 (共用)
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
 
-  // 創作者相關狀態 (履歷設定 Profile)
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
@@ -109,47 +102,40 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // 金流付款相關狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
-  // 初始化 Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) { setFbUser(user); } 
+      if (user) setFbUser(user);
       else { try { await signInAnonymously(auth); } catch (e) { console.error("匿名登入失敗:", e); } }
     });
     return () => unsubscribe();
   }, []);
 
-  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
-    // 讀取案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as ProjectData);
       setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     });
 
-    // 讀取行程許願池
     const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
     const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as TripData);
       setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 讀取邀請資料
     const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
     const unsubInv = onSnapshot(invCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as InvitationData);
-      setInvitations(data.sort((a, b) => b.id.localeCompare(a.id))); // 確保最新的在前面
+      setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 讀取當前創作者的履歷資料
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists() && role === 'creator') {
@@ -170,13 +156,10 @@ export default function DashboardPage() {
     return () => { unsubProjects(); unsubTrips(); unsubUser(); unsubInv(); };
   }, [fbUser, isLoggedIn, role]);
 
-  // 業者: 上傳照片
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    if (!storage) { alert("Firebase Storage 尚未初始化！請至 Firebase 後台啟用。"); return; }
-    if (!fbUser) return;
-
+    if (!storage || !fbUser) { alert("Firebase Storage 未準備好"); return; }
     setIsUploading(true);
     try {
       const urls: string[] = [];
@@ -188,22 +171,17 @@ export default function DashboardPage() {
       setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, ...urls] }));
     } catch (error) {
       console.error("上傳失敗:", error);
-      alert("照片上傳失敗，請確認 Storage 規則。");
     } finally { setIsUploading(false); }
   };
 
   const handleRemovePhoto = (indexToRemove: number) => {
-    setNewProject(prev => ({
-      ...prev,
-      gallery: prev.gallery.filter((_, idx) => idx !== indexToRemove)
-    }));
+    setNewProject(prev => ({ ...prev, gallery: prev.gallery.filter((_, idx) => idx !== indexToRemove) }));
   };
 
-  // 創作者: 上傳履歷照片 (封面 / 頭像 / 作品集)
   const handleCreatorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar' | 'portfolio') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    if (!storage || !fbUser) { alert("Storage 未準備好！"); return; }
+    if (!storage || !fbUser) return;
 
     if (type === 'cover') setIsUploadingCover(true);
     else if (type === 'avatar') setIsUploadingAvatar(true);
@@ -216,13 +194,11 @@ export default function DashboardPage() {
         const uploadTask = await uploadBytesResumable(fileRef, files[i]);
         urls.push(await getDownloadURL(uploadTask.ref));
       }
-
       if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: urls[0] }));
       else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: urls[0] }));
       else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, ...urls] }));
     } catch (error) {
-      console.error("創作者照片上傳失敗:", error);
-      alert("上傳失敗，請稍後再試。");
+      console.error("照片上傳失敗:", error);
     } finally {
       if (type === 'cover') setIsUploadingCover(false);
       else if (type === 'avatar') setIsUploadingAvatar(false);
@@ -230,129 +206,79 @@ export default function DashboardPage() {
     }
   };
 
-  // 業者: 將新案源寫入 Firebase
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProject.title) { alert("請輸入「案源標題」！"); return; }
-    if (!newProject.location) { alert("請輸入「地點」！"); return; }
-    if (!db || !fbUser) { alert("尚未連線至資料庫，請稍候再試。"); return; }
-
+    if (!newProject.title || !newProject.location) { alert("請填寫必填欄位"); return; }
+    if (!db || !fbUser) return;
     const newId = Date.now().toString();
-    const projectToSave: ProjectData = {
-      id: newId,
-      title: newProject.title,
-      category: newProject.category,
-      type: newProject.type,
-      location: newProject.location,
-      totalValue: newProject.totalValue || 'NT$ 未定',
-      valueBreakdown: newProject.valueBreakdown,
-      requirements: newProject.requirements,
-      spots: newProject.spots,
-      status: '招募中',
-      applicants: 0,
-      date: new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }),
-      image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-      gallery: newProject.gallery
-    };
-
     try {
-      const projectRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId);
-      await setDoc(projectRef, projectToSave);
+      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId), {
+        id: newId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
+        totalValue: newProject.totalValue || 'NT$ 未定', valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
+        spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
+        image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+        gallery: newProject.gallery
+      });
       setShowCreateModal(false);
       setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
-    } catch (err) {
-      console.error("新增案源失敗:", err);
-      alert("新增失敗，請檢查 Firebase 權限。");
-    }
+    } catch (err) { console.error(err); }
   };
 
-  // 創作者: 將新許願行程寫入 Firebase
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTrip.destination) { alert("請填寫目的地！"); return; }
-    if (!db || !fbUser) { alert("尚未連線至資料庫，請稍候再試。"); return; }
-
+    if (!newTrip.destination) { alert("請填寫目的地"); return; }
+    if (!db || !fbUser) return;
     const newId = `t${Date.now()}`;
-    const tripToSave: TripData = {
-      id: newId,
-      creatorName: creatorProfile.name || '創作者',
-      destination: newTrip.destination,
-      dates: newTrip.dates,
-      partySize: newTrip.partySize,
-      purpose: newTrip.purpose,
-      needs: newTrip.needs,
-      status: '招募中',
-      offers: 0
-    };
-
     try {
-      const tripRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'trips', newId);
-      await setDoc(tripRef, tripToSave);
+      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'trips', newId), {
+        id: newId, creatorName: creatorProfile.name || '創作者', destination: newTrip.destination, dates: newTrip.dates,
+        partySize: newTrip.partySize, purpose: newTrip.purpose, needs: newTrip.needs, status: '招募中', offers: 0
+      });
       setShowCreateTripModal(false);
       setNewTrip({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
-    } catch (err) {
-      console.error("新增行程失敗:", err);
-      alert("新增行程失敗，請重試。");
-    }
+    } catch (err) { console.error(err); }
   };
 
-  // 創作者: 儲存履歷至 Firebase
   const handleSaveCreatorProfile = async () => {
     if (!db || !fbUser) return;
     setIsSavingProfile(true);
     try {
-      const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
-      await setDoc(userRef, {
-        id: fbUser.uid,
-        name: creatorProfile.name,
-        email: `${creatorProfile.handle.replace('@', '')}@creator.com`, // 模擬 email
-        role: '創作者',
-        status: '活躍',
-        plan: 'Free',
-        joinDate: new Date().toLocaleDateString('zh-TW'),
-        handle: creatorProfile.handle,
-        lineId: creatorProfile.lineId,
-        location: creatorProfile.location,
-        tags: creatorProfile.tags.split(',').map(t => t.trim()).filter(Boolean),
-        bio: creatorProfile.bio,
-        coverImage: creatorProfile.coverImage,
-        avatar: creatorProfile.avatar,
-        portfolio: creatorProfile.portfolio,
-        rates: creatorProfile.rates,
-        audience: creatorProfile.audience,
-        followers: 12000, // 模擬基本數據
-        engagement: 4.5,
-        completedJobs: 0
+      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid), {
+        id: fbUser.uid, name: creatorProfile.name, email: `${creatorProfile.handle.replace('@', '')}@creator.com`, role: '創作者', status: '活躍', plan: 'Free',
+        joinDate: new Date().toLocaleDateString('zh-TW'), handle: creatorProfile.handle, lineId: creatorProfile.lineId, location: creatorProfile.location,
+        tags: creatorProfile.tags.split(',').map(t => t.trim()).filter(Boolean), bio: creatorProfile.bio, coverImage: creatorProfile.coverImage,
+        avatar: creatorProfile.avatar, portfolio: creatorProfile.portfolio, rates: creatorProfile.rates, audience: creatorProfile.audience,
+        followers: 12000, engagement: 4.5, completedJobs: 0
       }, { merge: true });
-      
-      alert("🎉 履歷更新成功！前台找網紅頁面將即刻同步顯示您的最新資訊。");
-    } catch (error) {
-      console.error("儲存履歷失敗:", error);
-      alert("儲存失敗，請檢查權限。");
-    } finally {
-      setIsSavingProfile(false);
+      alert("🎉 履歷更新成功！");
+    } catch (error) { console.error(error); } 
+    finally { setIsSavingProfile(false); }
+  };
+
+  // --- 更新邀請狀態 (創作者操作) ---
+  const handleUpdateInviteStatus = async (invId: string, newStatus: string) => {
+    if (!db) return;
+    try {
+      const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', invId);
+      await updateDoc(invRef, { status: newStatus });
+      alert(`已將邀請標示為「${newStatus}」！`);
+    } catch (e) {
+      console.error("更新狀態失敗:", e);
+      alert("更新狀態失敗，請稍後再試。");
     }
   };
 
-  // 業者: 處理金流付款程序
   const handlePaymentSubmit = async () => {
     setPaymentStep('processing');
     setTimeout(async () => {
       if (db && fbUser && purchaseItem) {
         try {
           const newTxId = `TX-${Date.now().toString().slice(-6)}`;
-          const txRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'transactions', newTxId);
-          await setDoc(txRef, {
-            id: newTxId,
-            user: role === 'business' ? '海角七號民宿' : creatorProfile.name,
-            item: purchaseItem.name,
-            amount: purchaseItem.price,
-            status: '成功',
-            date: new Date().toLocaleString('zh-TW', { hour12: false })
+          await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'transactions', newTxId), {
+            id: newTxId, user: role === 'business' ? '海角七號民宿' : creatorProfile.name, item: purchaseItem.name,
+            amount: purchaseItem.price, status: '成功', date: new Date().toLocaleString('zh-TW', { hour12: false })
           });
-        } catch (err) {
-          console.error("寫入交易紀錄失敗:", err);
-        }
+        } catch (err) { console.error(err); }
       }
       setPaymentStep('success');
     }, 2000);
@@ -439,7 +365,6 @@ export default function DashboardPage() {
     );
   }
 
-  // ✨ 選單結構：雙方皆擁有獨立的 invitations 選單
   const menuItems = role === 'business' ? [
     { id: 'overview', icon: LayoutDashboard, label: '總覽 Dashboard' },
     { id: 'projects', icon: Briefcase, label: '我的徵才 (案源)' },
@@ -459,7 +384,6 @@ export default function DashboardPage() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        // 過濾創作者自己收到的邀請 (簡單過濾：toName 包含創作者名字)
         const myReceivedInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
 
         return (
@@ -755,12 +679,23 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="md:w-2/3 flex flex-col justify-center">
+                         {/* 案源小卡 */}
+                         {inv.projectTitle && (
+                           <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold">
+                             <Briefcase size={16} /> 附件案源：{inv.projectTitle}
+                             {inv.projectValue && <span className="ml-auto text-xs bg-white px-2 py-0.5 rounded text-indigo-600 border border-indigo-100">{inv.projectValue}</span>}
+                           </div>
+                         )}
+
                          <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
                            "{inv.message}"
                          </div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
-                           <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">{inv.status}</span>
+                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                             inv.status === '已接受' ? 'bg-green-100 text-green-700' :
+                             inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                           }`}>{inv.status}</span>
                          </div>
                       </div>
                     </div>
@@ -803,14 +738,30 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="md:w-3/4 flex flex-col justify-center">
+                         {/* 案源小卡 */}
+                         {inv.projectTitle && (
+                           <div className="mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold">
+                             <Briefcase size={16} /> 附件案源：{inv.projectTitle}
+                             {inv.projectValue && <span className="ml-auto text-xs bg-white px-2 py-0.5 rounded text-indigo-600 border border-indigo-100">{inv.projectValue}</span>}
+                           </div>
+                         )}
                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700 mb-4 whitespace-pre-wrap leading-relaxed">
                            {inv.message}
                          </div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
                            <div className="flex gap-2">
-                             <button className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
-                             <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">回覆並接受</button>
+                             {/* 透過 onClick 調用資料庫更新邏輯 */}
+                             {(inv.status === '待回覆' || inv.status === '招募中') ? (
+                               <>
+                                 <button onClick={() => handleUpdateInviteStatus(inv.id, '已婉拒')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
+                                 <button onClick={() => handleUpdateInviteStatus(inv.id, '已接受')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">回覆並接受</button>
+                               </>
+                             ) : (
+                               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                                 inv.status === '已接受' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                               }`}>{inv.status}</span>
+                             )}
                            </div>
                          </div>
                       </div>
