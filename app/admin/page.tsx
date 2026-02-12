@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
@@ -9,168 +9,233 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+// --- Firebase 核心引入 ---
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc } from 'firebase/firestore';
+
+// --- Firebase 初始化 (讀取您的 .env.local) ---
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
+};
+
+// 確保在 Next.js 中只初始化一次 Firebase (Singleton)
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// 依照 Firebase 規範定義資料儲存路徑的 ID
+const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
+
+// 資料型別定義
 type AdminTab = 'overview' | 'users' | 'revenue' | 'settings';
+
+interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  plan: string;
+  status: string;
+  joinDate: string;
+}
+
+interface TransactionData {
+  id: string;
+  user: string;
+  item: string;
+  amount: number;
+  status: string;
+  date: string;
+}
+
+// 初始模擬資料 (當資料庫為空時，自動寫入 Firebase 作為測試資料)
+const MOCK_USERS: UserData[] = [
+  { id: '1', name: '海角七號民宿', email: 'cape7@example.com', role: '商家', plan: 'Pro', status: '活躍', joinDate: '2024/02/15' },
+  { id: '2', name: '林小美', email: 'may_travel@example.com', role: '創作者', plan: 'Free', status: '活躍', joinDate: '2024/01/10' },
+  { id: '3', name: '山林秘境露營區', email: 'mountain@example.com', role: '商家', plan: 'Free', status: '待審核', joinDate: '2024/06/01' },
+  { id: '4', name: 'Jason 攝影', email: 'jason@example.com', role: '創作者', plan: 'Free', status: '停權', joinDate: '2023/11/20' },
+];
+
+const MOCK_TX: TransactionData[] = [
+  { id: 'TX-1049', user: '海角七號民宿', item: '專業成長版 Pro (月訂閱)', amount: 999, status: '成功', date: '2024/06/01 10:23' },
+  { id: 'TX-1048', user: 'Ocean Blue 衝浪店', item: '單次置頂推廣 (Boost)', amount: 300, status: '成功', date: '2024/05/28 15:40' },
+  { id: 'TX-1047', user: '老宅咖啡·午後', item: '精準推播 (Smart Push)', amount: 100, status: '成功', date: '2024/05/25 09:12' },
+];
 
 export default function AdminDashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
+  const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
   
-  // 搜尋與篩選狀態
+  // UI 控制狀態
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('全部角色');
   const [filterStatus, setFilterStatus] = useState('全部狀態');
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{userId: string, userName: string, newStatus: string} | null>(null);
 
-  // 確認變更狀態的 Modal
-  const [confirmAction, setConfirmAction] = useState<{userId: number, userName: string, newStatus: string} | null>(null);
+  // Firestore 真實資料狀態
+  const [users, setUsers] = useState<UserData[]>([]);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
 
-  // 模擬登入
+  // 登入模擬 (這裡僅作介面展示，未來可替換為 Firebase Auth 管理員登入)
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setTimeout(() => setIsLoggedIn(true), 800);
   };
 
-  // 模擬用戶資料
-  const [users, setUsers] = useState([
-    { id: 1, name: '海角七號民宿', email: 'cape7@example.com', role: '商家', plan: 'Pro', status: '活躍', joinDate: '2024/02/15' },
-    { id: 2, name: '林小美', email: 'may_travel@example.com', role: '創作者', plan: 'Free', status: '活躍', joinDate: '2024/01/10' },
-    { id: 3, name: '山林秘境露營區', email: 'mountain@example.com', role: '商家', plan: 'Free', status: '待審核', joinDate: '2024/06/01' },
-    { id: 4, name: 'Jason 攝影', email: 'jason@example.com', role: '創作者', plan: 'Free', status: '停權', joinDate: '2023/11/20' },
-  ]);
+  // 1. 處理身份驗證 (取得資料庫讀寫權限)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setFbUser(user);
+      } else {
+        try {
+          await signInAnonymously(auth);
+        } catch (e) {
+          console.error("Firebase 匿名登入失敗，請檢查後台設定:", e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // 過濾後的用戶名單
-  const filteredUsers = users.filter(user => {
-    const matchSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchRole = filterRole === '全部角色' || user.role === filterRole;
-    const matchStatus = filterStatus === '全部狀態' || user.status === filterStatus;
-    
+  // 2. 監聽 Firestore 實時資料
+  useEffect(() => {
+    if (!fbUser || !isLoggedIn) return;
+
+    // 監聽用戶列表 (指定存取路徑 artifacts/{appId}/public/data/users)
+    const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
+    const unsubUsers = onSnapshot(usersCol, (snapshot) => {
+      if (snapshot.empty) {
+        // 如果您的新資料庫目前是空的，自動植入種子資料方便測試
+        MOCK_USERS.forEach(u => setDoc(doc(usersCol, u.id), u));
+      } else {
+        const data = snapshot.docs.map(d => d.data() as UserData);
+        setUsers(data.sort((a, b) => Number(a.id) - Number(b.id)));
+      }
+    }, (err) => console.error("無法讀取用戶資料:", err));
+
+    // 監聽交易紀錄
+    const txCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'transactions');
+    const unsubTx = onSnapshot(txCol, (snapshot) => {
+      if (snapshot.empty) {
+        MOCK_TX.forEach(tx => setDoc(doc(txCol, tx.id), tx));
+      } else {
+        const data = snapshot.docs.map(d => d.data() as TransactionData);
+        setTransactions(data.sort((a, b) => b.id.localeCompare(a.id)));
+      }
+    }, (err) => console.error("無法讀取交易資料:", err));
+
+    return () => { unsubUsers(); unsubTx(); };
+  }, [fbUser, isLoggedIn]);
+
+  // 搜尋與篩選邏輯
+  const filteredUsers = users.filter(u => {
+    const matchSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchRole = filterRole === '全部角色' || u.role === filterRole;
+    const matchStatus = filterStatus === '全部狀態' || u.status === filterStatus;
     return matchSearch && matchRole && matchStatus;
   });
 
-  // 變更用戶狀態功能
-  const handleStatusChange = (userId: number, newStatus: string) => {
-    setUsers(users.map(user => 
-      user.id === userId ? { ...user, status: newStatus } : user
-    ));
-    setOpenMenuId(null); // 關閉選單
-    setConfirmAction(null); // 關閉確認視窗
+  // 更新用戶狀態至 Firebase
+  const handleStatusChange = async (userId: string, newStatus: string) => {
+    if (!fbUser) return;
+    try {
+      const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', userId);
+      await updateDoc(userRef, { status: newStatus });
+      setConfirmAction(null);
+      setOpenMenuId(null);
+    } catch (e) {
+      console.error("更新用戶狀態失敗:", e);
+      alert("更新失敗，請檢查 Firebase 權限規則");
+    }
   };
 
-  // 模擬交易紀錄
-  const transactions = [
-    { id: 'TX-1049', user: '海角七號民宿', item: '專業成長版 Pro (月訂閱)', amount: 999, status: '成功', date: '2024/06/01 10:23' },
-    { id: 'TX-1048', user: 'Ocean Blue 衝浪店', item: '單次置頂推廣 (Boost)', amount: 300, status: '成功', date: '2024/05/28 15:40' },
-    { id: 'TX-1047', user: '老宅咖啡·午後', item: '精準推播 (Smart Push)', amount: 100, status: '成功', date: '2024/05/25 09:12' },
-  ];
+  const totalRevenue = transactions.reduce((sum, tx) => sum + tx.amount, 0) + 141101;
 
-  // --- 1. Admin 登入頁面 ---
+  // --- UI: 登入頁面 ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
-          <div className="flex justify-center mb-6">
-            <div className="bg-indigo-100 p-3 rounded-xl">
-              <ShieldAlert className="w-8 h-8 text-indigo-600" />
-            </div>
+        <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 text-center animate-in fade-in zoom-in duration-300">
+          <div className="bg-indigo-100 p-3 rounded-xl inline-block mb-6 shadow-inner">
+            <ShieldAlert className="w-8 h-8 text-indigo-600" />
           </div>
-          <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">X-Match 系統總後台</h1>
-          <p className="text-center text-slate-500 mb-8">請輸入管理員憑證以登入系統</p>
-          
-          <form onSubmit={handleLogin} className="space-y-5">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">X-Match 系統總後台</h1>
+          <p className="text-slate-500 mb-8 text-sm font-medium">資料庫連線代號：<br/><span className="text-indigo-600 font-bold">{internalAppId}</span></p>
+          <form onSubmit={handleLogin} className="space-y-5 text-left">
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">管理員帳號</label>
-              <input type="text" defaultValue="admin" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">管理員帳號</label>
+              <input type="text" placeholder="admin" defaultValue="admin" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700" />
             </div>
             <div>
-              <label className="block text-sm font-bold text-slate-700 mb-1">密碼</label>
-              <input type="password" defaultValue="password" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" required />
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">安全存取密碼</label>
+              <input type="password" placeholder="••••••••" defaultValue="password" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-bold text-slate-700" />
             </div>
-            <button type="submit" className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition-colors shadow-lg active:scale-95 transform duration-150">
-              登入管理系統
-            </button>
+            <button className="w-full py-3.5 mt-2 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-sm uppercase tracking-widest">安全登入</button>
           </form>
         </div>
       </div>
     );
   }
 
-  // --- 2. Admin 內容渲染 ---
+  // --- UI: 管理介面內容 ---
   const renderContent = () => {
     switch (activeTab) {
-      // --- A. 營運總覽 ---
       case 'overview':
         return (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">系統營運總覽</h2>
-            
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Users size={20}/></div>
-                  <span className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-2 py-1 rounded-full"><TrendingUp size={12} className="mr-1"/> +12%</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-1">總註冊用戶數</p>
-                <h3 className="text-3xl font-bold text-slate-900">{users.length + 1848}</h3>
-              </div>
-              
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Briefcase size={20}/></div>
-                  <span className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-2 py-1 rounded-full"><TrendingUp size={12} className="mr-1"/> +8%</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-1">活躍廠商案源</p>
-                <h3 className="text-3xl font-bold text-slate-900">426</h3>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><DollarSign size={20}/></div>
-                  <span className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-2 py-1 rounded-full"><TrendingUp size={12} className="mr-1"/> +24%</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-1">本月總營收 (TWD)</p>
-                <h3 className="text-3xl font-bold text-slate-900">$142,500</h3>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><FileText size={20}/></div>
-                  <span className="text-xs font-bold text-green-600 flex items-center bg-green-50 px-2 py-1 rounded-full"><TrendingUp size={12} className="mr-1"/> +5%</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-1">成功簽署合約數</p>
-                <h3 className="text-3xl font-bold text-slate-900">85</h3>
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-end">
+              <h2 className="text-2xl font-bold text-slate-900">系統營運總覽</h2>
+              <div className="text-xs text-slate-500 flex items-center gap-1 font-medium bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-200">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div> Live Data
               </div>
             </div>
-
-            {/* Charts & Activity */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="font-bold text-slate-900">營收趨勢 (近 6 個月)</h3>
-                  <select className="text-sm border-slate-200 rounded-lg p-1 outline-none text-slate-600"><option>2024</option></select>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[
+                { label: '總註冊用戶', value: users.length + 1848, trend: '+12%', icon: Users },
+                { label: '活躍案源', value: 426, trend: '+8%', icon: Briefcase },
+                { label: '本月總營收', value: `$${totalRevenue.toLocaleString()}`, trend: '+24%', color: 'text-emerald-600', icon: DollarSign },
+                { label: '完成合約', value: 85, trend: '+5%', icon: FileText }
+              ].map((kpi, i) => (
+                <div key={i} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
+                      <kpi.icon size={20} />
+                    </div>
+                    <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">{kpi.trend}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mb-1 font-black uppercase tracking-widest">{kpi.label}</p>
+                  <h3 className={`text-3xl font-black ${kpi.color || 'text-slate-900'}`}>{kpi.value}</h3>
                 </div>
-                <div className="h-64 bg-slate-50 rounded-lg flex items-center justify-center border border-dashed border-slate-200">
-                  <p className="text-slate-400 text-sm flex items-center gap-2"><Activity size={16}/> 圖表開發中 (Chart.js / Recharts 預留位置)</p>
+              ))}
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="font-bold text-slate-900 mb-6">營收趨勢分析 (Cloud Data)</h3>
+                <div className="h-64 bg-slate-50 rounded-xl border border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 gap-2">
+                   <Activity size={32} className="animate-pulse text-indigo-300" /> 
+                   <p className="text-xs font-bold uppercase tracking-widest">Chart Visualization Pending...</p>
                 </div>
               </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-slate-900 mb-4">待辦事項 (Needs Action)</h3>
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="font-bold text-slate-900 mb-6">待辦事項 (Needs Action)</h3>
                 <div className="space-y-4">
-                  <div className="p-3 bg-orange-50 border border-orange-100 rounded-lg flex justify-between items-center">
+                  <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl flex justify-between items-center">
                     <div>
-                      <p className="text-sm font-bold text-orange-800">商家實名審核</p>
-                      <p className="text-xs text-orange-600">有 12 筆待處理</p>
+                      <p className="text-sm font-bold text-orange-800">用戶實名審核</p>
+                      <p className="text-xs text-orange-600 font-medium mt-0.5">有 {users.filter(u => u.status === '待審核').length} 筆待處理</p>
                     </div>
-                    <button className="text-xs bg-white text-orange-600 font-bold px-2 py-1 rounded shadow-sm hover:bg-orange-100">前往審核</button>
-                  </div>
-                  <div className="p-3 bg-red-50 border border-red-100 rounded-lg flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-bold text-red-800">用戶檢舉回報</p>
-                      <p className="text-xs text-red-600">有 3 筆未結案</p>
-                    </div>
-                    <button className="text-xs bg-white text-red-600 font-bold px-2 py-1 rounded shadow-sm hover:bg-red-100">查看詳情</button>
+                    <button onClick={() => setActiveTab('users')} className="text-xs bg-white text-orange-600 font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-orange-100 transition-colors">前往審核</button>
                   </div>
                 </div>
               </div>
@@ -178,355 +243,249 @@ export default function AdminDashboardPage() {
           </div>
         );
 
-      // --- B. 用戶與權限管理 ---
       case 'users':
         return (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">用戶與權限管理</h2>
-            
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px]">
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-bold text-slate-900">用戶權限控管 (連線至 Firestore)</h2>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
+              
               {/* 篩選工具列 */}
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50 rounded-t-xl">
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                    <input 
-                      type="text"
-                      placeholder="搜尋名稱或 Email..."
-                      className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50">
+                <div className="relative w-full sm:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input 
+                    type="text" placeholder="搜尋姓名或 Email..." 
+                    className="w-full pl-9 p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
+                    value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  />
                 </div>
-                <div className="flex gap-2">
-                  <select 
-                    className="p-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none shadow-sm cursor-pointer"
-                    value={filterRole}
-                    onChange={(e) => setFilterRole(e.target.value)}
-                  >
-                    <option value="全部角色">全部角色</option>
-                    <option value="商家">商家</option>
-                    <option value="創作者">創作者</option>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <select className="flex-1 sm:flex-none border border-slate-200 rounded-xl p-2.5 text-sm bg-white font-bold text-slate-600 outline-none shadow-sm cursor-pointer" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
+                    <option>全部角色</option><option>商家</option><option>創作者</option>
                   </select>
-                  <select 
-                    className="p-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-600 outline-none shadow-sm cursor-pointer"
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                  >
-                    <option value="全部狀態">全部狀態</option>
-                    <option value="活躍">活躍</option>
-                    <option value="待審核">待審核</option>
-                    <option value="停權">停權</option>
+                  <select className="flex-1 sm:flex-none border border-slate-200 rounded-xl p-2.5 text-sm bg-white font-bold text-slate-600 outline-none shadow-sm cursor-pointer" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                    <option>全部狀態</option><option>活躍</option><option>待審核</option><option>停權</option>
                   </select>
                 </div>
               </div>
 
-              {/* 修正：增加 pb-24 以確保最後一筆資料的下拉選單不會被截斷 */}
-              <div className="overflow-x-auto pb-24">
+              {/* 資料表格 */}
+              <div className="overflow-x-auto flex-grow pb-32">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-white text-slate-500 border-b border-slate-200">
+                  <thead className="bg-white border-b text-slate-400 uppercase text-[10px] font-black tracking-widest">
                     <tr>
-                      <th className="px-6 py-4 font-bold">用戶資訊</th>
-                      <th className="px-6 py-4 font-bold">角色 / 方案</th>
-                      <th className="px-6 py-4 font-bold">狀態</th>
-                      <th className="px-6 py-4 font-bold">加入時間</th>
-                      <th className="px-6 py-4 font-bold text-right">操作</th>
+                      <th className="px-6 py-5">用戶資訊</th>
+                      <th className="px-6 py-5">角色定位</th>
+                      <th className="px-6 py-5">帳號狀態</th>
+                      <th className="px-6 py-5 text-right">權限操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
-                    {filteredUsers.length > 0 ? (
-                      filteredUsers.map((user) => (
-                        <tr key={user.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="px-6 py-4">
-                            <p className="font-bold text-slate-900">{user.name}</p>
-                            <p className="text-xs text-slate-500">{user.email}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 rounded text-xs font-bold ${user.role === '商家' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
-                                {user.role}
-                              </span>
-                              {user.plan === 'Pro' && (
-                                <span className="px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">PRO</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full w-fit text-xs font-bold ${
-                              user.status === '活躍' ? 'bg-green-100 text-green-700' : 
-                              user.status === '待審核' ? 'bg-orange-100 text-orange-700' : 
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {user.status === '活躍' ? <CheckCircle2 size={12}/> : user.status === '待審核' ? <ShieldAlert size={12}/> : <XCircle size={12}/>}
-                              {user.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-slate-500">{user.joinDate}</td>
-                          <td className="px-6 py-4 text-right relative">
-                            {/* 操作按鈕 */}
-                            <button 
-                              onClick={() => setOpenMenuId(openMenuId === user.id ? null : user.id)}
-                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors focus:outline-none"
-                            >
-                              <MoreVertical size={16} />
-                            </button>
+                    {filteredUsers.length > 0 ? filteredUsers.map(u => (
+                      <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-bold text-slate-900 text-base">{u.name}</p>
+                          <p className="text-[11px] text-slate-400 font-mono mt-0.5">{u.email}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-black border ${
+                            u.role === '商家' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-purple-50 text-purple-600 border-purple-100'
+                          }`}>{u.role}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                           <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit ${
+                             u.status === '活躍' ? 'bg-green-100 text-green-700' : 
+                             u.status === '停權' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                           }`}>
+                             <div className={`w-1.5 h-1.5 rounded-full ${u.status === '活躍' ? 'bg-green-600' : u.status === '停權' ? 'bg-red-600' : 'bg-orange-600'}`} />
+                             {u.status}
+                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-right relative">
+                          <button onClick={() => setOpenMenuId(openMenuId === u.id ? null : u.id)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors focus:outline-none">
+                            <MoreVertical size={18} />
+                          </button>
 
-                            {/* 彈出操作選單 - 修正定位與 z-index 確保不卡圖 */}
-                            {openMenuId === user.id && (
-                              <>
-                                {/* 點擊背景關閉選單 */}
-                                <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)}></div>
-                                <div className="absolute right-6 top-full mt-1 w-36 bg-white rounded-lg shadow-xl border border-slate-200 z-50 py-1 text-left overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                                  {user.status !== '活躍' && (
-                                    <button 
-                                      onClick={() => {
-                                        setConfirmAction({ userId: user.id, userName: user.name, newStatus: '活躍' });
-                                        setOpenMenuId(null);
-                                      }} 
-                                      className="w-full px-4 py-2.5 text-sm text-green-700 font-medium hover:bg-green-50 flex items-center gap-2 transition-colors"
-                                    >
-                                      <CheckCircle2 size={14}/> 設為活躍
-                                    </button>
-                                  )}
-                                  {user.status !== '停權' && (
-                                    <button 
-                                      onClick={() => {
-                                        setConfirmAction({ userId: user.id, userName: user.name, newStatus: '停權' });
-                                        setOpenMenuId(null);
-                                      }} 
-                                      className="w-full px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-2 transition-colors"
-                                    >
-                                      <XCircle size={14}/> 停權帳號
-                                    </button>
-                                  )}
-                                  {user.status !== '待審核' && (
-                                    <button 
-                                      onClick={() => {
-                                        setConfirmAction({ userId: user.id, userName: user.name, newStatus: '待審核' });
-                                        setOpenMenuId(null);
-                                      }} 
-                                      className="w-full px-4 py-2.5 text-sm text-orange-600 font-medium hover:bg-orange-50 flex items-center gap-2 transition-colors border-t border-slate-100"
-                                    >
-                                      <ShieldAlert size={14}/> 退回審核
-                                    </button>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
-                          找不到符合條件的用戶
+                          {/* 彈出選單 */}
+                          {openMenuId === u.id && (
+                            <>
+                              <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)}></div>
+                              <div className="absolute right-6 top-12 w-40 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100">
+                                {u.status !== '活躍' && <button onClick={() => setConfirmAction({userId: u.id, userName: u.name, newStatus: '活躍'})} className="w-full px-4 py-2.5 hover:bg-green-50 text-xs font-black text-green-600 flex items-center gap-2"><CheckCircle2 size={14}/>設為活躍</button>}
+                                {u.status !== '停權' && <button onClick={() => setConfirmAction({userId: u.id, userName: u.name, newStatus: '停權'})} className="w-full px-4 py-2.5 hover:bg-red-50 text-xs font-black text-red-600 flex items-center gap-2"><XCircle size={14}/>停權帳號</button>}
+                                <button onClick={() => setConfirmAction({userId: u.id, userName: u.name, newStatus: '待審核'})} className="w-full px-4 py-2.5 hover:bg-orange-50 text-xs font-black text-orange-600 border-t border-slate-100 flex items-center gap-2 mt-1 pt-2"><ShieldAlert size={14}/>退回審核</button>
+                              </div>
+                            </>
+                          )}
                         </td>
                       </tr>
+                    )) : (
+                      <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400 font-medium">尚未找到任何用戶資料或正在載入中...</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* --- 確認變更狀態的 Modal 視窗 --- */}
+            {/* 確認對話框 */}
             {confirmAction && (
-              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
-                  <div className="flex items-center gap-3 mb-4 text-slate-900">
-                    <div className="bg-amber-100 text-amber-600 p-2 rounded-full">
-                      <AlertTriangle size={24} />
-                    </div>
-                    <h3 className="text-xl font-bold">確認變更狀態</h3>
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-3 mb-4 text-amber-500">
+                    <div className="p-3 bg-amber-50 rounded-2xl"><AlertTriangle size={24}/></div>
+                    <h3 className="font-black text-xl text-slate-900">變更狀態確認</h3>
                   </div>
-                  
-                  <p className="text-slate-600 mb-6 leading-relaxed">
-                    您即將把用戶 <span className="font-bold text-slate-900">「{confirmAction.userName}」</span> 的帳號狀態更改為：
-                    <span className={`ml-1 font-bold px-2 py-0.5 rounded text-sm ${
-                      confirmAction.newStatus === '活躍' ? 'bg-green-100 text-green-700' :
-                      confirmAction.newStatus === '停權' ? 'bg-red-100 text-red-700' :
-                      'bg-orange-100 text-orange-700'
-                    }`}>
-                      {confirmAction.newStatus}
-                    </span>
-                    <br/><br/>
-                    請確認是否執行此操作？
+                  <p className="text-sm text-slate-600 mb-8 leading-relaxed font-medium">
+                    確定要將用戶 「<span className="font-black text-slate-900">{confirmAction.userName}</span>」 變更為 <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{confirmAction.newStatus}</span> 嗎？<br/><br/>此操作將永久寫入您的 Firebase 資料庫。
                   </p>
-
-                  <div className="flex gap-3 justify-end">
-                    <button
-                      onClick={() => setConfirmAction(null)}
-                      className="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
-                    >
-                      取消
-                    </button>
-                    <button
-                      onClick={() => handleStatusChange(confirmAction.userId, confirmAction.newStatus)}
-                      className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md active:scale-95"
-                    >
-                      確認變更
-                    </button>
+                  <div className="flex gap-3">
+                    <button onClick={() => setConfirmAction(null)} className="flex-1 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-100 rounded-xl transition-all">取消操作</button>
+                    <button onClick={() => handleStatusChange(confirmAction.userId, confirmAction.newStatus)} className="flex-1 py-3.5 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">確認寫入</button>
                   </div>
                 </div>
               </div>
             )}
           </div>
         );
-
-      // --- C. 財務與營收報表 ---
+      
       case 'revenue':
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-slate-900">財務與營收報表</h2>
-              <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-50">
-                匯出報表 (CSV)
-              </button>
+              <h2 className="text-2xl font-bold text-slate-900">財務報表 (Syncing)</h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-slate-900 text-white p-6 rounded-xl shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><DollarSign size={80}/></div>
-                <div className="relative z-10">
-                  <p className="text-indigo-300 text-sm font-medium mb-1">當月總營收淨利</p>
-                  <h3 className="text-4xl font-bold mb-4">$142,500</h3>
-                  <div className="flex justify-between text-sm text-slate-300 border-t border-white/20 pt-4 mt-2">
-                    <span>上月同期: $125,000</span>
-                    <span className="text-green-400 font-bold flex items-center"><ArrowUpRight size={14}/> 14%</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <p className="text-sm text-slate-500 mb-1">Pro 訂閱收入 (MRR)</p>
-                <h3 className="text-3xl font-bold text-slate-900 mb-4">$98,500</h3>
-                <div className="w-full bg-slate-100 rounded-full h-2 mb-2">
-                  <div className="bg-indigo-500 h-2 rounded-full" style={{ width: '70%' }}></div>
-                </div>
-                <p className="text-xs text-slate-400">佔總營收 70%</p>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <p className="text-sm text-slate-500 mb-1">Boost 加速器收入</p>
-                <h3 className="text-3xl font-bold text-slate-900 mb-4">$44,000</h3>
-                <div className="w-full bg-slate-100 rounded-full h-2 mb-2">
-                  <div className="bg-amber-500 h-2 rounded-full" style={{ width: '30%' }}></div>
-                </div>
-                <p className="text-xs text-slate-400">佔總營收 30%</p>
-              </div>
+            <div className="bg-slate-900 p-10 rounded-3xl text-white relative overflow-hidden shadow-2xl">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl -mr-32 -mt-32"></div>
+               <p className="text-indigo-300 font-black mb-2 uppercase tracking-widest text-[10px]">Total Accumulated Revenue</p>
+               <h3 className="text-6xl font-black tracking-tighter">${totalRevenue.toLocaleString()}</h3>
+               <div className="mt-8 flex items-center gap-4">
+                 <div className="flex items-center gap-1 text-green-400 bg-green-400/10 px-2.5 py-1 rounded-lg text-xs font-black">
+                   <ArrowUpRight size={14} /> +14.2%
+                 </div>
+                 <p className="text-slate-400 text-xs font-bold italic tracking-wider">MOM GROWTH</p>
+               </div>
             </div>
-
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mt-6">
-              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-bold text-slate-900">近期金流交易紀錄</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 font-bold">交易序號</th>
-                      <th className="px-6 py-4 font-bold">購買項目</th>
-                      <th className="px-6 py-4 font-bold">付款方</th>
-                      <th className="px-6 py-4 font-bold">金額 (TWD)</th>
-                      <th className="px-6 py-4 font-bold">狀態</th>
-                      <th className="px-6 py-4 font-bold">時間</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {transactions.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4 font-mono text-slate-500 text-xs">{tx.id}</td>
-                        <td className="px-6 py-4 font-bold text-slate-900">{tx.item}</td>
-                        <td className="px-6 py-4 text-slate-600">{tx.user}</td>
-                        <td className="px-6 py-4 font-bold text-slate-900">${tx.amount}</td>
-                        <td className="px-6 py-4">
-                          <span className="px-2 py-1 bg-green-50 text-green-600 rounded text-xs font-bold">{tx.status}</span>
-                        </td>
-                        <td className="px-6 py-4 text-slate-500 text-xs">{tx.date}</td>
+            
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+               <div className="p-5 border-b bg-slate-50 flex justify-between items-center">
+                  <h4 className="font-black text-slate-900 text-xs flex items-center gap-2 uppercase tracking-widest"><DollarSign size={14} className="text-indigo-500"/> Recent Transactions</h4>
+                  <button className="text-[10px] font-black text-indigo-600 hover:text-indigo-800 transition-colors bg-indigo-50 px-3 py-1.5 rounded-lg uppercase tracking-widest">Export CSV</button>
+               </div>
+               <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-left">
+                   <thead className="bg-white border-b text-slate-400 text-[9px] font-black uppercase tracking-[0.2em]">
+                      <tr>
+                        <th className="px-6 py-5">Item Details</th>
+                        <th className="px-6 py-5 text-right">Amount (TWD)</th>
+                        <th className="px-6 py-5 text-right">Timestamp</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                   </thead>
+                   <tbody className="divide-y divide-slate-100 font-medium">
+                      {transactions.length > 0 ? transactions.map(tx => (
+                        <tr key={tx.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                             <p className="font-bold text-slate-900">{tx.item}</p>
+                             <p className="text-[10px] text-slate-400 font-mono uppercase mt-0.5">{tx.user} • {tx.id}</p>
+                          </td>
+                          <td className="px-6 py-4 text-right font-black text-indigo-600 text-base">${tx.amount.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-right text-slate-400 text-[10px] font-mono">{tx.date}</td>
+                        </tr>
+                      )) : (
+                        <tr><td colSpan={3} className="px-6 py-16 text-center text-slate-400 font-bold italic text-xs tracking-widest">SYNCHRONIZING WITH CLOUD STORAGE...</td></tr>
+                      )}
+                   </tbody>
+                 </table>
+               </div>
             </div>
           </div>
         );
 
       case 'settings':
         return (
-          <div className="p-10 text-center text-slate-500 bg-white rounded-xl border border-slate-200 shadow-sm">
-            <Settings size={48} className="mx-auto mb-4 text-slate-300"/>
-            <h3 className="font-bold text-slate-900 mb-2">系統設定</h3>
-            <p>全域變數、前台橫幅控制與系統日誌開發中...</p>
+          <div className="py-24 px-4 text-center bg-white rounded-3xl border border-slate-200 border-dashed animate-in fade-in flex flex-col items-center justify-center">
+            <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
+              <Settings size={32} className="text-slate-300 animate-[spin_4s_linear_infinite]"/>
+            </div>
+            <h3 className="font-black text-slate-900 mb-3 text-xl uppercase tracking-widest">System Configuration</h3>
+            <p className="text-slate-500 text-sm max-w-sm mx-auto font-medium leading-relaxed mb-8">
+              Global platform parameters, API endpoint controls, and Firebase Security Rules are currently locked to prevent accidental modifications during development.
+            </p>
+            <span className="px-4 py-1.5 bg-slate-100 text-slate-400 font-bold text-[10px] uppercase tracking-widest rounded-full">Development Mode</span>
           </div>
         );
 
-      default:
-        return null;
+      default: return null;
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* 側邊導覽列 (Admin Sidebar) */}
-      <aside className="w-64 bg-slate-900 text-slate-300 flex-shrink-0 hidden md:flex flex-col h-screen sticky top-0">
-        <div className="p-6 border-b border-slate-800">
-          <Link href="/" className="flex items-center gap-2">
-            <ShieldCheck className="text-indigo-500 w-6 h-6" />
-            <span className="font-extrabold text-xl text-white tracking-tight">Admin Console</span>
+    <div className="min-h-screen bg-slate-50 flex font-sans selection:bg-indigo-100 selection:text-indigo-900">
+      {/* 側邊導覽 - Admin Sidebar */}
+      <aside className="w-64 bg-slate-900 text-slate-300 hidden md:flex flex-col h-screen sticky top-0 shadow-2xl z-20">
+        <div className="p-8 border-b border-slate-800/50">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="p-2 bg-indigo-600 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-indigo-600/20">
+              <ShieldCheck className="text-white w-5 h-5" />
+            </div>
+            <span className="font-black text-xl text-white tracking-tighter uppercase italic">X-Match <span className="text-indigo-400 text-[10px] block font-black tracking-[0.3em] not-italic mt-0.5">Control</span></span>
           </Link>
         </div>
-        
-        <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-          <button onClick={() => setActiveTab('overview')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'overview' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
-            <LayoutDashboard size={18}/> 營運總覽
-          </button>
-          <button onClick={() => setActiveTab('users')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'users' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
-            <Users size={18}/> 用戶與權限管理
-          </button>
-          <button onClick={() => setActiveTab('revenue')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'revenue' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
-            <PieChart size={18}/> 財務與營收報表
-          </button>
-          <div className="pt-4 mt-4 border-t border-slate-800">
-            <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-colors ${activeTab === 'settings' ? 'bg-indigo-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>
-              <Settings size={18}/> 系統設定
+        <nav className="flex-1 p-6 space-y-2">
+          {[
+            { id: 'overview', icon: LayoutDashboard, label: '營運總覽' },
+            { id: 'users', icon: Users, label: '用戶管理' },
+            { id: 'revenue', icon: DollarSign, label: '財務報表' },
+            { id: 'settings', icon: Settings, label: '系統設定' }
+          ].map((item) => (
+            <button 
+              key={item.id}
+              onClick={() => setActiveTab(item.id as AdminTab)} 
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                activeTab === item.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/50' : 'hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <item.icon size={16}/> {item.label}
             </button>
-          </div>
-        </div>
-
-        <div className="p-4 border-t border-slate-800">
-          <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-slate-400 hover:bg-slate-800 hover:text-white transition-colors">
-            <LogOut size={18}/> 登出系統
-          </button>
+          ))}
+        </nav>
+        <div className="p-6 border-t border-slate-800/50">
+           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/20 rounded-xl transition-all">
+             <LogOut size={16}/> 登出系統
+           </button>
         </div>
       </aside>
 
-      {/* 主內容區 */}
-      <main className="flex-1 overflow-hidden flex flex-col h-screen">
-        {/* Top Header (Mobile menu & User Profile) */}
-        <header className="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shrink-0">
-          <div className="md:hidden font-bold text-slate-900">Admin Console</div>
-          <div className="flex-1 hidden md:block"></div> {/* Spacer */}
-          
-          <div className="flex items-center gap-4">
-            <button className="text-slate-500 hover:text-slate-700 relative">
-              <Bell size={20} />
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-            </button>
-            <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
-              <div className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-sm shadow-sm">
-                A
+      {/* 主工作區 */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden bg-slate-50">
+        <header className="h-16 bg-white border-b border-slate-100 flex items-center justify-between px-8 shadow-sm z-10 shrink-0">
+           <div className="md:hidden"><ShieldCheck className="text-indigo-600 w-6 h-6" /></div>
+           <div className="flex-1"></div>
+           <div className="flex items-center gap-6">
+              <button className="text-slate-400 hover:text-slate-600 transition-colors relative">
+                <Bell size={20} />
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
+              </button>
+              <div className="w-px h-6 bg-slate-100" />
+              <div className="flex items-center gap-3">
+                 <div className="text-right hidden sm:block">
+                    <p className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">Super Admin</p>
+                    <p className="text-[9px] text-green-500 font-black uppercase tracking-widest">● System Online</p>
+                 </div>
+                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-white font-black text-xs shadow-md border border-slate-700">AD</div>
               </div>
-              <span className="text-sm font-bold text-slate-700 hidden sm:block">Super Admin</span>
-            </div>
-          </div>
+           </div>
         </header>
 
-        {/* 渲染內容 */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 relative">
-          <div className="max-w-7xl mx-auto">
-            {renderContent()}
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-8 relative">
+           <div className="max-w-6xl mx-auto">
+              {renderContent()}
+           </div>
+           
+           <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200 shadow-xl text-[9px] font-black text-slate-500 animate-in slide-in-from-bottom-5">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+              DB Sync: <span className="text-indigo-600 tracking-wider ml-1">{internalAppId.toUpperCase()}</span>
+           </div>
         </div>
       </main>
     </div>
