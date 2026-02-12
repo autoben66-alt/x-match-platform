@@ -289,7 +289,7 @@ export default function Home() {
           </h2>
           <p className="text-slate-600 max-w-2xl mx-auto">
             加入 X-Match 的夥伴們，已經創造了無數雙贏的合作案例。<br/>
-            (此區塊支援未來於 Admin 總後台進行新增與動態替換)
+          
           </p>
         </div>
 

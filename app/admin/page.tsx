@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
   Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell,
-  AlertTriangle
+  AlertTriangle, Quote, Plus, Loader2
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -91,6 +91,10 @@ export default function AdminDashboardPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<{userId: string, userName: string, newStatus: string} | null>(null);
 
+  // 首頁評價 CMS 控制狀態
+  const [newTestimonial, setNewTestimonial] = useState({ quote: '', authorName: '', metricLabel: '' });
+  const [isSubmittingTestimonial, setIsSubmittingTestimonial] = useState(false);
+
   // Firestore 真實資料狀態
   const [users, setUsers] = useState<UserData[]>([]);
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
@@ -167,6 +171,41 @@ export default function AdminDashboardPage() {
     } catch (e) {
       console.error("更新用戶狀態失敗:", e);
       alert("更新失敗，請檢查 Firebase 權限規則");
+    }
+  };
+
+  // 新增首頁評價 (CMS) 至 Firebase
+  const handleAddTestimonial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!db || !fbUser) {
+      alert("尚未連線至資料庫，請稍候再試。");
+      return;
+    }
+    setIsSubmittingTestimonial(true);
+    
+    try {
+      const newId = `case-${Date.now()}`;
+      const testimonialRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', newId);
+      
+      await setDoc(testimonialRef, {
+        id: newId,
+        quote: newTestimonial.quote,
+        authorName: newTestimonial.authorName,
+        authorInitial: newTestimonial.authorName.charAt(0), // 自動抓取第一個字作為頭像代號
+        authorLocation: "台灣優質用戶", // 預設地區
+        metricIcon: 'TrendingUp', // 預設圖示
+        metricLabel: newTestimonial.metricLabel,
+        rating: 5, // 預設 5 星好評
+        image: "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" // 預設美觀背景圖
+      });
+      
+      alert("🎉 評價新增成功！前台首頁已即時同步更新。");
+      setNewTestimonial({ quote: '', authorName: '', metricLabel: '' }); // 清空表單
+    } catch (err) {
+      console.error("新增評價失敗:", err);
+      alert("新增失敗，請檢查 Firebase 權限設定。");
+    } finally {
+      setIsSubmittingTestimonial(false);
     }
   };
 
@@ -415,15 +454,84 @@ export default function AdminDashboardPage() {
 
       case 'settings':
         return (
-          <div className="py-24 px-4 text-center bg-white rounded-3xl border border-slate-200 border-dashed animate-in fade-in flex flex-col items-center justify-center">
-            <div className="w-20 h-20 bg-slate-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-              <Settings size={32} className="text-slate-300 animate-[spin_4s_linear_infinite]"/>
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-900">系統設定與 CMS</h2>
+              <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold tracking-widest uppercase">Admin Level</span>
             </div>
-            <h3 className="font-black text-slate-900 mb-3 text-xl uppercase tracking-widest">System Configuration</h3>
-            <p className="text-slate-500 text-sm max-w-sm mx-auto font-medium leading-relaxed mb-8">
-              Global platform parameters, API endpoint controls, and Firebase Security Rules are currently locked to prevent accidental modifications during development.
-            </p>
-            <span className="px-4 py-1.5 bg-slate-100 text-slate-400 font-bold text-[10px] uppercase tracking-widest rounded-full">Development Mode</span>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Testimonials CMS */}
+              <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-sky-100 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none"></div>
+                <div className="relative z-10">
+                  <h3 className="text-xl font-black text-slate-900 mb-2 flex items-center gap-2">
+                    <Quote className="text-sky-500" size={24} />
+                    首頁評價管理 (Testimonials)
+                  </h3>
+                  <p className="text-sm text-slate-500 mb-8 font-medium">
+                    在此新增的成功案例將會「即時同步」顯示於前台首頁的「聽聽他們怎麼說」區塊。
+                  </p>
+
+                  <form onSubmit={handleAddTestimonial} className="space-y-5">
+                    <div>
+                      <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價內容 (Quote) <span className="text-red-500">*</span></label>
+                      <textarea 
+                        required
+                        placeholder="例如：自從使用了 X-Match，我們的訂房率提升了 30%！"
+                        className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all font-medium text-slate-700 h-28 resize-none"
+                        value={newTestimonial.quote}
+                        onChange={(e) => setNewTestimonial({...newTestimonial, quote: e.target.value})}
+                      />
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">提供者名稱 <span className="text-red-500">*</span></label>
+                        <input 
+                          required
+                          type="text" 
+                          placeholder="例如：海角七號民宿"
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all font-bold text-slate-700"
+                          value={newTestimonial.authorName}
+                          onChange={(e) => setNewTestimonial({...newTestimonial, authorName: e.target.value})}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">成效數字 <span className="text-red-500">*</span></label>
+                        <input 
+                          required
+                          type="text" 
+                          placeholder="例如：轉換率 +30%"
+                          className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all font-bold text-slate-700"
+                          value={newTestimonial.metricLabel}
+                          onChange={(e) => setNewTestimonial({...newTestimonial, metricLabel: e.target.value})}
+                        />
+                      </div>
+                    </div>
+
+                    <button 
+                      disabled={isSubmittingTestimonial}
+                      type="submit" 
+                      className="w-full py-4 mt-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70"
+                    >
+                      {isSubmittingTestimonial ? <Loader2 className="animate-spin" size={18}/> : <Plus size={18} />}
+                      {isSubmittingTestimonial ? '正在寫入雲端...' : '發布至前台首頁'}
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Other Settings (Placeholder) */}
+              <div className="bg-slate-50 rounded-3xl p-8 border border-slate-200 border-dashed flex flex-col items-center justify-center text-center">
+                <Settings size={40} className="text-slate-300 mb-4 animate-[spin_6s_linear_infinite]" />
+                <h3 className="font-black text-slate-900 mb-2 uppercase tracking-widest">進階系統設定</h3>
+                <p className="text-slate-500 text-sm max-w-xs font-medium">
+                  全域參數、API 限制與安全規則，目前於開發模式中鎖定。
+                </p>
+                <span className="mt-6 px-4 py-1.5 bg-slate-200 text-slate-500 font-bold text-[10px] uppercase tracking-widest rounded-full">Locked</span>
+              </div>
+            </div>
           </div>
         );
 
