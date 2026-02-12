@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { 
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
-  Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell
+  Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell,
+  AlertTriangle
 } from 'lucide-react';
 
 type AdminTab = 'overview' | 'users' | 'revenue' | 'settings';
@@ -19,6 +20,9 @@ export default function AdminDashboardPage() {
   const [filterRole, setFilterRole] = useState('全部角色');
   const [filterStatus, setFilterStatus] = useState('全部狀態');
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+
+  // 確認變更狀態的 Modal
+  const [confirmAction, setConfirmAction] = useState<{userId: number, userName: string, newStatus: string} | null>(null);
 
   // 模擬登入
   const handleLogin = (e: React.FormEvent) => {
@@ -50,6 +54,7 @@ export default function AdminDashboardPage() {
       user.id === userId ? { ...user, status: newStatus } : user
     ));
     setOpenMenuId(null); // 關閉選單
+    setConfirmAction(null); // 關閉確認視窗
   };
 
   // 模擬交易紀錄
@@ -179,9 +184,9 @@ export default function AdminDashboardPage() {
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">用戶與權限管理</h2>
             
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-h-[400px]">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm min-h-[400px]">
               {/* 篩選工具列 */}
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50">
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50 rounded-t-xl">
                 <div className="flex gap-2 w-full sm:w-auto">
                   <div className="relative w-full sm:w-72">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -217,7 +222,8 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              {/* 修正：增加 pb-24 以確保最後一筆資料的下拉選單不會被截斷 */}
+              <div className="overflow-x-auto pb-24">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-white text-slate-500 border-b border-slate-200">
                     <tr>
@@ -266,15 +272,18 @@ export default function AdminDashboardPage() {
                               <MoreVertical size={16} />
                             </button>
 
-                            {/* 彈出操作選單 */}
+                            {/* 彈出操作選單 - 修正定位與 z-index 確保不卡圖 */}
                             {openMenuId === user.id && (
                               <>
                                 {/* 點擊背景關閉選單 */}
-                                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)}></div>
-                                <div className="absolute right-6 top-10 w-36 bg-white rounded-lg shadow-xl border border-slate-200 z-20 py-1 text-left overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                                <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)}></div>
+                                <div className="absolute right-6 top-full mt-1 w-36 bg-white rounded-lg shadow-xl border border-slate-200 z-50 py-1 text-left overflow-hidden animate-in fade-in zoom-in-95 duration-100">
                                   {user.status !== '活躍' && (
                                     <button 
-                                      onClick={() => handleStatusChange(user.id, '活躍')} 
+                                      onClick={() => {
+                                        setConfirmAction({ userId: user.id, userName: user.name, newStatus: '活躍' });
+                                        setOpenMenuId(null);
+                                      }} 
                                       className="w-full px-4 py-2.5 text-sm text-green-700 font-medium hover:bg-green-50 flex items-center gap-2 transition-colors"
                                     >
                                       <CheckCircle2 size={14}/> 設為活躍
@@ -282,7 +291,10 @@ export default function AdminDashboardPage() {
                                   )}
                                   {user.status !== '停權' && (
                                     <button 
-                                      onClick={() => handleStatusChange(user.id, '停權')} 
+                                      onClick={() => {
+                                        setConfirmAction({ userId: user.id, userName: user.name, newStatus: '停權' });
+                                        setOpenMenuId(null);
+                                      }} 
                                       className="w-full px-4 py-2.5 text-sm text-red-600 font-medium hover:bg-red-50 flex items-center gap-2 transition-colors"
                                     >
                                       <XCircle size={14}/> 停權帳號
@@ -290,7 +302,10 @@ export default function AdminDashboardPage() {
                                   )}
                                   {user.status !== '待審核' && (
                                     <button 
-                                      onClick={() => handleStatusChange(user.id, '待審核')} 
+                                      onClick={() => {
+                                        setConfirmAction({ userId: user.id, userName: user.name, newStatus: '待審核' });
+                                        setOpenMenuId(null);
+                                      }} 
                                       className="w-full px-4 py-2.5 text-sm text-orange-600 font-medium hover:bg-orange-50 flex items-center gap-2 transition-colors border-t border-slate-100"
                                     >
                                       <ShieldAlert size={14}/> 退回審核
@@ -313,6 +328,48 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             </div>
+
+            {/* --- 確認變更狀態的 Modal 視窗 --- */}
+            {confirmAction && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-3 mb-4 text-slate-900">
+                    <div className="bg-amber-100 text-amber-600 p-2 rounded-full">
+                      <AlertTriangle size={24} />
+                    </div>
+                    <h3 className="text-xl font-bold">確認變更狀態</h3>
+                  </div>
+                  
+                  <p className="text-slate-600 mb-6 leading-relaxed">
+                    您即將把用戶 <span className="font-bold text-slate-900">「{confirmAction.userName}」</span> 的帳號狀態更改為：
+                    <span className={`ml-1 font-bold px-2 py-0.5 rounded text-sm ${
+                      confirmAction.newStatus === '活躍' ? 'bg-green-100 text-green-700' :
+                      confirmAction.newStatus === '停權' ? 'bg-red-100 text-red-700' :
+                      'bg-orange-100 text-orange-700'
+                    }`}>
+                      {confirmAction.newStatus}
+                    </span>
+                    <br/><br/>
+                    請確認是否執行此操作？
+                  </p>
+
+                  <div className="flex gap-3 justify-end">
+                    <button
+                      onClick={() => setConfirmAction(null)}
+                      className="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={() => handleStatusChange(confirmAction.userId, confirmAction.newStatus)}
+                      className="px-5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-md active:scale-95"
+                    >
+                      確認變更
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         );
 
