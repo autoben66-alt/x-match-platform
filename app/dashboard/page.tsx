@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -40,7 +40,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義後台分頁
+// 定義資料型別
 type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings';
 
 interface ProjectData {
@@ -56,6 +56,13 @@ interface ProjectData {
   status: string;
   applicants: number;
   date: string;
+}
+
+interface PaymentItem {
+  id: string;
+  name: string;
+  price: number;
+  type: 'subscription' | 'one-time';
 }
 
 // 初始模擬案源資料 (用於第一次寫入 Firebase)
@@ -85,6 +92,11 @@ export default function DashboardPage() {
     requirements: '',
     spots: 1
   });
+
+  // 金流付款相關狀態
+  const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
+  const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
   // 登入處理
   const handleAuth = (e: React.FormEvent) => {
@@ -162,11 +174,39 @@ export default function DashboardPage() {
     }
   };
 
+  // 處理金流付款程序
+  const handlePaymentSubmit = async () => {
+    setPaymentStep('processing');
+    
+    // 模擬 API 處理延遲
+    setTimeout(async () => {
+      // 成功後將交易寫入 Firestore (讓 Admin 後台可以即時看到)
+      if (db && fbUser && purchaseItem) {
+        try {
+          const newTxId = `TX-${Date.now().toString().slice(-6)}`;
+          const txRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'transactions', newTxId);
+          await setDoc(txRef, {
+            id: newTxId,
+            user: role === 'business' ? '海角七號民宿' : '林小美',
+            item: purchaseItem.name,
+            amount: purchaseItem.price,
+            status: '成功',
+            date: new Date().toLocaleString('zh-TW', { hour12: false })
+          });
+        } catch (err) {
+          console.error("寫入交易紀錄失敗:", err);
+        }
+      }
+      setPaymentStep('success');
+    }, 2000);
+  };
+
   // --- 1. 登入/註冊頁面 ---
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+      // 使用 fixed inset-0 z-[100] 來完美覆蓋原本的 Navbar
+      <div className="fixed inset-0 z-[100] bg-slate-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row my-auto">
           <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-center relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-600 to-indigo-900 opacity-50"></div>
             <div className="relative z-10">
@@ -188,6 +228,12 @@ export default function DashboardPage() {
           </div>
           
           <div className="md:w-1/2 p-12 flex flex-col justify-center">
+             {/* 加入返回首頁的按鈕 */}
+            <div className="mb-8">
+              <Link href="/" className="text-sm font-bold text-slate-400 hover:text-sky-600 transition-colors">
+                &larr; 返回前台首頁
+              </Link>
+            </div>
             <h2 className="text-2xl font-bold text-slate-900 mb-2">
               {authMode === 'login' ? '歡迎回來' : '建立您的帳號'}
             </h2>
@@ -612,8 +658,8 @@ export default function DashboardPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Free Plan Card */}
-              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-                <div className="relative z-10">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
+                <div className="relative z-10 flex-grow">
                   <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded mb-4 inline-block">目前方案</span>
                   <h3 className="text-2xl font-bold text-slate-900 mb-2">Free 免費體驗版</h3>
                   <div className="flex items-baseline mb-4">
@@ -626,14 +672,16 @@ export default function DashboardPage() {
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約 (每月 1 份)</li>
                     <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅深度數據</li>
                   </ul>
+                </div>
+                <div className="mt-auto">
                   <button className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl cursor-not-allowed">使用中</button>
                 </div>
               </div>
 
               {/* Pro Plan Card */}
-              <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white">
+              <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white flex flex-col">
                 <div className="absolute top-0 right-0 bg-yellow-400 text-indigo-900 text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
-                <div className="relative z-10">
+                <div className="relative z-10 flex-grow">
                   <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">
                     專業成長版 Pro <Crown size={20} className="text-yellow-400 fill-yellow-400"/>
                   </h3>
@@ -649,7 +697,17 @@ export default function DashboardPage() {
                     <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 贈送每月置頂推廣 ($300) 每月一次</li>
                     <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 贈送每月精準推播 每月一次</li>
                   </ul>
-                  <button className="w-full py-2 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg">立即升級</button>
+                </div>
+                <div className="mt-auto">
+                  <button 
+                    onClick={() => {
+                      setPurchaseItem({ id: 'pro', name: '專業成長版 Pro (月費)', price: 999, type: 'subscription' });
+                      setPaymentStep('form');
+                    }}
+                    className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg active:scale-95"
+                  >
+                    立即升級 Pro
+                  </button>
                 </div>
               </div>
             </div>
@@ -660,23 +718,39 @@ export default function DashboardPage() {
                 <Rocket className="text-indigo-600" size={20}/> 單次付費推廣 (Boost)
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
                   <div className="flex justify-between items-start mb-2">
                     <div className="p-2 bg-amber-100 text-amber-600 rounded-lg group-hover:scale-110 transition-transform"><Zap size={20} fill="currentColor"/></div>
                     <span className="font-bold text-slate-900">$300</span>
                   </div>
-                  <h4 className="font-bold text-slate-900">置頂推廣 (Featured)</h4>
-                  <p className="text-xs text-slate-500 mt-1 mb-3">讓您的徵才需求置頂 3 天，曝光加倍。</p>
-                  <button className="text-xs font-bold text-indigo-600 hover:underline">購買點數 &rarr;</button>
+                  <h4 className="font-bold text-slate-900 flex-grow">置頂推廣 (Featured)</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">讓您的徵才需求置頂 3 天，曝光加倍。</p>
+                  <button 
+                    onClick={() => {
+                      setPurchaseItem({ id: 'boost-featured', name: '置頂推廣 (單次)', price: 300, type: 'one-time' });
+                      setPaymentStep('form');
+                    }}
+                    className="mt-auto text-xs font-bold text-indigo-600 hover:underline text-left"
+                  >
+                    購買點數 &rarr;
+                  </button>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
                   <div className="flex justify-between items-start mb-2">
                     <div className="p-2 bg-sky-100 text-sky-600 rounded-lg group-hover:scale-110 transition-transform"><Rocket size={20} fill="currentColor"/></div>
                     <span className="font-bold text-slate-900">$100</span>
                   </div>
-                  <h4 className="font-bold text-slate-900">精準推播 (Smart Push)</h4>
-                  <p className="text-xs text-slate-500 mt-1 mb-3">主動推播給附近 10 位符合條件的網紅。</p>
-                  <button className="text-xs font-bold text-indigo-600 hover:underline">購買點數 &rarr;</button>
+                  <h4 className="font-bold text-slate-900 flex-grow">精準推播 (Smart Push)</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">主動推播給附近 10 位符合條件的網紅。</p>
+                  <button 
+                    onClick={() => {
+                      setPurchaseItem({ id: 'boost-push', name: '精準推播 (單次)', price: 100, type: 'one-time' });
+                      setPaymentStep('form');
+                    }}
+                    className="mt-auto text-xs font-bold text-indigo-600 hover:underline text-left"
+                  >
+                    購買點數 &rarr;
+                  </button>
                 </div>
               </div>
             </div>
@@ -903,13 +977,15 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* 頂部導覽 */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
+    // 使用 fixed inset-0 覆蓋掉 layout.tsx 的公用導覽列，達到完全獨立的後台介面
+    <div className="fixed inset-0 z-[100] bg-slate-50 flex flex-col overflow-y-auto">
+      
+      {/* 頂部導覽 (後台專用) */}
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-2">
-              <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight font-sans">
+              <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight font-sans hover:opacity-80 transition-opacity">
                 X-Match
               </Link>
               <span className={`text-xs px-2 py-1 rounded-full font-medium ml-2 ${
@@ -945,7 +1021,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 relative flex-grow">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-1">
             <nav className="space-y-1 sticky top-24">
@@ -963,13 +1039,13 @@ export default function DashboardPage() {
                   {item.label}
                 </button>
               ))}
-              <button 
-                onClick={() => setIsLoggedIn(false)}
-                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg mt-8"
+              <Link 
+                href="/"
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg mt-8 transition-colors"
               >
                 <LogOut size={18} />
-                登出
-              </button>
+                登出回首頁
+              </Link>
             </nav>
           </div>
 
@@ -978,11 +1054,150 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        {/* Firebase 連線狀態指示器 (對齊 Admin) */}
+        {/* Firebase 連線狀態指示器 */}
         {isLoggedIn && (
-          <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200 shadow-xl text-[9px] font-black text-slate-500 animate-in slide-in-from-bottom-5 z-50">
+          <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200 shadow-xl text-[9px] font-black text-slate-500 animate-in slide-in-from-bottom-5 z-40">
              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
              DB Sync: <span className="text-indigo-600 tracking-wider ml-1">{internalAppId.toUpperCase()}</span>
+          </div>
+        )}
+
+        {/* --- 金流付款彈出視窗 (Payment Modal) --- */}
+        {purchaseItem && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200 flex flex-col">
+              
+              {/* Header */}
+              <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50 shrink-0">
+                <h3 className="font-bold text-slate-900">結帳確認</h3>
+                {paymentStep === 'form' && (
+                  <button onClick={() => setPurchaseItem(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+
+              {/* Step 1: Payment Form */}
+              {paymentStep === 'form' && (
+                <div className="p-6 overflow-y-auto">
+                  {/* Order Summary */}
+                  <div className="bg-indigo-50 p-4 rounded-xl mb-6 border border-indigo-100">
+                    <p className="text-xs text-indigo-600 font-bold mb-1 uppercase tracking-wider">購買項目</p>
+                    <div className="flex justify-between items-end">
+                      <p className="font-bold text-slate-900 text-lg">{purchaseItem.name}</p>
+                      <p className="font-black text-2xl text-indigo-700">
+                        NT$ {purchaseItem.price} <span className="text-sm font-normal text-slate-500">{purchaseItem.type === 'subscription' ? '/ 月' : '/ 次'}</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Payment Method Tabs */}
+                  <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
+                    <button 
+                      onClick={() => setPaymentMethod('credit_card')}
+                      className={`flex-1 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${paymentMethod === 'credit_card' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}
+                    >
+                      <CreditCard size={16}/> 信用卡
+                    </button>
+                    <button 
+                      onClick={() => setPaymentMethod('bank_transfer')}
+                      className={`flex-1 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${paymentMethod === 'bank_transfer' ? 'bg-white shadow text-slate-900' : 'text-slate-500'}`}
+                    >
+                      <Landmark size={16}/> 銀行匯款
+                    </button>
+                  </div>
+
+                  {/* Credit Card Form (Mock) */}
+                  {paymentMethod === 'credit_card' && (
+                    <div className="space-y-4 animate-in fade-in slide-in-from-left-2">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">信用卡卡號</label>
+                        <input type="text" placeholder="0000 0000 0000 0000" className="w-full p-3 border border-slate-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      </div>
+                      <div className="flex gap-4">
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-slate-500 mb-1">有效期限</label>
+                          <input type="text" placeholder="MM/YY" className="w-full p-3 border border-slate-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-xs font-bold text-slate-500 mb-1">安全碼 (CVC)</label>
+                          <input type="text" placeholder="123" className="w-full p-3 border border-slate-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bank Transfer Info (Mock) */}
+                  {paymentMethod === 'bank_transfer' && (
+                    <div className="p-5 bg-slate-50 border border-slate-200 rounded-xl animate-in fade-in slide-in-from-right-2">
+                      <p className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+                        <Info size={16} className="text-sky-500" /> 請匯款至以下專屬虛擬帳號：
+                      </p>
+                      <div className="space-y-2 mb-4">
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                          <span className="text-xs text-slate-500">銀行代碼</span>
+                          <span className="font-bold text-slate-700">808 (玉山銀行)</span>
+                        </div>
+                        <div className="flex justify-between items-center pb-2 border-b border-slate-200">
+                          <span className="text-xs text-slate-500">繳款帳號</span>
+                          <span className="font-mono font-bold text-indigo-600 text-lg tracking-wider">9876-5432-1098</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs text-slate-500">應繳金額</span>
+                          <span className="font-bold text-slate-700">NT$ {purchaseItem.price}</span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed">
+                        * 此虛擬帳號限本次交易使用。<br/>
+                        * 轉帳完成後系統將自動為您開通權限，無需額外回報。
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Action Button */}
+                  <div className="mt-8">
+                    <button 
+                      onClick={handlePaymentSubmit}
+                      className="w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 active:scale-95 transition-all"
+                    >
+                      {paymentMethod === 'credit_card' ? '確認付款' : '我已了解，建立虛擬帳號'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Processing */}
+              {paymentStep === 'processing' && (
+                <div className="p-12 flex flex-col items-center justify-center min-h-[300px]">
+                  <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+                  <h3 className="font-bold text-lg text-slate-900 mb-2">安全處理中...</h3>
+                  <p className="text-sm text-slate-500">請勿關閉視窗或重新整理頁面</p>
+                </div>
+              )}
+
+              {/* Step 3: Success */}
+              {paymentStep === 'success' && (
+                <div className="p-8 text-center min-h-[300px] flex flex-col justify-center animate-in zoom-in-95 duration-300">
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="w-10 h-10 text-green-600" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">交易成功！</h3>
+                  <p className="text-sm text-slate-600 mb-8">
+                    感謝您的購買，您的「{purchaseItem.name}」權限已開通。<br/>
+                    電子發票將發送至您的註冊信箱。
+                  </p>
+                  <button 
+                    onClick={() => {
+                      setPurchaseItem(null);
+                      setActiveTab('overview'); // 付款完跳回總覽
+                    }}
+                    className="w-full py-3 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors"
+                  >
+                    返回總覽
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
