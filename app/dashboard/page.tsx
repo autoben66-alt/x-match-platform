@@ -15,7 +15,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } 
 import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-// --- Firebase 初始化 (終極防護版) ---
+// --- Firebase 初始化 ---
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
@@ -43,63 +43,31 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings';
+// 定義新增了 'invitations' 的 Tab
+type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings' | 'invitations';
 
 interface ProjectData {
-  id: string;
-  title: string;
-  category: string;
-  type: string;
-  location: string;
-  totalValue: string;
-  valueBreakdown: string;
-  requirements: string;
-  spots: number;
-  status: string;
-  applicants: number;
-  date: string;
-  image?: string;
-  gallery?: string[];
+  id: string; title: string; category: string; type: string; location: string; 
+  totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
+  status: string; applicants: number; date: string; image?: string; gallery?: string[];
 }
 
 interface TripData {
-  id: string;
-  creatorName: string;
-  destination: string;
-  dates: string;
-  partySize: string;
-  purpose: string;
-  needs: string;
-  status: string;
-  offers: number;
-}
-
-interface PaymentItem {
-  id: string;
-  name: string;
-  price: number;
-  type: 'subscription' | 'one-time';
+  id: string; creatorName: string; destination: string; dates: string; partySize: string; 
+  purpose: string; needs: string; status: string; offers: number;
 }
 
 interface InvitationData {
-  id: string;
-  fromName: string;
-  toName: string;
-  toHandle: string;
-  toAvatar: string;
-  message: string;
-  status: string;
-  date: string;
+  id: string; fromName: string; toName: string; toHandle: string; toAvatar: string;
+  message: string; status: string; date: string;
 }
 
-const MOCK_PROJECTS: ProjectData[] = [
-  { id: '1', title: '海景房開箱體驗招募', category: '住宿', type: '互惠體驗', location: '屏東恆春', totalValue: 'NT$ 8,800', valueBreakdown: '海景房住宿($6800) + 早餐($800) + 接送($1200)', requirements: 'IG 貼文 1 則 + 限動 3 則 (需標記地點)', spots: 1, status: '招募中', applicants: 12, date: '2024/06/01' },
-  { id: '2', title: '夏日餐飲新品推廣', category: '餐飲', type: '付費推廣', location: '台北大安', totalValue: 'NT$ 3,000', valueBreakdown: '餐點($1000) + 車馬費($2000)', requirements: 'Reels 短影音 1 支', spots: 3, status: '已關閉', applicants: 8, date: '2024/05/15' },
-];
+interface PaymentItem {
+  id: string; name: string; price: number; type: 'subscription' | 'one-time';
+}
 
-const MOCK_TRIPS: TripData[] = [
-  { id: 't1', creatorName: '林小美', destination: '宜蘭礁溪', dates: '2024/05/20 - 05/22', partySize: '2大2小', purpose: '家庭週末小旅行', needs: '尋找親子友善飯店，希望有泳池', status: '招募中', offers: 5 }
-];
+const MOCK_PROJECTS: ProjectData[] = [];
+const MOCK_TRIPS: TripData[] = [];
 
 export default function DashboardPage() {
   // 狀態管理
@@ -125,6 +93,9 @@ export default function DashboardPage() {
     destination: '', dates: '', partySize: '1人', purpose: '', needs: ''
   });
 
+  // 邀請相關狀態 (共用)
+  const [invitations, setInvitations] = useState<InvitationData[]>([]);
+
   // 創作者相關狀態 (履歷設定 Profile)
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
@@ -137,9 +108,6 @@ export default function DashboardPage() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-
-  // 邀請相關狀態
-  const [invitations, setInvitations] = useState<InvitationData[]>([]);
 
   // 金流付款相關狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
@@ -159,31 +127,26 @@ export default function DashboardPage() {
   // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
+    
+    // 讀取案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
-      if (snapshot.empty) {
-        MOCK_PROJECTS.forEach(p => setDoc(doc(projectsCol, String(p.id)), p));
-      } else {
-        const data = snapshot.docs.map(d => d.data() as ProjectData);
-        setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
-      }
+      const data = snapshot.docs.map(d => d.data() as ProjectData);
+      setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     });
 
+    // 讀取行程許願池
     const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
     const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
-      if (snapshot.empty) {
-        MOCK_TRIPS.forEach(t => setDoc(doc(tripsCol, String(t.id)), t));
-      } else {
-        const data = snapshot.docs.map(d => d.data() as TripData);
-        setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
-      }
+      const data = snapshot.docs.map(d => d.data() as TripData);
+      setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
     // 讀取邀請資料
     const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
     const unsubInv = onSnapshot(invCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as InvitationData);
-      setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
+      setInvitations(data.sort((a, b) => b.id.localeCompare(a.id))); // 確保最新的在前面
     });
 
     // 讀取當前創作者的履歷資料
@@ -476,15 +439,17 @@ export default function DashboardPage() {
     );
   }
 
+  // ✨ 選單結構：雙方皆擁有獨立的 invitations 選單
   const menuItems = role === 'business' ? [
     { id: 'overview', icon: LayoutDashboard, label: '總覽 Dashboard' },
     { id: 'projects', icon: Briefcase, label: '我的徵才 (案源)' },
-    { id: 'trips', icon: Plane, label: '發出的邀請' },
+    { id: 'invitations', icon: Mail, label: '發出的邀請' },
     { id: 'contracts', icon: FileSignature, label: '合約管理' },
     { id: 'wallet', icon: CreditCard, label: '訂閱與點數' },
     { id: 'settings', icon: Settings, label: '商家設定' },
   ] : [
     { id: 'overview', icon: LayoutDashboard, label: '創作者中心' },
+    { id: 'invitations', icon: Mail, label: '收到的邀請' },
     { id: 'trips', icon: Plane, label: '我的許願行程' },
     { id: 'projects', icon: FileText, label: '我的應徵' },
     { id: 'contracts', icon: FileSignature, label: '合約管理' },
@@ -494,6 +459,9 @@ export default function DashboardPage() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
+        // 過濾創作者自己收到的邀請 (簡單過濾：toName 包含創作者名字)
+        const myReceivedInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
+
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">
@@ -527,9 +495,11 @@ export default function DashboardPage() {
                       <span className="text-xs font-bold text-green-600 flex items-center"><TrendingUp size={12}/> +24%</span>
                     </div>
                   </div>
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-300" onClick={() => setActiveTab('invitations')}>
                     <p className="text-sm text-slate-500 mb-1">收到的邀請</p>
-                    <h3 className="text-3xl font-bold text-slate-900">{invitations.length} <span className="text-sm text-red-500 font-bold text-base">New!</span></h3>
+                    <h3 className="text-3xl font-bold text-slate-900">
+                      {myReceivedInvs.length} {myReceivedInvs.length > 0 && <span className="text-sm text-red-500 font-bold text-base ml-2">New!</span>}
+                    </h3>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500 mb-1">待簽署合約</p>
@@ -538,33 +508,35 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
+            
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="font-bold text-slate-900">近期通知</h3>
                 <button className="text-sm text-sky-600 hover:underline">查看全部</button>
               </div>
               <div className="divide-y divide-slate-50">
-                {role === 'creator' && invitations.length > 0 ? (
-                  invitations.slice(0, 3).map((inv) => (
+                {role === 'creator' && myReceivedInvs.length > 0 ? (
+                  myReceivedInvs.slice(0, 3).map((inv) => (
                     <div key={inv.id} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
                       <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
                       <div>
                         <p className="text-sm text-slate-800">
-                          廠商「{inv.fromName}」向您發送了合作邀請！
+                          廠商「<span className="font-bold">{inv.fromName}</span>」向您發送了合作邀請！
                         </p>
                         <p className="text-xs text-slate-400 mt-1">{inv.date}</p>
                       </div>
+                      <button onClick={() => setActiveTab('invitations')} className="ml-auto text-xs font-bold text-indigo-600 hover:underline mt-1">查看內容</button>
                     </div>
                   ))
                 ) : (
                   [1, 2, 3].map((i) => (
                     <div key={i} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                      <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
+                      <div className="w-2 h-2 rounded-full bg-slate-300 mt-2 shrink-0"></div>
                       <div>
                         <p className="text-sm text-slate-800">
                           {role === 'business' 
                             ? `創作者 @user${i} 已簽署了「暑期推廣合約」，合約正式生效。` 
-                            : `廠商「海角七號民宿」向您的「蘭嶼行程」發送了合作邀請。`}
+                            : `您的行程「蘭嶼星空攝影」已獲得 350 次曝光。`}
                         </p>
                         <p className="text-xs text-slate-400 mt-1">2 小時前</p>
                       </div>
@@ -589,7 +561,6 @@ export default function DashboardPage() {
               </button>
             </div>
             
-            {/* 案源列表 (連接 Firebase) */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -645,7 +616,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* --- 新增案源 Modal (寫入 Firebase) 包含互惠詳情與相簿 --- */}
             {showCreateModal && (
               <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -660,151 +630,75 @@ export default function DashboardPage() {
                   
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-6" onSubmit={handleCreateProject}>
-                      
-                      {/* Section 1: 基本設定 */}
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-sky-500 pl-2">基本設定</h4>
                         <div className="space-y-4">
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1">案源標題 <span className="text-red-500">*</span></label>
-                            <input 
-                              type="text" 
-                              className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" 
-                              placeholder="例如：海景房開箱體驗招募"
-                              value={newProject.title}
-                              onChange={(e) => setNewProject({...newProject, title: e.target.value})}
-                            />
+                            <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" placeholder="例如：海景房開箱體驗招募" value={newProject.title} onChange={(e) => setNewProject({...newProject, title: e.target.value})} />
                           </div>
-                          
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-500 mb-1">類別</label>
-                              <select 
-                                className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm"
-                                value={newProject.category}
-                                onChange={(e) => setNewProject({...newProject, category: e.target.value})}
-                              >
-                                <option>住宿</option>
-                                <option>餐飲</option>
-                                <option>體驗</option>
+                              <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={newProject.category} onChange={(e) => setNewProject({...newProject, category: e.target.value})}>
+                                <option>住宿</option><option>餐飲</option><option>體驗</option>
                               </select>
                             </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-500 mb-1">地點 <span className="text-red-500">*</span></label>
                               <div className="flex items-center relative">
                                  <MapPin size={16} className="absolute left-3 text-slate-400"/>
-                                 <input 
-                                   type="text" 
-                                   className="w-full pl-9 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm"
-                                   placeholder="例如：屏東恆春"
-                                   value={newProject.location}
-                                   onChange={(e) => setNewProject({...newProject, location: e.target.value})}
-                                 />
+                                 <input type="text" className="w-full pl-9 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" placeholder="例如：屏東恆春" value={newProject.location} onChange={(e) => setNewProject({...newProject, location: e.target.value})} />
                               </div>
                             </div>
                           </div>
-
-                          {/* 真實照片上傳功能 */}
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
                             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar items-center">
                               <label className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors relative overflow-hidden">
-                                {isUploading ? (
-                                  <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-                                ) : (
-                                  <>
-                                    <Plus size={24} />
-                                    <span className="text-[10px] mt-1 font-bold">選擇照片</span>
-                                  </>
-                                )}
-                                <input 
-                                  type="file" 
-                                  multiple 
-                                  accept="image/*" 
-                                  className="hidden" 
-                                  onChange={handleFileUpload} 
-                                  disabled={isUploading}
-                                />
+                                {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-indigo-500" /> : <><Plus size={24} /><span className="text-[10px] mt-1 font-bold">選擇照片</span></>}
+                                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
                               </label>
                               {newProject.gallery.map((img, idx) => (
                                 <div key={idx} className="shrink-0 w-20 h-20 bg-slate-200 rounded-lg overflow-hidden relative group shadow-sm">
                                   <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
-                                  <button 
-                                    type="button" 
-                                    onClick={() => handleRemovePhoto(idx)} 
-                                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                                  >
-                                    <X size={12} />
-                                  </button>
+                                  <button type="button" onClick={() => handleRemovePhoto(idx)} className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"><X size={12} /></button>
                                 </div>
                               ))}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">
-                              支援多圖上傳，第一張將預設為前台封面主圖。(需在 Firebase 後台開啟 Storage 服務)
-                            </p>
+                            <p className="text-[10px] text-slate-400 mt-1">支援多圖上傳，第一張將預設為前台封面主圖。(需在 Firebase 後台開啟 Storage 服務)</p>
                           </div>
                         </div>
                       </div>
 
-                      {/* Section 2: 互惠合作詳情 */}
                       <div className="pt-2">
                         <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-indigo-500 pl-2">互惠合作詳情</h4>
                         <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">合作模式</label>
-                              <select 
-                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                                value={newProject.type}
-                                onChange={(e) => setNewProject({...newProject, type: e.target.value})}
-                              >
-                                <option>互惠體驗</option>
-                                <option>付費推廣</option>
+                              <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" value={newProject.type} onChange={(e) => setNewProject({...newProject, type: e.target.value})}>
+                                <option>互惠體驗</option><option>付費推廣</option>
                               </select>
                             </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">開放名額</label>
-                              <input 
-                                type="number" min="1"
-                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                                value={newProject.spots}
-                                onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})}
-                              />
+                              <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" value={newProject.spots} onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})} />
                             </div>
                           </div>
-
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值 (前台顯示金額)</label>
-                              <input 
-                                type="text" 
-                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600 placeholder:font-normal"
-                                placeholder="例如：NT$ 8,800"
-                                value={newProject.totalValue}
-                                onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})}
-                              />
+                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600 placeholder:font-normal" placeholder="例如：NT$ 8,800" value={newProject.totalValue} onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})} />
                             </div>
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解 (請用 + 號分隔)</label>
-                              <input 
-                                type="text" 
-                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm"
-                                placeholder="例如：住宿($6800) + 早餐($800)"
-                                value={newProject.valueBreakdown}
-                                onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})}
-                              />
+                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="例如：住宿($6800) + 早餐($800)" value={newProject.valueBreakdown} onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})} />
                             </div>
                           </div>
-
                           <div>
                             <label className="block text-xs font-bold text-slate-700 mb-1">交付內容需求</label>
-                            <textarea 
-                              className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
-                              placeholder="例如：IG 貼文 1 則 + 限動 3 則 (需標記地點)..."
-                              value={newProject.requirements}
-                              onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}
-                            ></textarea>
+                            <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：IG 貼文 1 則 + 限動 3 則 (需標記地點)..." value={newProject.requirements} onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}></textarea>
                           </div>
                         </div>
                       </div>
@@ -843,50 +737,100 @@ export default function DashboardPage() {
           </div>
         );
 
-      case 'trips':
-        return role === 'business' ? (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
-            {invitations.length > 0 ? (
-              <div className="grid gap-4">
-                {invitations.map((inv) => (
-                  <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
-                    <div className="flex items-center gap-4 md:w-1/3 shrink-0">
-                      <img src={inv.toAvatar} className="w-12 h-12 rounded-full border border-slate-200" alt="avatar" />
-                      <div>
-                        <p className="font-bold text-slate-900">{inv.toName}</p>
-                        <p className="text-xs text-slate-500">{inv.toHandle}</p>
+      // ✨ 新增的 invitations 區塊，負責處理雙方對於「邀請」的檢視
+      case 'invitations':
+        if (role === 'business') {
+          return (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
+              {invitations.length > 0 ? (
+                <div className="grid gap-4">
+                  {invitations.map((inv) => (
+                    <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 md:w-1/3 shrink-0">
+                        <img src={inv.toAvatar} className="w-12 h-12 rounded-full border border-slate-200" alt="avatar" />
+                        <div>
+                          <p className="font-bold text-slate-900">{inv.toName}</p>
+                          <p className="text-xs text-slate-500">{inv.toHandle}</p>
+                        </div>
+                      </div>
+                      <div className="md:w-2/3 flex flex-col justify-center">
+                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
+                           "{inv.message}"
+                         </div>
+                         <div className="flex justify-between items-center">
+                           <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
+                           <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">{inv.status}</span>
+                         </div>
                       </div>
                     </div>
-                    <div className="md:w-2/3 flex flex-col justify-center">
-                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
-                         "{inv.message}"
-                       </div>
-                       <div className="flex justify-between items-center">
-                         <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
-                         <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">{inv.status}</span>
-                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-                <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
-                  <Link href="/creators" className="text-indigo-600 font-bold hover:underline">
-                    前往「找網紅」尋找適合的對象
-                  </Link>
-                  <span className="hidden sm:block text-slate-300">|</span>
-                  <Link href="/trips" className="text-indigo-600 font-bold hover:underline">
-                    前往「行程許願池」尋找適合的對象
-                  </Link>
+                  ))}
                 </div>
-              </div>
-            )}
-          </div>
-        ) : (
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+                  <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
+                    <Link href="/creators" className="text-indigo-600 font-bold hover:underline">
+                      前往「找網紅」尋找適合的對象
+                    </Link>
+                    <span className="hidden sm:block text-slate-300">|</span>
+                    <Link href="/trips" className="text-indigo-600 font-bold hover:underline">
+                      前往「行程許願池」尋找適合的對象
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        } else {
+          // 創作者專屬：收到的邀請
+          const myInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
+          return (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <h2 className="text-2xl font-bold text-slate-900">收到的邀請</h2>
+              {myInvs.length > 0 ? (
+                <div className="grid gap-4">
+                  {myInvs.map((inv) => (
+                    <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 md:w-1/4 shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100">
+                          {inv.fromName.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900">{inv.fromName}</p>
+                          <p className="text-xs text-slate-500">合作廠商</p>
+                        </div>
+                      </div>
+                      <div className="md:w-3/4 flex flex-col justify-center">
+                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700 mb-4 whitespace-pre-wrap leading-relaxed">
+                           {inv.message}
+                         </div>
+                         <div className="flex justify-between items-center">
+                           <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
+                           <div className="flex gap-2">
+                             <button className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
+                             <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">回覆並接受</button>
+                           </div>
+                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 p-12 text-center flex flex-col items-center">
+                   <Mail className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                   <p className="font-bold text-slate-700 text-lg mb-1">尚未收到任何邀請</p>
+                   <p className="text-sm text-slate-500">完善您的 Media Kit，或是發布更多許願行程來吸引廠商吧！</p>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+      case 'trips':
+        // 現在 trips 只有創作者會有這個選單項目 (我的許願行程)
+        return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">我的許願行程</h2>
@@ -925,7 +869,12 @@ export default function DashboardPage() {
                       <p className="text-xs text-slate-500 mb-1">目前收到</p>
                       <p className="text-4xl font-black text-indigo-600 mb-1">{trip.offers}</p>
                       <p className="text-xs text-slate-500 font-medium">間廠商邀請</p>
-                      <button className="mt-4 w-full py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors">查看邀請</button>
+                      <button 
+                        onClick={() => setActiveTab('invitations')} 
+                        className="mt-4 w-full py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors"
+                      >
+                        查看邀請
+                      </button>
                     </div>
                   </div>
                  ))
@@ -985,7 +934,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        );
+        ) : null;
 
       case 'contracts':
         return (
