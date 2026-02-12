@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, ArrowRight, Users, CheckCircle, X, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2 } from 'lucide-react';
+import { MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, ArrowRight, Users, CheckCircle, X, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2, Building2 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -34,8 +34,8 @@ const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a8
 // 定義案源資料結構 (需與 Dashboard 寫入的結構一致)
 interface Opportunity {
   id: string;
-  title: string;           // 對應 Dashboard 的 title
-  business?: string;       // 商家名稱 (若無則顯示預設)
+  title: string;           
+  business?: string;       
   location: string;
   type: '互惠體驗' | '付費推廣' | string;
   category: '住宿' | '餐飲' | '體驗' | string;
@@ -77,9 +77,9 @@ const FALLBACK_DATA: Opportunity[] = [
 ];
 
 export default function OpportunitiesPage() {
-  const [applyJob, setApplyJob] = useState<Opportunity | null>(null); // 控制「快速應徵」視窗
-  const [viewJob, setViewJob] = useState<Opportunity | null>(null);   // 控制「詳情」視窗
-  const [activeImage, setActiveImage] = useState<string>('');         // 控制詳情視窗的當前大圖
+  const [applyJob, setApplyJob] = useState<Opportunity | null>(null); 
+  const [viewJob, setViewJob] = useState<Opportunity | null>(null);   
+  const [activeImage, setActiveImage] = useState<string>('');         
   const [isSuccess, setIsSuccess] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('全部');
 
@@ -108,11 +108,10 @@ export default function OpportunitiesPage() {
             gallery: rawData.gallery || [],
             description: rawData.description || "歡迎熱愛分享的創作者一起合作，詳細內容請參考互惠需求。",
             tags: rawData.tags || ["熱門案源", "最新發布"],
-            matchScore: rawData.matchScore || Math.floor(Math.random() * (99 - 80 + 1)) + 80, // 隨機生成 80-99 契合度
+            matchScore: rawData.matchScore || Math.floor(Math.random() * (99 - 80 + 1)) + 80, 
             spotsLeft: rawData.spotsLeft || rawData.spotsLeft === 0 ? rawData.spotsLeft : 3,
           };
         });
-        // 依據 ID (時間戳) 降序排列，新的在最前
         setOpportunities(data.sort((a, b) => Number(b.id) - Number(a.id)));
       } else {
         setOpportunities([]);
@@ -162,7 +161,6 @@ export default function OpportunitiesPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-3">
             最新廠商合作案源
-            {/* 連線狀態指示燈 */}
             <span className="flex items-center gap-1.5 px-2.5 py-1 bg-green-50 border border-green-200 rounded-full text-[10px] font-bold text-green-600 uppercase tracking-widest">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
               Live Sync
@@ -202,7 +200,7 @@ export default function OpportunitiesPage() {
               key={job.id} 
               onClick={() => {
                 setViewJob(job);
-                setActiveImage(job.image || ''); // 開啟詳情時，預設顯示主圖
+                setActiveImage(job.image || ''); 
               }} 
               className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col sm:flex-row hover:shadow-xl hover:border-indigo-200 transition-all duration-300 group cursor-pointer h-full relative"
             >
@@ -288,7 +286,7 @@ export default function OpportunitiesPage() {
                     
                     <button 
                       onClick={(e) => {
-                        e.stopPropagation(); // 避免觸發卡片點擊
+                        e.stopPropagation(); 
                         handleQuickApply(job);
                       }}
                       className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all hover:shadow-md hover:scale-105 active:scale-95 group/btn"

@@ -56,6 +56,8 @@ interface ProjectData {
   status: string;
   applicants: number;
   date: string;
+  image?: string;
+  gallery?: string[];
 }
 
 interface TripData {
@@ -102,11 +104,12 @@ export default function DashboardPage() {
     title: '',
     category: '住宿',
     type: '互惠體驗',
-    location: '屏東恆春',
+    location: '',
     totalValue: '',
     valueBreakdown: '',
     requirements: '',
-    spots: 1
+    spots: 1,
+    gallery: [] as string[] // 加入相簿狀態
   });
 
   // 許願行程相關狀態 (創作者)
@@ -180,10 +183,43 @@ export default function DashboardPage() {
     };
   }, [fbUser, isLoggedIn]);
 
+  // 模擬上傳照片邏輯
+  const handleAddPhoto = () => {
+    const mockImages = [
+      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+      "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+      "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
+      "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
+    ];
+    const randomImg = mockImages[Math.floor(Math.random() * mockImages.length)];
+    setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, randomImg] }));
+  };
+
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setNewProject(prev => ({
+      ...prev,
+      gallery: prev.gallery.filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
   // 將新案源寫入 Firebase (業者)
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !fbUser) return;
+    
+    // 自定義防呆檢查，取代原生 required 避免靜默失敗
+    if (!newProject.title) {
+      alert("請輸入「案源標題」！");
+      return;
+    }
+    if (!newProject.location) {
+      alert("請輸入「地點」！");
+      return;
+    }
+    
+    if (!db || !fbUser) {
+      alert("尚未連線至資料庫或身分驗證未完成，請稍候再試。");
+      return;
+    }
 
     const newId = Date.now().toString();
     const projectToSave: ProjectData = {
@@ -192,20 +228,23 @@ export default function DashboardPage() {
       category: newProject.category,
       type: newProject.type,
       location: newProject.location,
-      totalValue: newProject.totalValue,
+      totalValue: newProject.totalValue || 'NT$ 未定',
       valueBreakdown: newProject.valueBreakdown,
       requirements: newProject.requirements,
       spots: newProject.spots,
       status: '招募中',
       applicants: 0,
-      date: new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' })
+      date: new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+      image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      gallery: newProject.gallery
     };
 
     try {
       const projectRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId);
       await setDoc(projectRef, projectToSave);
       setShowCreateModal(false);
-      setNewProject({ ...newProject, title: '', totalValue: '', valueBreakdown: '', requirements: '' });
+      // 重置表單
+      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
     } catch (err) {
       console.error("新增案源失敗:", err);
       alert("新增失敗，請檢查網路連線或 Firebase 權限。");
@@ -215,7 +254,16 @@ export default function DashboardPage() {
   // 將新許願行程寫入 Firebase (創作者)
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !fbUser) return;
+    
+    if (!newTrip.destination) {
+      alert("請填寫目的地！");
+      return;
+    }
+
+    if (!db || !fbUser) {
+      alert("尚未連線至資料庫或身分驗證未完成，請稍候再試。");
+      return;
+    }
 
     const newId = `t${Date.now()}`;
     const tripToSave: TripData = {
@@ -269,7 +317,6 @@ export default function DashboardPage() {
   // --- 1. 登入/註冊頁面 ---
   if (!isLoggedIn) {
     return (
-      // 使用 fixed inset-0 z-[100] 來完美覆蓋原本的 Navbar
       <div className="fixed inset-0 z-[100] bg-slate-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row my-auto">
           <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-center relative overflow-hidden">
@@ -529,10 +576,9 @@ export default function DashboardPage() {
                         <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-sky-500 pl-2">基本設定</h4>
                         <div className="space-y-4">
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">案源標題</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">案源標題 <span className="text-red-500">*</span></label>
                             <input 
                               type="text" 
-                              required
                               className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" 
                               placeholder="例如：海景房開箱體驗招募"
                               value={newProject.title}
@@ -554,7 +600,7 @@ export default function DashboardPage() {
                               </select>
                             </div>
                             <div>
-                              <label className="block text-xs font-bold text-slate-500 mb-1">地點</label>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">地點 <span className="text-red-500">*</span></label>
                               <div className="flex items-center relative">
                                  <MapPin size={16} className="absolute left-3 text-slate-400"/>
                                  <input 
@@ -568,17 +614,31 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
+                          {/* 新增上傳照片功能 */}
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
-                            <div className="grid grid-cols-5 gap-3">
-                              <div className="aspect-square bg-slate-50 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400">
+                            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
+                              <button 
+                                type="button" 
+                                onClick={handleAddPhoto} 
+                                className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors"
+                              >
                                 <Plus size={24} />
-                              </div>
-                              {/* 模擬的已上傳相片 placeholder */}
-                              <div className="aspect-square bg-slate-200 rounded-lg"></div>
-                              <div className="aspect-square bg-slate-200 rounded-lg"></div>
+                              </button>
+                              {newProject.gallery.map((img, idx) => (
+                                <div key={idx} className="shrink-0 w-20 h-20 bg-slate-200 rounded-lg overflow-hidden relative group">
+                                  <img src={img} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => handleRemovePhoto(idx)} 
+                                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ))}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">建議上傳 3-5 張環境照片以吸引創作者</p>
+                            <p className="text-[10px] text-slate-400 mt-1">點擊 + 號可模擬上傳照片 (首張照片將自動設為前台封面)</p>
                           </div>
                         </div>
                       </div>
@@ -766,9 +826,9 @@ export default function DashboardPage() {
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-4" onSubmit={handleCreateTrip}>
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">目的地 (城市/區域)</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">目的地 (城市/區域) <span className="text-red-500">*</span></label>
                         <input 
-                          type="text" required
+                          type="text" 
                           className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium" 
                           placeholder="例如：宜蘭礁溪、台南中西區"
                           value={newTrip.destination}
@@ -780,7 +840,7 @@ export default function DashboardPage() {
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1">預計日期</label>
                           <input 
-                            type="text" required
+                            type="text" 
                             className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
                             placeholder="例如：2024/07/15 - 07/17"
                             value={newTrip.dates}
@@ -790,7 +850,7 @@ export default function DashboardPage() {
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1">隨行人數</label>
                           <input 
-                            type="text" required
+                            type="text" 
                             className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" 
                             placeholder="例如：2大1小、單人"
                             value={newTrip.partySize}
@@ -802,7 +862,6 @@ export default function DashboardPage() {
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">行程目的 (將產出什麼內容？)</label>
                         <textarea 
-                          required
                           className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
                           placeholder="例如：家庭暑假旅遊，預計會拍攝兩支短影音介紹親子友善設施。"
                           value={newTrip.purpose}
@@ -813,7 +872,6 @@ export default function DashboardPage() {
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">許願需求 (希望廠商提供什麼？)</label>
                         <textarea 
-                          required
                           className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm"
                           placeholder="例如：尋求有溫泉設施的飯店住宿贊助兩晚，或周邊親子餐廳體驗。"
                           value={newTrip.needs}
@@ -973,7 +1031,7 @@ export default function DashboardPage() {
         return role === 'business' ? (
            <div className="space-y-6">
              <div className="flex justify-between items-center">
-               <h2 className="text-2xl font-bold text-slate-900">編輯商家檔案 (Business Profile)</h2>
+               <h2 className="text-2xl font-bold text-slate-900">基本資料設定</h2>
                <button 
                  onClick={() => alert("儲存成功！")}
                  className="hidden sm:flex bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-slate-800 transition-colors shadow-sm"
@@ -984,9 +1042,9 @@ export default function DashboardPage() {
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                <div className="lg:col-span-1 space-y-6">
-                 {/* 移除了環境相簿，僅保留封面圖 */}
+                 {/* 僅保留 Logo 封面圖，相簿與互惠內容移至新增案源 */}
                  <div className="bg-white p-6 rounded-xl border border-slate-200">
-                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 商家封面圖</h3>
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 商家封面圖 (Logo)</h3>
                    <div className="relative h-48 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
                      <div className="text-center text-slate-400">
                        <Upload size={24} className="mx-auto mb-2"/>
@@ -998,7 +1056,7 @@ export default function DashboardPage() {
 
                <div className="lg:col-span-2 space-y-6">
                  <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-5">
-                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 基本資料設定</h3>
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 商家資訊</h3>
                    
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                      <div>
