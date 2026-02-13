@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
   Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell,
-  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit2, Save
+  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit, Save, CreditCard, UserCog
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -101,7 +101,12 @@ export default function AdminDashboardPage() {
   const [filterRole, setFilterRole] = useState('全部角色');
   const [filterStatus, setFilterStatus] = useState('全部狀態');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  
+  // 狀態變更確認視窗
   const [confirmAction, setConfirmAction] = useState<{userId: string, userName: string, newStatus: string} | null>(null);
+  
+  // ✨ 新增：用戶編輯視窗 (方案/權限)
+  const [editingUser, setEditingUser] = useState<UserData | null>(null);
 
   // Firestore 真實資料狀態
   const [users, setUsers] = useState<UserData[]>([]);
@@ -198,105 +203,83 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 處理評價配圖上傳
+  // ✨ 更新用戶資料 (角色與方案)
+  const handleUpdateUser = async () => {
+    if (!db || !fbUser || !editingUser) return;
+    try {
+      const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', editingUser.id);
+      await updateDoc(userRef, { 
+        role: editingUser.role,
+        plan: editingUser.plan
+      });
+      setEditingUser(null);
+      setOpenMenuId(null);
+      alert(`用戶 ${editingUser.name} 資料更新成功！`);
+    } catch (e) {
+      console.error("更新用戶資料失敗:", e);
+      alert("更新失敗，請稍後再試");
+    }
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    if (!storage || !fbUser) {
-      alert("Firebase Storage 尚未準備好或身分驗證未完成，請稍後再試。");
-      return;
-    }
+    if (!storage || !fbUser) { alert("Storage 未就緒"); return; }
 
     setIsUploadingImage(true);
-
     try {
       const fileRef = ref(storage, `artifacts/${internalAppId}/public/data/testimonials/${Date.now()}_${file.name}`);
       const uploadTask = await uploadBytesResumable(fileRef, file);
       const downloadURL = await getDownloadURL(uploadTask.ref);
       setTestimonialImage(downloadURL);
-    } catch (error) {
-      console.error("上傳失敗:", error);
-      alert("照片上傳失敗，請確認 Firebase Storage 已開啟並設定為測試模式。");
-    } finally {
-      setIsUploadingImage(false);
-    }
+    } catch (error) { console.error("上傳失敗:", error); } 
+    finally { setIsUploadingImage(false); }
   };
 
-  // 新增/修改首頁評價 (CMS) 至 Firebase
   const handleSubmitTestimonial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!db || !fbUser) {
-      alert("尚未連線至資料庫，請稍候再試。");
-      return;
-    }
+    if (!db || !fbUser) return;
     setIsSubmittingTestimonial(true);
     
     try {
       if (editingTestimonialId) {
-        // 修改模式
         const ref = doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', editingTestimonialId);
         await updateDoc(ref, {
-          quote: newTestimonial.quote,
-          authorName: newTestimonial.authorName,
-          authorInitial: newTestimonial.authorName.charAt(0),
-          metricLabel: newTestimonial.metricLabel,
-          // 如果有上傳新圖片，才覆寫圖片欄位
+          quote: newTestimonial.quote, authorName: newTestimonial.authorName, metricLabel: newTestimonial.metricLabel,
           ...(testimonialImage ? { image: testimonialImage } : {})
         });
         alert("🎉 評價修改成功！");
       } else {
-        // 新增模式
         const newId = `case-${Date.now()}`;
         const ref = doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', newId);
         await setDoc(ref, {
-          id: newId,
-          quote: newTestimonial.quote,
-          authorName: newTestimonial.authorName,
-          authorInitial: newTestimonial.authorName.charAt(0), 
-          authorLocation: "台灣優質用戶", 
-          metricIcon: 'TrendingUp', 
-          metricLabel: newTestimonial.metricLabel,
-          rating: 5, 
+          id: newId, quote: newTestimonial.quote, authorName: newTestimonial.authorName, authorInitial: newTestimonial.authorName.charAt(0), 
+          authorLocation: "台灣優質用戶", metricIcon: 'TrendingUp', metricLabel: newTestimonial.metricLabel, rating: 5, 
           image: testimonialImage || "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" 
         });
-        alert("🎉 評價新增成功！前台首頁已即時同步更新。");
+        alert("🎉 評價新增成功！");
       }
-      handleCancelEdit(); // 清空狀態
-    } catch (err) {
-      console.error("處理評價失敗:", err);
-      alert("操作失敗，請檢查 Firebase 權限設定。");
-    } finally {
-      setIsSubmittingTestimonial(false);
-    }
+      handleCancelEdit();
+    } catch (err) { console.error(err); } 
+    finally { setIsSubmittingTestimonial(false); }
   };
 
-  // 點擊編輯按鈕
   const handleEditTestimonial = (t: TestimonialData) => {
     setEditingTestimonialId(t.id);
     setNewTestimonial({ quote: t.quote, authorName: t.authorName, metricLabel: t.metricLabel });
     setTestimonialImage(t.image);
-    // 捲動到頂部方便編輯
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 刪除評價
   const handleDeleteTestimonial = async (id: string) => {
     if (!db || !fbUser) return;
     if (!confirm("確定要永久刪除這筆評價嗎？")) return;
-    
     try {
       await deleteDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials', id));
-      if (editingTestimonialId === id) {
-        handleCancelEdit(); // 如果正在編輯該筆，則清空表單
-      }
-    } catch (err) {
-      console.error("刪除評價失敗:", err);
-      alert("刪除失敗");
-    }
+      if (editingTestimonialId === id) handleCancelEdit();
+    } catch (err) { console.error(err); }
   };
 
-  // 取消編輯並重置表單
   const handleCancelEdit = () => {
     setEditingTestimonialId(null);
     setNewTestimonial({ quote: '', authorName: '', metricLabel: '' });
@@ -305,7 +288,6 @@ export default function AdminDashboardPage() {
 
   const totalRevenue = transactions.reduce((sum, tx) => sum + tx.amount, 0) + 141101;
 
-  // --- UI: 登入頁面 ---
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans">
@@ -331,7 +313,6 @@ export default function AdminDashboardPage() {
     );
   }
 
-  // --- UI: 管理介面內容 ---
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -391,7 +372,7 @@ export default function AdminDashboardPage() {
       case 'users':
         return (
           <div className="space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-bold text-slate-900">用戶權限控管 (連線至 Firestore)</h2>
+            <h2 className="text-2xl font-bold text-slate-900">用戶權限與方案管理</h2>
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
               
               {/* 篩選工具列 */}
@@ -406,10 +387,10 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex gap-3 w-full sm:w-auto">
                   <select className="flex-1 sm:flex-none border border-slate-200 rounded-xl p-2.5 text-sm bg-white font-bold text-slate-600 outline-none shadow-sm cursor-pointer" value={filterRole} onChange={e => setFilterRole(e.target.value)}>
-                    <option>全部角色</option><option>商家</option><option>創作者</option>
+                    <option value="全部角色">全部角色</option><option value="商家">商家</option><option value="創作者">創作者</option>
                   </select>
                   <select className="flex-1 sm:flex-none border border-slate-200 rounded-xl p-2.5 text-sm bg-white font-bold text-slate-600 outline-none shadow-sm cursor-pointer" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-                    <option>全部狀態</option><option>活躍</option><option>待審核</option><option>停權</option>
+                    <option value="全部狀態">全部狀態</option><option value="活躍">活躍</option><option value="待審核">待審核</option><option value="停權">停權</option>
                   </select>
                 </div>
               </div>
@@ -421,7 +402,8 @@ export default function AdminDashboardPage() {
                     <tr>
                       <th className="px-6 py-5">用戶資訊</th>
                       <th className="px-6 py-5">角色定位</th>
-                      <th className="px-6 py-5">帳號狀態</th>
+                      <th className="px-6 py-5">訂閱方案</th>
+                      <th className="px-6 py-5">目前狀態</th>
                       <th className="px-6 py-5 text-right">權限操作</th>
                     </tr>
                   </thead>
@@ -438,6 +420,13 @@ export default function AdminDashboardPage() {
                           }`}>{u.role}</span>
                         </td>
                         <td className="px-6 py-4">
+                           {u.plan === 'Pro' ? (
+                             <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200">PRO PLAN</span>
+                           ) : (
+                             <span className="px-2.5 py-1 rounded-md text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">FREE</span>
+                           )}
+                        </td>
+                        <td className="px-6 py-4">
                            <span className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1.5 w-fit ${
                              u.status === '活躍' ? 'bg-green-100 text-green-700' : 
                              u.status === '停權' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
@@ -451,11 +440,22 @@ export default function AdminDashboardPage() {
                             <MoreVertical size={18} />
                           </button>
 
-                          {/* 彈出選單 */}
+                          {/* 彈出操作選單 */}
                           {openMenuId === u.id && (
                             <>
                               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)}></div>
-                              <div className="absolute right-6 top-12 w-40 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100">
+                              <div className="absolute right-6 top-12 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100">
+                                {/* ✨ 新增的編輯按鈕 */}
+                                <button 
+                                  onClick={() => {
+                                    setEditingUser(u);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full px-4 py-2.5 hover:bg-indigo-50 text-xs font-bold text-indigo-600 flex items-center gap-2 border-b border-slate-100"
+                                >
+                                  <Edit size={14}/> 編輯權限/方案
+                                </button>
+
                                 {u.status !== '活躍' && <button onClick={() => setConfirmAction({userId: u.id, userName: u.name, newStatus: '活躍'})} className="w-full px-4 py-2.5 hover:bg-green-50 text-xs font-black text-green-600 flex items-center gap-2"><CheckCircle2 size={14}/>設為活躍</button>}
                                 {u.status !== '停權' && <button onClick={() => setConfirmAction({userId: u.id, userName: u.name, newStatus: '停權'})} className="w-full px-4 py-2.5 hover:bg-red-50 text-xs font-black text-red-600 flex items-center gap-2"><XCircle size={14}/>停權帳號</button>}
                                 <button onClick={() => setConfirmAction({userId: u.id, userName: u.name, newStatus: '待審核'})} className="w-full px-4 py-2.5 hover:bg-orange-50 text-xs font-black text-orange-600 border-t border-slate-100 flex items-center gap-2 mt-1 pt-2"><ShieldAlert size={14}/>退回審核</button>
@@ -465,14 +465,65 @@ export default function AdminDashboardPage() {
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={4} className="px-6 py-20 text-center text-slate-400 font-medium">尚未找到任何用戶資料或正在載入中...</td></tr>
+                      <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-400 font-medium">尚未找到任何用戶資料或正在載入中...</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
             </div>
+            
+            {/* ✨ 編輯用戶權限 Modal */}
+            {editingUser && (
+               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                  <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-3 text-indigo-600">
+                        <div className="p-3 bg-indigo-50 rounded-2xl"><UserCog size={24}/></div>
+                        <h3 className="font-black text-xl text-slate-900">編輯用戶權限</h3>
+                      </div>
+                      <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                    </div>
 
-            {/* 確認對話框 */}
+                    <div className="space-y-4 mb-8">
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">用戶名稱</label>
+                         <p className="font-bold text-slate-900 px-3 py-2 bg-slate-50 rounded-lg">{editingUser.name}</p>
+                       </div>
+                       
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">角色設定 (Role)</label>
+                         <select 
+                           className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                           value={editingUser.role}
+                           onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
+                         >
+                           <option value="商家">商家 (Business)</option>
+                           <option value="創作者">創作者 (Creator)</option>
+                         </select>
+                       </div>
+
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">訂閱方案 (Plan)</label>
+                         <select 
+                           className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                           value={editingUser.plan}
+                           onChange={(e) => setEditingUser({...editingUser, plan: e.target.value})}
+                         >
+                           <option value="Free">Free (免費版)</option>
+                           <option value="Pro">Pro (專業版)</option>
+                         </select>
+                       </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button onClick={() => setEditingUser(null)} className="flex-1 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-100 rounded-xl transition-all">取消</button>
+                      <button onClick={handleUpdateUser} className="flex-1 py-3 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-xl hover:bg-indigo-700 shadow-lg active:scale-95 transition-all">儲存變更</button>
+                    </div>
+                  </div>
+               </div>
+            )}
+
+            {/* 確認變更狀態 Modal */}
             {confirmAction && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
                 <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
@@ -747,7 +798,7 @@ export default function AdminDashboardPage() {
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id as AdminTab)} 
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
                 activeTab === item.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/50' : 'hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -756,7 +807,9 @@ export default function AdminDashboardPage() {
           ))}
         </nav>
         <div className="p-6 border-t border-slate-800/50">
-           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
+           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/20 rounded-xl transition-all">
+             <LogOut size={16}/> 登出系統
+           </button>
         </div>
       </aside>
 
