@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   TrendingUp, Users, CheckCircle, ArrowRight, Search, MessageCircle, Heart, Star, BarChart, Loader2,
-  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown
+  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote
 } from 'lucide-react';
 import CreatorCard, { Creator } from '@/components/CreatorCard';
 
@@ -36,20 +36,20 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義資料結構
+// 定義資料結構 (對應 Admin 後台寫入的欄位)
 interface Testimonial {
   id: string;
   image: string;
   quote: string;
-  authorInitial: string;
+  authorInitial?: string;
   authorName: string;
-  authorLocation: string;
-  metricIcon: 'BarChart' | 'TrendingUp';
-  metricLabel: string;
-  rating: number;
+  authorLocation?: string;
+  metricIcon?: string;
+  metricLabel?: string;
+  rating?: number;
 }
 
-// 擴充創作者資料結構 (包含詳情頁所需欄位)
+// 擴充創作者資料結構
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -92,6 +92,7 @@ const ENRICH_DATA = [
   }
 ];
 
+// 預設的精美首頁評價資料 (當資料庫沒有資料時顯示)
 const FALLBACK_TESTIMONIALS: Testimonial[] = [
   {
     id: "case-1",
@@ -117,9 +118,13 @@ export default function Home() {
 
   // 監聽 Firebase 資料
   useEffect(() => {
-    if (!db) { setIsLoading(false); return; }
+    if (!db) {
+      setIsLoading(false);
+      setTestimonials(FALLBACK_TESTIMONIALS);
+      return;
+    }
 
-    // 1. 抓取創作者清單 (動態顯示在首頁)
+    // 1. 抓取創作者清單
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
@@ -155,25 +160,28 @@ export default function Home() {
           };
         });
 
-        // 隨機打亂並取前三名
         const shuffled = mappedCreators.sort(() => 0.5 - Math.random());
         setCreators(shuffled.slice(0, 3));
       }
       setIsLoading(false);
     });
 
-    // 2. 抓取成功案例
+    // 2. 抓取成功案例 (聽聽他們怎麼說) - 對應 Admin 後台的新增功能
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => doc.data() as Testimonial);
         setTestimonials(data);
       } else {
+        // 如果資料庫是空的，顯示預設資料
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
     });
 
-    return () => { unsubUsers(); unsubTestimonials(); };
+    return () => {
+      unsubUsers();
+      unsubTestimonials();
+    };
   }, []);
 
   return (
@@ -237,35 +245,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* How it Works Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold text-slate-900 mb-4">簡單三步驟，開啟互惠旅程</h2>
-          <p className="text-slate-600 max-w-2xl mx-auto">
-            我們簡化了繁瑣的溝通流程，讓您專注於創作與體驗。
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-          <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
-          {[
-            { step: "01", title: "探索與許願", desc: "網紅發布旅遊行程（許願池），或業者發布體驗招募。", icon: Search },
-            { step: "02", title: "智能媒合", desc: "系統根據地區、風格與互惠標準，推薦最適合的合作對象。", icon: MessageCircle },
-            { step: "03", title: "體驗與分享", desc: "完成體驗行程，系統自動生成數據結案報告，累積信用評價。", icon: Heart }
-          ].map((item, idx) => (
-            <div key={idx} className="flex flex-col items-center text-center bg-white p-6 rounded-xl">
-              <div className="w-24 h-24 bg-white border-4 border-sky-100 rounded-full flex items-center justify-center mb-6 shadow-sm relative z-10">
-                <item.icon className="w-10 h-10 text-sky-500" />
-                <span className="absolute -top-2 -right-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-sm border-2 border-white">{item.step}</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">{item.title}</h3>
-              <p className="text-slate-600 leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Featured Creators Section (Cloud Sync) */}
+      {/* Featured Creators Section */}
       <div className="bg-slate-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
@@ -292,7 +272,6 @@ export default function Home() {
           ) : creators.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {creators.map(creator => (
-                // 修正：將 Card 包裹在 div 中並加上 onClick 觸發 Modal
                 <div 
                   key={creator.id} 
                   className="cursor-pointer transition-transform hover:-translate-y-1"
@@ -326,45 +305,49 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {testimonials.map((item, index) => (
-            <div key={item.id || index} className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 flex flex-col md:flex-row hover:shadow-xl transition-shadow duration-300">
-              <div className="md:w-2/5 relative min-h-[200px] md:min-h-full">
-                <img 
-                  src={item.image} 
-                  alt={item.authorName} 
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              </div>
-              <div className="p-8 md:w-3/5 flex flex-col justify-center bg-white relative z-10">
-                <div className="flex items-center gap-1 mb-4">
-                  {[...Array(item.rating)].map((_, i) => <Star key={i} size={16} className="text-yellow-400 fill-yellow-400" />)}
+        {testimonials.length === 0 && isLoading ? (
+           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-300"/></div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {testimonials.map((item, index) => (
+              <div key={item.id || index} className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 flex flex-col md:flex-row hover:shadow-xl transition-shadow duration-300">
+                <div className="md:w-2/5 relative min-h-[200px] md:min-h-full">
+                  <img 
+                    src={item.image} 
+                    alt={item.authorName} 
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
                 </div>
-                <blockquote className="text-lg font-medium text-slate-800 mb-6 italic leading-relaxed">
-                  "{item.quote}"
-                </blockquote>
-                <div className="flex items-center gap-4 border-t border-slate-100 pt-4 mt-auto">
-                  <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shrink-0">
-                    {item.authorInitial}
+                <div className="p-8 md:w-3/5 flex flex-col justify-center bg-white relative z-10">
+                  <div className="flex items-center gap-1 mb-4">
+                    {[...Array(item.rating || 5)].map((_, i) => <Star key={i} size={16} className="text-yellow-400 fill-yellow-400" />)}
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-900 text-sm">{item.authorName}</p>
-                    <p className="text-xs text-slate-500">{item.authorLocation}</p>
-                  </div>
-                  <div className={`ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold shrink-0 ${
-                    item.metricIcon === 'BarChart' ? 'bg-green-50 text-green-700' : 'bg-sky-50 text-sky-700'
-                  }`}>
-                    {item.metricIcon === 'BarChart' ? <BarChart size={14} /> : <TrendingUp size={14} />} 
-                    {item.metricLabel}
+                  <blockquote className="text-lg font-medium text-slate-800 mb-6 italic leading-relaxed">
+                    "{item.quote}"
+                  </blockquote>
+                  <div className="flex items-center gap-4 border-t border-slate-100 pt-4 mt-auto">
+                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shrink-0">
+                      {item.authorInitial || item.authorName.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm">{item.authorName}</p>
+                      <p className="text-xs text-slate-500">{item.authorLocation || '優質合作夥伴'}</p>
+                    </div>
+                    {item.metricLabel && (
+                      <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold shrink-0 bg-green-50 text-green-700">
+                        {item.metricIcon === 'BarChart' ? <BarChart size={14} /> : <TrendingUp size={14} />} 
+                        {item.metricLabel}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* --- Creator Details Modal (移植自 creators/page.tsx) --- */}
+      {/* --- Creator Details Modal (熱門創作者詳情) --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -438,12 +421,26 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            
-            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-between items-center gap-4 z-20">
-               <div className="hidden sm:block"><p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p></div>
-               <Link href="/dashboard" className="flex-1 sm:flex-none w-full sm:w-auto px-8 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all">
-                 <Mail size={18} /> 發送合作邀請
-               </Link>
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex flex-col sm:flex-row justify-between items-center gap-4 z-20">
+               <div className="hidden sm:block shrink-0">
+                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
+               </div>
+               <div className="flex gap-3 w-full sm:w-auto">
+                 <a 
+                   href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 >
+                   <MessageCircle size={18} /> LINE 聯繫
+                 </a>
+                 <Link 
+                   href="/dashboard"
+                   className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 >
+                   <Mail size={18} /> 發送合作邀請
+                 </Link>
+               </div>
             </div>
           </div>
         </div>
