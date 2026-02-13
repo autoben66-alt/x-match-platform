@@ -5,7 +5,8 @@ import { MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Fl
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 // --- Firebase 初始化 ---
 const firebaseConfig = {
@@ -18,11 +19,13 @@ const firebaseConfig = {
 };
 
 let app: any = null;
+let auth: any = null;
 let db: any = null;
 
 if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    auth = getAuth(app);
     db = getFirestore(app);
   } catch (error) {
     console.error("Firebase 初始化失敗:", error);
@@ -82,12 +85,23 @@ export default function OpportunitiesPage() {
   const [activeImage, setActiveImage] = useState<string>('');         
   const [isSuccess, setIsSuccess] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState('全部');
+  const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
   // Firebase 資料狀態
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. 監聽 Firestore 資料
+  // 1. 初始化 Auth (為了取得 user ID 寫入應徵紀錄)
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) setFbUser(user);
+      else { try { await signInAnonymously(auth); } catch (e) { console.error(e); } }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. 監聽 Firestore 資料
   useEffect(() => {
     if (!db) {
       setOpportunities(FALLBACK_DATA);
@@ -100,16 +114,17 @@ export default function OpportunitiesPage() {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => {
           const rawData = doc.data() as Opportunity;
-          // 針對缺乏的欄位給予預設值 (確保從 Dashboard 新增的簡易資料不會讓畫面報錯)
+          // 針對缺乏的欄位給予預設值
           return {
             ...rawData,
             business: rawData.business || "優質合作廠商",
             image: rawData.image || "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-            gallery: rawData.gallery || [],
+            gallery: rawData.gallery && rawData.gallery.length > 0 ? rawData.gallery : ["https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"],
             description: rawData.description || "歡迎熱愛分享的創作者一起合作，詳細內容請參考互惠需求。",
             tags: rawData.tags || ["熱門案源", "最新發布"],
             matchScore: rawData.matchScore || Math.floor(Math.random() * (99 - 80 + 1)) + 80, 
-            spotsLeft: rawData.spotsLeft || rawData.spotsLeft === 0 ? rawData.spotsLeft : 3,
+            spotsLeft: rawData.spotsLeft !== undefined ? rawData.spotsLeft : 3,
+            applicants: rawData.applicants || 0
           };
         });
         setOpportunities(data.sort((a, b) => Number(b.id) - Number(a.id)));
@@ -126,21 +141,54 @@ export default function OpportunitiesPage() {
     return () => unsubscribe();
   }, []);
 
-  // 開啟快速應徵 (會關閉詳情視窗)
+  // 開啟快速應徵
   const handleQuickApply = (job: Opportunity) => {
     setViewJob(null);
     setApplyJob(job);
     setIsSuccess(false);
   };
 
-  const confirmApply = () => {
-    setTimeout(() => {
+  // 確認應徵：寫入 Firestore (type: 'application')
+  const confirmApply = async () => {
+    if (!db) {
+      alert("尚未連線至資料庫，請稍候再試。");
+      return;
+    }
+    
+    try {
+      const newId = `app-${Date.now()}`;
+      // 寫入到 invitations 集合，讓業者後台的「管理名單」可以讀取到
+      const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', newId);
+      
+      await setDoc(invRef, {
+        id: newId,
+        type: 'application', // 標記為「應徵」
+        fromName: '林小美',  // 模擬當前創作者
+        toName: applyJob?.business || '廠商',
+        message: '您好，我對這個案源非常有興趣，這是我的履歷資料，期待有機會合作！',
+        status: '待審核',
+        date: new Date().toLocaleString('zh-TW', { hour12: false }),
+        projectId: applyJob?.id,
+        projectTitle: applyJob?.title,
+        // 附帶創作者履歷快照 (模擬)
+        creatorInfo: {
+          name: '林小美',
+          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+          followers: 12000,
+          engagement: 4.5,
+          tags: ['旅遊', '親子']
+        }
+      });
+
       setIsSuccess(true);
       setTimeout(() => {
         setApplyJob(null);
         setIsSuccess(false);
       }, 2000);
-    }, 800);
+    } catch (e) {
+      console.error("應徵失敗", e);
+      alert("應徵失敗，請稍後再試");
+    }
   };
 
   const filteredOpportunities = opportunities.filter(job => {
@@ -148,12 +196,7 @@ export default function OpportunitiesPage() {
     return job.category === categoryFilter;
   });
 
-  const categories = [
-    { id: '全部', label: '全部' },
-    { id: '住宿', label: '住宿' },
-    { id: '餐飲', label: '餐飲' },
-    { id: '體驗', label: '體驗' },
-  ];
+  const categories = [ { id: '全部', label: '全部' }, { id: '住宿', label: '住宿' }, { id: '餐飲', label: '餐飲' }, { id: '體驗', label: '體驗' } ];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -286,7 +329,7 @@ export default function OpportunitiesPage() {
                     
                     <button 
                       onClick={(e) => {
-                        e.stopPropagation(); 
+                        e.stopPropagation(); // 避免觸發卡片點擊
                         handleQuickApply(job);
                       }}
                       className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all hover:shadow-md hover:scale-105 active:scale-95 group/btn"
@@ -317,7 +360,7 @@ export default function OpportunitiesPage() {
       {/* --- 詳情頁面視窗 (Job Details Modal) --- */}
       {viewJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-2xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-2xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
             
             {/* Header Image / Gallery */}
             <div className="relative h-64 sm:h-72 shrink-0 bg-slate-200">
@@ -350,7 +393,7 @@ export default function OpportunitiesPage() {
             </div>
 
             {/* Content */}
-            <div className="p-6 sm:p-8 flex-grow">
+            <div className="p-6 sm:p-8 flex-grow bg-slate-50/50">
                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                  <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -411,7 +454,7 @@ export default function OpportunitiesPage() {
                      <p className="text-sm text-slate-600 mb-3">{viewJob.requirements}</p>
                      <div className="flex items-center gap-2 text-xs text-slate-500 bg-white p-2 rounded border border-slate-200">
                        <Users size={14}/>
-                       <span>目前已有 {viewJob.applicants || 0} 人應徵 / 剩餘 {viewJob.spotsLeft || 5} 個名額</span>
+                       <span>目前已有 {viewJob.applicants || 0} 人應徵 / 剩餘 {viewJob.spotsLeft !== undefined ? viewJob.spotsLeft : 5} 個名額</span>
                      </div>
                   </div>
                </div>

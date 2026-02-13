@@ -59,7 +59,9 @@ interface TripData {
 interface InvitationData {
   id: string; fromName: string; toName: string; toHandle: string; toAvatar: string;
   message: string; status: string; date: string;
-  projectId?: string; projectTitle?: string; projectValue?: string; // 關聯案源 ID
+  projectId?: string; projectTitle?: string; projectValue?: string; 
+  type?: 'invite' | 'application'; // 區分邀請或應徵
+  creatorInfo?: any; // 創作者的詳細履歷
 }
 
 interface PaymentItem {
@@ -295,10 +297,10 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 點擊「管理名單」：過濾出與該專案相關的應徵者 (invitations)
+  // ✨ 點擊「管理名單」：過濾出與該專案相關的「應徵者」
   const handleManageApplicants = (project: ProjectData) => {
-    // 找出所有 projectId 相符的邀請函 (即創作者的應徵)
-    const apps = invitations.filter(inv => inv.projectId === project.id);
+    // 找出所有 projectId 相符，且類型為 'application' 的資料
+    const apps = invitations.filter(inv => inv.projectId === project.id && inv.type === 'application');
     setCurrentProjectApplicants(apps);
     setCurrentProjectTitle(project.title);
     setShowApplicantsModal(true);
@@ -586,37 +588,14 @@ export default function DashboardPage() {
                             </div>
                           </td>
                           <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
-                          <td className="px-6 py-4 text-right">
-                            <button 
-                              onClick={() => handleManageApplicants(project)}
-                              className="text-sky-600 font-bold hover:underline"
-                            >
-                              管理名單
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {projects.length === 0 && (
-                <div className="p-12 text-center text-slate-500 flex flex-col items-center">
-                  <Briefcase size={32} className="text-slate-300 mb-3" />
-                  <p className="font-bold text-slate-700">尚未發布任何合作案源</p>
-                  <p className="text-sm mt-1">點擊右上角「新增案源」開始招募創作者！</p>
-                </div>
-              )}
-            </div>
-
-            {/* --- 管理應徵者名單 Modal (New) --- */}
+            {/* --- 管理應徵者名單 Modal (已更新為顯示履歷樣式) --- */}
             {showApplicantsModal && (
               <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <div>
                       <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
-                      <p className="text-xs text-slate-500">{currentProjectTitle}</p>
+                      <p className="text-xs text-slate-500">案源：{currentProjectTitle}</p>
                     </div>
                     <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
                       <X size={24} />
@@ -624,33 +603,56 @@ export default function DashboardPage() {
                   </div>
                   <div className="p-4 overflow-y-auto bg-slate-50/50 flex-grow">
                      {currentProjectApplicants.length > 0 ? (
-                       <div className="space-y-3">
+                       <div className="space-y-4">
                          {currentProjectApplicants.map(app => (
-                           <div key={app.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
-                             <img src={app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-12 h-12 rounded-full border border-slate-100" alt="Avatar"/>
-                             <div className="flex-1">
-                               <div className="flex justify-between items-start mb-1">
-                                 <div>
-                                   <p className="font-bold text-slate-900">{app.fromName}</p> {/* 修正：顯示發送者(創作者)的名字 */}
-                                   <p className="text-xs text-slate-500">{app.date}</p>
+                           <div key={app.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                             {/* 創作者基本資料 */}
+                             <div className="flex items-start gap-4 mb-4 border-b border-slate-50 pb-4">
+                               <img src={app.creatorInfo?.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-14 h-14 rounded-full border-2 border-white shadow-sm" alt="Avatar"/>
+                               <div className="flex-1">
+                                 <div className="flex justify-between items-start">
+                                    <div>
+                                       <p className="font-bold text-slate-900 text-lg">{app.creatorInfo?.name || app.fromName}</p>
+                                       <div className="flex gap-2 text-xs text-slate-500 mt-0.5">
+                                          <span>粉絲 {app.creatorInfo?.followers?.toLocaleString() || '12k'}</span>
+                                          <span>•</span>
+                                          <span>互動 {app.creatorInfo?.engagement || '4.5'}%</span>
+                                       </div>
+                                    </div>
+                                    <span className={`px-2.5 py-1 rounded-md text-xs font-bold ${app.status === '待審核' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'}`}>{app.status}</span>
                                  </div>
-                                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${app.status === '待回覆' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{app.status}</span>
+                                 <div className="mt-2 flex flex-wrap gap-1">
+                                    {app.creatorInfo?.tags?.map((t:string, i:number) => <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">#{t}</span>)}
+                                 </div>
                                </div>
-                               <div className="text-sm text-slate-600 bg-slate-50 p-2 rounded mb-2">"{app.message}"</div>
-                               {app.status === '待回覆' && (
-                                 <div className="flex gap-2 justify-end">
-                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="px-3 py-1.5 border border-slate-300 rounded text-xs font-bold text-slate-600 hover:bg-slate-50">婉拒</button>
-                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已接受')} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 shadow-sm">接受合作</button>
-                                 </div>
-                               )}
                              </div>
+                             
+                             {/* 應徵留言 */}
+                             <div className="text-sm text-slate-600 bg-slate-50 p-3 rounded-lg mb-4 italic">
+                               "{app.message}"
+                             </div>
+                             
+                             {/* 操作按鈕 */}
+                             {app.status === '待審核' ? (
+                               <div className="flex gap-2">
+                                 <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="flex-1 py-2 border border-slate-300 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">婉拒</button>
+                                 <button onClick={() => handleUpdateInviteStatus(app.id, '已接受')} className="flex-1 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-md">接受並開始合作</button>
+                               </div>
+                             ) : (
+                               <div className="text-center text-xs text-slate-400 font-bold bg-slate-50 py-2 rounded-lg">
+                                 此申請已處理 ({app.status})
+                               </div>
+                             )}
                            </div>
                          ))}
                        </div>
                      ) : (
-                       <div className="text-center py-12 text-slate-400">
-                         <Users size={32} className="mx-auto mb-2 opacity-50"/>
-                         <p>目前尚無人應徵此案源</p>
+                       <div className="text-center py-16 text-slate-400 flex flex-col items-center">
+                         <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-3">
+                           <Users size={32} className="opacity-50"/>
+                         </div>
+                         <p className="font-bold">目前尚無人應徵此案源</p>
+                         <p className="text-xs mt-1">您可以嘗試購買「置頂推廣」來增加曝光</p>
                        </div>
                      )}
                   </div>
