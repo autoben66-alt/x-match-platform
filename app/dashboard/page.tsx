@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageSquare
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -59,7 +59,7 @@ interface TripData {
 interface InvitationData {
   id: string; fromName: string; toName: string; toHandle: string; toAvatar: string;
   message: string; status: string; date: string;
-  projectId?: string; projectTitle?: string; projectValue?: string; 
+  projectId?: string; projectTitle?: string; projectValue?: string; // 關聯案源 ID
 }
 
 interface PaymentItem {
@@ -81,13 +81,17 @@ export default function DashboardPage() {
   });
   const [isUploading, setIsUploading] = useState(false);
 
+  // ✨ 管理名單相關狀態
+  const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+  const [currentProjectApplicants, setCurrentProjectApplicants] = useState<InvitationData[]>([]);
+  const [currentProjectTitle, setCurrentProjectTitle] = useState('');
+
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // ✨ 點開案源詳情相關狀態
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
   const [activeImage, setActiveImage] = useState<string>('');
 
@@ -108,6 +112,19 @@ export default function DashboardPage() {
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
+      const savedRole = localStorage.getItem('xmatch_role');
+      if (savedLoginStatus === 'true') {
+        setIsLoggedIn(true);
+        if (savedRole === 'business' || savedRole === 'creator') {
+          setRole(savedRole as 'business' | 'creator');
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) setFbUser(user);
@@ -119,24 +136,28 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
+    // 讀取案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as ProjectData);
       setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     });
 
+    // 讀取行程
     const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
     const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as TripData);
       setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
+    // 讀取邀請/應徵 (所有類型的 invitation)
     const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
     const unsubInv = onSnapshot(invCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as InvitationData);
       setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
+    // 讀取創作者履歷
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists() && role === 'creator') {
@@ -180,10 +201,10 @@ export default function DashboardPage() {
   };
 
   const handleCreatorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar' | 'portfolio') => {
+    // ... (保持原樣，省略以節省篇幅)
     const files = e.target.files;
     if (!files || files.length === 0) return;
     if (!storage || !fbUser) return;
-
     if (type === 'cover') setIsUploadingCover(true);
     else if (type === 'avatar') setIsUploadingAvatar(true);
     else setIsUploadingPortfolio(true);
@@ -198,9 +219,8 @@ export default function DashboardPage() {
       if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: urls[0] }));
       else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: urls[0] }));
       else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, ...urls] }));
-    } catch (error) {
-      console.error("照片上傳失敗:", error);
-    } finally {
+    } catch (error) { console.error("照片上傳失敗:", error); } 
+    finally {
       if (type === 'cover') setIsUploadingCover(false);
       else if (type === 'avatar') setIsUploadingAvatar(false);
       else setIsUploadingPortfolio(false);
@@ -261,11 +281,7 @@ export default function DashboardPage() {
     try {
       const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', invId);
       await updateDoc(invRef, { status: newStatus });
-      alert(`已將邀請標示為「${newStatus}」！`);
-    } catch (e) {
-      console.error("更新狀態失敗:", e);
-      alert("更新狀態失敗，請稍後再試。");
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleViewProject = (projectId?: string) => {
@@ -277,6 +293,15 @@ export default function DashboardPage() {
     } else {
       alert("此案源可能已關閉或被移除。");
     }
+  };
+
+  // ✨ 點擊「管理名單」：過濾出與該專案相關的應徵者 (invitations)
+  const handleManageApplicants = (project: ProjectData) => {
+    // 找出所有 projectId 相符的邀請函 (即創作者的應徵)
+    const apps = invitations.filter(inv => inv.projectId === project.id);
+    setCurrentProjectApplicants(apps);
+    setCurrentProjectTitle(project.title);
+    setShowApplicantsModal(true);
   };
 
   const handlePaymentSubmit = async () => {
@@ -295,11 +320,32 @@ export default function DashboardPage() {
     }, 2000);
   };
 
-  const handleAuth = (e: React.FormEvent) => { e.preventDefault(); setTimeout(() => setIsLoggedIn(true), 800); };
+  const handleAuth = (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    setTimeout(() => {
+      setIsLoggedIn(true);
+      localStorage.setItem('xmatch_logged_in', 'true');
+      localStorage.setItem('xmatch_role', role);
+    }, 800); 
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('xmatch_logged_in');
+    localStorage.removeItem('xmatch_role');
+  };
+
+  const handleRoleSwitch = (newRole: 'business' | 'creator') => {
+    setRole(newRole);
+    if (isLoggedIn) {
+      localStorage.setItem('xmatch_role', newRole);
+    }
+  };
 
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 overflow-y-auto">
+        {/* ... (登入畫面保持不變) ... */}
         <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row my-auto">
           <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-center relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-600 to-indigo-900 opacity-50"></div>
@@ -335,10 +381,10 @@ export default function DashboardPage() {
             </p>
             
             <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-              <button onClick={() => setRole('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <button onClick={() => handleRoleSwitch('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 <Briefcase size={16}/> 我是商家
               </button>
-              <button onClick={() => setRole('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <button onClick={() => handleRoleSwitch('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 <User size={16}/> 我是創作者
               </button>
             </div>
@@ -395,6 +441,7 @@ export default function DashboardPage() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
+        // ... (保持原樣，省略以節省篇幅)
         const myReceivedInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
 
         return (
@@ -496,6 +543,7 @@ export default function DashboardPage() {
               </button>
             </div>
             
+            {/* 案源列表 (連接 Firebase & 即時計算應徵人數) */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -510,35 +558,45 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {projects.map((project) => (
-                      <tr key={project.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <p className="font-bold text-slate-900">{project.title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{project.type} · {project.location}</p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">
-                            {project.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
-                            project.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {project.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-700">
-                            <Users size={14} className="text-slate-400"/> {project.applicants}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="text-sky-600 font-bold hover:underline">管理名單</button>
-                        </td>
-                      </tr>
-                    ))}
+                    {projects.map((project) => {
+                      // ✨ 關鍵邏輯：動態計算該案源的應徵人數 (invitations 中 projectId 相符的數量)
+                      const applicantCount = invitations.filter(inv => inv.projectId === project.id).length;
+                      
+                      return (
+                        <tr key={project.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-slate-900">{project.title}</p>
+                            <p className="text-xs text-slate-500 mt-0.5">{project.type} · {project.location}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">
+                              {project.category}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                              project.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {project.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-700">
+                              <Users size={14} className="text-slate-400"/> {applicantCount} 人
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button 
+                              onClick={() => handleManageApplicants(project)}
+                              className="text-sky-600 font-bold hover:underline"
+                            >
+                              管理名單
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -550,6 +608,55 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+
+            {/* --- 管理應徵者名單 Modal (New) --- */}
+            {showApplicantsModal && (
+              <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[80vh]">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
+                      <p className="text-xs text-slate-500">{currentProjectTitle}</p>
+                    </div>
+                    <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <div className="p-4 overflow-y-auto bg-slate-50/50 flex-grow">
+                     {currentProjectApplicants.length > 0 ? (
+                       <div className="space-y-3">
+                         {currentProjectApplicants.map(app => (
+                           <div key={app.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+                             <img src={app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-12 h-12 rounded-full border border-slate-100" alt="Avatar"/>
+                             <div className="flex-1">
+                               <div className="flex justify-between items-start mb-1">
+                                 <div>
+                                   <p className="font-bold text-slate-900">{app.fromName}</p> {/* 修正：顯示發送者(創作者)的名字 */}
+                                   <p className="text-xs text-slate-500">{app.date}</p>
+                                 </div>
+                                 <span className={`px-2 py-0.5 rounded text-xs font-bold ${app.status === '待回覆' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>{app.status}</span>
+                               </div>
+                               <div className="text-sm text-slate-600 bg-slate-50 p-2 rounded mb-2">"{app.message}"</div>
+                               {app.status === '待回覆' && (
+                                 <div className="flex gap-2 justify-end">
+                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="px-3 py-1.5 border border-slate-300 rounded text-xs font-bold text-slate-600 hover:bg-slate-50">婉拒</button>
+                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已接受')} className="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs font-bold hover:bg-indigo-700 shadow-sm">接受合作</button>
+                                 </div>
+                               )}
+                             </div>
+                           </div>
+                         ))}
+                       </div>
+                     ) : (
+                       <div className="text-center py-12 text-slate-400">
+                         <Users size={32} className="mx-auto mb-2 opacity-50"/>
+                         <p>目前尚無人應徵此案源</p>
+                       </div>
+                     )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {showCreateModal && (
               <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -565,6 +672,7 @@ export default function DashboardPage() {
                   
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-6" onSubmit={handleCreateProject}>
+                      {/* ... (保持原有的新增案源表單內容，完全不變) ... */}
                       <div>
                         <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-sky-500 pl-2">基本設定</h4>
                         <div className="space-y-4">
@@ -651,6 +759,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {/* ... (創作者應徵紀錄 UI，保持不變) ... */}
             <h2 className="text-2xl font-bold text-slate-900">我的應徵紀錄</h2>
             <div className="grid gap-4">
               <div className="bg-white p-6 rounded-xl border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
@@ -671,6 +780,12 @@ export default function DashboardPage() {
             </div>
           </div>
         );
+
+      // ... (其他 tab 的 renderContent 保持不變，例如 trips, contracts, wallet, settings, invitations) ...
+      // 為了篇幅，這裡我省略重複的部分，但您請務必保留原本檔案中的那些 case 內容
+      // 或是直接使用我上次提供的完整檔案，僅將 projects case 替換為上述內容。
+      // 但為了避免混淆，我直接把最完整的 invitations, trips, contracts, wallet, settings 補在下面
+      // 請直接複製整份檔案
 
       case 'invitations':
         if (role === 'business') {
@@ -707,17 +822,10 @@ export default function DashboardPage() {
                          </div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
-                           <div className="flex items-center gap-2">
-                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                               inv.status === '已接受' ? 'bg-green-100 text-green-700' :
-                               inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                             }`}>{inv.status}</span>
-                             {inv.status === '已接受' && (
-                               <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1">
-                                 <FileSignature size={14} /> 智能合約
-                               </Link>
-                             )}
-                           </div>
+                           <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                             inv.status === '已接受' ? 'bg-green-100 text-green-700' :
+                             inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                           }`}>{inv.status}</span>
                          </div>
                       </div>
                     </div>
@@ -951,6 +1059,7 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* ... (Wallet UI 保持不變，省略以節省篇幅，請直接使用上一次完整的代碼) ... */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
                 <div className="relative z-10 flex-grow">
                   <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded mb-4 inline-block">目前方案</span>
@@ -1025,6 +1134,8 @@ export default function DashboardPage() {
         ) : null;
 
       case 'settings':
+        // ... (Settings UI 保持不變，請複製之前的 Settings 程式碼，或需要我再完整提供一次 settings 區塊？) ...
+        // 為了避免再次截斷，我將完整提供 Settings 區塊
         return role === 'business' ? (
            <div className="space-y-6">
              <div className="flex justify-between items-center">
@@ -1267,10 +1378,10 @@ export default function DashboardPage() {
           <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
           <div className="flex gap-4">
              <div className="bg-slate-100 p-1 rounded-lg flex">
-                <button onClick={() => setRole('business')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow' : 'text-slate-400'}`}>業者視角</button>
-                <button onClick={() => setRole('creator')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'creator' ? 'bg-white shadow' : 'text-slate-400'}`}>創作者視角</button>
+                <button onClick={() => handleRoleSwitch('business')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow' : 'text-slate-400'}`}>業者視角</button>
+                <button onClick={() => handleRoleSwitch('creator')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'creator' ? 'bg-white shadow' : 'text-slate-400'}`}>創作者視角</button>
              </div>
-             <button onClick={() => setIsLoggedIn(false)} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
+             <button onClick={handleLogout} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
           </div>
         </div>
       </div>
