@@ -62,7 +62,7 @@ interface InvitationData {
   projectId?: string; projectTitle?: string; projectValue?: string; 
   type?: 'invite' | 'application'; 
   creatorInfo?: any;
-  fromLineId?: string; // 新增：來源者的 LINE ID (若有)
+  fromLineId?: string; // 來源者的 LINE ID
 }
 
 interface PaymentItem {
@@ -602,12 +602,13 @@ export default function DashboardPage() {
               )}
             </div>
 
+            {/* --- 管理應徵者名單 Modal --- */}
             {showApplicantsModal && (
               <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <div>
-                      <h3 className="font-bold text-xl text-slate-900">應徵者名單</h3>
+                      <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
                       <p className="text-xs text-slate-500 mt-1">案源：{currentProjectTitle}</p>
                     </div>
                     <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -621,6 +622,7 @@ export default function DashboardPage() {
                            const info = app.creatorInfo || {};
                            return (
                              <div key={app.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                               {/* 創作者卡片頭部 */}
                                <div className="flex flex-col sm:flex-row items-start gap-5 mb-5 border-b border-slate-100 pb-5">
                                  <div className="relative shrink-0">
                                    <img src={info.avatar || app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-16 h-16 rounded-full border-4 border-slate-50 shadow-sm" alt="Avatar"/>
@@ -649,9 +651,9 @@ export default function DashboardPage() {
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
                                             {app.status}
                                         </span>
+                                        {/* ✨ 已接受時顯示的按鈕 */}
                                         {app.status === '已接受' && (
                                             <div className="flex gap-2">
-                                                {/* ✨ 新增：LINE 聯繫按鈕 (業者端) */}
                                                 {info.lineId ? (
                                                   <a 
                                                       href={`https://line.me/ti/p/~${info.lineId}`}
@@ -838,8 +840,6 @@ export default function DashboardPage() {
         );
 
       case 'invitations':
-        // ... (這部分內容維持不變，請複製之前的 invitations case 程式碼) ...
-        // 為確保完整性，我再次提供邀請部分
         if (role === 'business') {
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -861,12 +861,26 @@ export default function DashboardPage() {
                              <Briefcase size={16} className="shrink-0" /> <span className="truncate">附件案源：{inv.projectTitle}</span><span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
                            </button>
                          )}
-                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">"{inv.message}"</div>
+
+                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
+                           "{inv.message}"
+                         </div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
                            <div className="flex items-center gap-2">
-                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${inv.status === '已接受' ? 'bg-green-100 text-green-700' : inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{inv.status}</span>
-                             {inv.status === '已接受' && <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 智能合約</Link>}
+                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                               inv.status === '已接受' ? 'bg-green-100 text-green-700' :
+                               inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                             }`}>{inv.status}</span>
+                             {inv.status === '已接受' && (
+                               <div className="flex gap-2">
+                                  {/* ✨ 業者端也要有 LINE 按鈕 (當創作者有提供 ID 時) */}
+                                  {inv.creatorInfo?.lineId && (
+                                    <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
+                                  )}
+                                  <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 智能合約</Link>
+                               </div>
+                             )}
                            </div>
                          </div>
                       </div>
@@ -887,7 +901,7 @@ export default function DashboardPage() {
             </div>
           );
         } else {
-          // 創作者專屬
+          // 創作者專屬：收到的邀請
           const myInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -918,7 +932,16 @@ export default function DashboardPage() {
                              ) : (
                                <div className="flex items-center gap-2">
                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${inv.status === '已接受' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{inv.status}</span>
-                                 {inv.status === '已接受' && <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 智能合約</Link>}
+                                 {inv.status === '已接受' && (
+                                   <div className="flex gap-2">
+                                      {inv.fromLineId ? (
+                                         <a href={`https://line.me/ti/p/~${inv.fromLineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
+                                      ) : (
+                                         <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
+                                      )}
+                                      <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 智能合約</Link>
+                                   </div>
+                                 )}
                                </div>
                              )}
                            </div>
@@ -938,8 +961,9 @@ export default function DashboardPage() {
           );
         }
 
+      // ... (其他 trips, contracts, wallet, settings 保持不變，直接沿用上一次的完整代碼) ...
+      // 為了避免再次截斷，這裡完整提供剩餘部分
       case 'trips':
-        // ... (保持原樣，請複製之前的 trips case) ...
         return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
@@ -1046,8 +1070,6 @@ export default function DashboardPage() {
           </div>
         ) : null;
 
-      // ... (其他 contracts, wallet, settings 保持不變，直接沿用上一次的完整代碼) ...
-      // 為了完整性，我再貼一次剩餘的部分
       case 'contracts':
         return (
           <div className="space-y-6">
