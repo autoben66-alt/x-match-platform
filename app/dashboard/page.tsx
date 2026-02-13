@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Instagram, Youtube
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -68,9 +68,6 @@ interface PaymentItem {
   id: string; name: string; price: number; type: 'subscription' | 'one-time';
 }
 
-const MOCK_PROJECTS: ProjectData[] = [];
-const MOCK_TRIPS: TripData[] = [];
-
 export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<'business' | 'creator'>('business');
@@ -78,6 +75,7 @@ export default function DashboardPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
+  // 案源管理相關狀態
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
@@ -90,16 +88,23 @@ export default function DashboardPage() {
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [currentProjectApplicants, setCurrentProjectApplicants] = useState<InvitationData[]>([]);
   const [currentProjectTitle, setCurrentProjectTitle] = useState('');
+  
+  // ✨ 修正：補上 viewApplicant 狀態
+  const [viewApplicant, setViewApplicant] = useState<any>(null);
 
+  // 許願行程相關狀態
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
+  // 邀請函狀態
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
+  // 案源詳情檢視狀態
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
   const [activeImage, setActiveImage] = useState<string>('');
 
+  // 創作者履歷狀態
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
@@ -112,6 +117,7 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
+  // 金流狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
@@ -130,6 +136,7 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -139,27 +146,32 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
+  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
+    // 案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as ProjectData);
       setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     });
 
+    // 行程
     const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
     const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as TripData);
       setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
+    // 邀請函
     const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
     const unsubInv = onSnapshot(invCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as InvitationData);
       setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
+    // 創作者履歷
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists() && role === 'creator') {
@@ -206,7 +218,11 @@ export default function DashboardPage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     if (!storage || !fbUser) return;
-    if (type === 'cover') setIsUploadingCover(true); else if (type === 'avatar') setIsUploadingAvatar(true); else setIsUploadingPortfolio(true);
+
+    if (type === 'cover') setIsUploadingCover(true);
+    else if (type === 'avatar') setIsUploadingAvatar(true);
+    else setIsUploadingPortfolio(true);
+
     try {
       const urls: string[] = [];
       for (let i = 0; i < files.length; i++) {
@@ -217,9 +233,12 @@ export default function DashboardPage() {
       if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: urls[0] }));
       else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: urls[0] }));
       else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, ...urls] }));
-    } catch (error) { console.error("照片上傳失敗:", error); } 
-    finally {
-      if (type === 'cover') setIsUploadingCover(false); else if (type === 'avatar') setIsUploadingAvatar(false); else setIsUploadingPortfolio(false);
+    } catch (error) {
+      console.error("照片上傳失敗:", error);
+    } finally {
+      if (type === 'cover') setIsUploadingCover(false);
+      else if (type === 'avatar') setIsUploadingAvatar(false);
+      else setIsUploadingPortfolio(false);
     }
   };
 
@@ -539,6 +558,7 @@ export default function DashboardPage() {
               </button>
             </div>
             
+            {/* 案源列表 (連接 Firebase & 即時計算應徵人數) */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -600,10 +620,10 @@ export default function DashboardPage() {
             {/* --- 管理應徵者名單 Modal (New) --- */}
             {showApplicantsModal && (
               <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <div>
-                      <h3 className="font-bold text-xl text-slate-900">應徵者名單</h3>
+                      <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
                       <p className="text-xs text-slate-500 mt-1">案源：{currentProjectTitle}</p>
                     </div>
                     <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
