@@ -105,7 +105,7 @@ export default function AdminDashboardPage() {
   // 狀態變更確認視窗
   const [confirmAction, setConfirmAction] = useState<{userId: string, userName: string, newStatus: string} | null>(null);
   
-  // ✨ 新增：用戶編輯視窗 (方案/權限)
+  // 用戶編輯視窗 (方案/權限)
   const [editingUser, setEditingUser] = useState<UserData | null>(null);
 
   // Firestore 真實資料狀態
@@ -203,7 +203,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // ✨ 更新用戶資料 (角色與方案)
+  // 更新用戶資料 (角色與方案)
   const handleUpdateUser = async () => {
     if (!db || !fbUser || !editingUser) return;
     try {
@@ -375,7 +375,6 @@ export default function AdminDashboardPage() {
             <h2 className="text-2xl font-bold text-slate-900">用戶權限與方案管理</h2>
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
               
-              {/* 篩選工具列 */}
               <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50 rounded-t-xl">
                 <div className="relative w-full sm:max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
@@ -395,7 +394,6 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              {/* 資料表格 */}
               <div className="overflow-x-auto flex-grow pb-32">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-white border-b text-slate-400 uppercase text-[10px] font-black tracking-widest">
@@ -440,12 +438,10 @@ export default function AdminDashboardPage() {
                             <MoreVertical size={18} />
                           </button>
 
-                          {/* 彈出操作選單 */}
                           {openMenuId === u.id && (
                             <>
                               <div className="fixed inset-0 z-40" onClick={() => setOpenMenuId(null)}></div>
                               <div className="absolute right-6 top-12 w-48 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 py-1.5 text-left animate-in fade-in zoom-in-95 duration-100">
-                                {/* ✨ 新增的編輯按鈕 */}
                                 <button 
                                   onClick={() => {
                                     setEditingUser(u);
@@ -472,7 +468,7 @@ export default function AdminDashboardPage() {
               </div>
             </div>
             
-            {/* ✨ 編輯用戶權限 Modal */}
+            {/* 編輯用戶權限 Modal */}
             {editingUser && (
                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
                   <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
@@ -747,7 +743,7 @@ export default function AdminDashboardPage() {
                             onClick={() => handleEditTestimonial(t)}
                             className="px-3 py-1.5 bg-white border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50 rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
                           >
-                            <Edit2 size={12}/> 編輯
+                            <Edit size={12}/> 編輯
                           </button>
                           <button 
                             onClick={() => handleDeleteTestimonial(t.id)}
@@ -807,9 +803,7 @@ export default function AdminDashboardPage() {
           ))}
         </nav>
         <div className="p-6 border-t border-slate-800/50">
-           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/20 rounded-xl transition-all">
-             <LogOut size={16}/> 登出系統
-           </button>
+           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
         </div>
       </aside>
 

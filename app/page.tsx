@@ -36,7 +36,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義資料結構
+// 定義資料結構 (對應 Admin 後台寫入的欄位)
 interface Testimonial {
   id: string;
   image: string;
