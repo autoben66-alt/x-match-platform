@@ -36,7 +36,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義資料結構 (對應 Admin 後台寫入的欄位)
+// 定義資料結構
 interface Testimonial {
   id: string;
   image: string;
@@ -64,25 +64,25 @@ interface CreatorDetail extends Creator {
 // 模擬豐富的履歷資料 (用於補全 Firebase 僅有的基本資料)
 const ENRICH_DATA = [
   {
-    name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
+    name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
     tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
     bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", completedJobs: 42, rating: 4.9,
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
-    portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3" ]
+    portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
   },
   {
-    name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason",
+    name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
     tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁",
     bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", completedJobs: 85, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
-    portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ]
+    portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
   },
   {
-    name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly",
+    name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
     tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市",
     bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", completedJobs: 63, rating: 4.8,
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
@@ -166,14 +166,13 @@ export default function Home() {
       setIsLoading(false);
     });
 
-    // 2. 抓取成功案例 (聽聽他們怎麼說) - 對應 Admin 後台的新增功能
+    // 2. 抓取成功案例
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => doc.data() as Testimonial);
         setTestimonials(data);
       } else {
-        // 如果資料庫是空的，顯示預設資料
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
     });
@@ -245,6 +244,34 @@ export default function Home() {
         </div>
       </div>
 
+      {/* How it Works Section */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl font-bold text-slate-900 mb-4">簡單三步驟，開啟互惠旅程</h2>
+          <p className="text-slate-600 max-w-2xl mx-auto">
+            我們簡化了繁瑣的溝通流程，讓您專注於創作與體驗。
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+          <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
+          {[
+            { step: "01", title: "探索與許願", desc: "網紅發布旅遊行程（許願池），或業者發布體驗招募。", icon: Search },
+            { step: "02", title: "智能媒合", desc: "系統根據地區、風格與互惠標準，推薦最適合的合作對象。", icon: MessageCircle },
+            { step: "03", title: "體驗與分享", desc: "完成體驗行程，系統自動生成數據結案報告，累積信用評價。", icon: Heart }
+          ].map((item, idx) => (
+            <div key={idx} className="flex flex-col items-center text-center bg-white p-6 rounded-xl">
+              <div className="w-24 h-24 bg-white border-4 border-sky-100 rounded-full flex items-center justify-center mb-6 shadow-sm relative z-10">
+                <item.icon className="w-10 h-10 text-sky-500" />
+                <span className="absolute -top-2 -right-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-sm border-2 border-white">{item.step}</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-3">{item.title}</h3>
+              <p className="text-slate-600 leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Featured Creators Section */}
       <div className="bg-slate-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -290,7 +317,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Success Stories / Case Studies */}
+      {/* Success Stories */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="text-center mb-16">
           <span className="text-sky-600 font-bold tracking-wider uppercase text-sm mb-2 block">Success Stories</span>
@@ -347,7 +374,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- Creator Details Modal (熱門創作者詳情) --- */}
+      {/* --- Creator Details Modal --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -421,26 +448,8 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex flex-col sm:flex-row justify-between items-center gap-4 z-20">
-               <div className="hidden sm:block shrink-0">
-                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
-               </div>
-               <div className="flex gap-3 w-full sm:w-auto">
-                 <a 
-                   href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
-                 >
-                   <MessageCircle size={18} /> LINE 聯繫
-                 </a>
-                 <Link 
-                   href="/dashboard"
-                   className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
-                 >
-                   <Mail size={18} /> 發送合作邀請
-                 </Link>
-               </div>
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
+               <button onClick={() => setSelectedCreator(null)} className="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉詳情</button>
             </div>
           </div>
         </div>

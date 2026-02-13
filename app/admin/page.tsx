@@ -15,7 +15,7 @@ import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } 
 import { getFirestore, collection, onSnapshot, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
-// --- Firebase 初始化 (終極防護版) ---
+// --- Firebase 初始化 ---
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
@@ -30,19 +30,17 @@ let auth: any = null;
 let db: any = null;
 let storage: any = null;
 
-// 防護機制：只有在瀏覽器端，且「確實有讀取到 API Key」時才進行初始化
 if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
     db = getFirestore(app);
-    storage = getStorage(app); // 初始化 Storage
+    storage = getStorage(app);
   } catch (error) {
     console.error("Firebase 初始化失敗:", error);
   }
 }
 
-// 依照 Firebase 規範定義資料儲存路徑的 ID
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
 // 資料型別定義
@@ -123,7 +121,7 @@ export default function AdminDashboardPage() {
     setTimeout(() => setIsLoggedIn(true), 800);
   };
 
-  // 1. 處理身份驗證 (取得資料庫讀寫權限)
+  // 1. 處理身份驗證
   useEffect(() => {
     if (!auth) return; 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -133,7 +131,7 @@ export default function AdminDashboardPage() {
         try {
           await signInAnonymously(auth);
         } catch (e) {
-          console.error("Firebase 匿名登入失敗，請檢查後台設定:", e);
+          console.error("Firebase 匿名登入失敗:", e);
         }
       }
     });
@@ -397,7 +395,7 @@ export default function AdminDashboardPage() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
               
               {/* 篩選工具列 */}
-              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50">
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50 rounded-t-xl">
                 <div className="relative w-full sm:max-w-md">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                   <input 
@@ -566,8 +564,8 @@ export default function AdminDashboardPage() {
                     <Quote className="text-sky-500" size={24} />
                     {editingTestimonialId ? '編輯首頁評價' : '新增首頁評價 (Testimonials)'}
                   </h3>
-                  <p className="text-sm text-slate-500 mb-6 font-medium">
-                    在此操作的內容將會「即時同步」顯示於前台首頁的「聽聽他們怎麼說」區塊。
+                  <p className="text-sm text-slate-500 mb-8 font-medium">
+                    在此新增的成功案例將會「即時同步」顯示於前台首頁的「聽聽他們怎麼說」區塊。
                   </p>
 
                   <form onSubmit={handleSubmitTestimonial} className="space-y-5">
@@ -618,7 +616,7 @@ export default function AdminDashboardPage() {
                       <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價內容 (Quote) <span className="text-red-500">*</span></label>
                       <textarea 
                         required
-                        placeholder="例如：自從使用了 X-Match，我們的訂單提升了 30%！"
+                        placeholder="例如：自從使用了 X-Match，我們的訂房率提升了 30%！"
                         className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-sky-500 transition-all font-medium text-slate-700 h-28 resize-none"
                         value={newTestimonial.quote}
                         onChange={(e) => setNewTestimonial({...newTestimonial, quote: e.target.value})}
@@ -749,7 +747,7 @@ export default function AdminDashboardPage() {
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id as AdminTab)} 
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
                 activeTab === item.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/50' : 'hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -758,7 +756,7 @@ export default function AdminDashboardPage() {
           ))}
         </nav>
         <div className="p-6 border-t border-slate-800/50">
-           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
+           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
         </div>
       </aside>
 
