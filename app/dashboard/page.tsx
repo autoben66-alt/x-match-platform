@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Instagram, Youtube
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -43,7 +43,6 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義資料型別
 type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings' | 'invitations';
 
 interface ProjectData {
@@ -61,8 +60,8 @@ interface InvitationData {
   id: string; fromName: string; toName: string; toHandle: string; toAvatar: string;
   message: string; status: string; date: string;
   projectId?: string; projectTitle?: string; projectValue?: string; 
-  type?: 'invite' | 'application'; // 區分是業者邀請還是創作者應徵
-  creatorInfo?: any; // 創作者應徵時附帶的履歷快照
+  type?: 'invite' | 'application'; 
+  creatorInfo?: any;
 }
 
 interface PaymentItem {
@@ -79,7 +78,6 @@ export default function DashboardPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // 案源管理相關狀態
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
@@ -92,22 +90,16 @@ export default function DashboardPage() {
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [currentProjectApplicants, setCurrentProjectApplicants] = useState<InvitationData[]>([]);
   const [currentProjectTitle, setCurrentProjectTitle] = useState('');
-  // ✨ 新增：查看應徵者完整履歷
-  const [viewApplicant, setViewApplicant] = useState<any>(null);
 
-  // 許願行程相關狀態
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
-  // 邀請函狀態
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // 案源詳情檢視狀態
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
   const [activeImage, setActiveImage] = useState<string>('');
 
-  // 創作者履歷狀態
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
@@ -120,7 +112,6 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // 金流狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
@@ -139,7 +130,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -149,7 +139,6 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
@@ -191,7 +180,6 @@ export default function DashboardPage() {
     return () => { unsubProjects(); unsubTrips(); unsubUser(); unsubInv(); };
   }, [fbUser, isLoggedIn, role]);
 
-  // 上傳圖片邏輯... (保持原樣，省略以節省篇幅)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -205,7 +193,9 @@ export default function DashboardPage() {
         urls.push(await getDownloadURL(uploadTask.ref));
       }
       setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, ...urls] }));
-    } catch (error) { console.error("上傳失敗:", error); } finally { setIsUploading(false); }
+    } catch (error) {
+      console.error("上傳失敗:", error);
+    } finally { setIsUploading(false); }
   };
 
   const handleRemovePhoto = (indexToRemove: number) => {
@@ -233,7 +223,6 @@ export default function DashboardPage() {
     }
   };
 
-  // 創建與更新邏輯... (保持原樣)
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProject.title || !newProject.location) { alert("請填寫必填欄位"); return; }
@@ -657,9 +646,35 @@ export default function DashboardPage() {
                                             {info.tags?.map((t:string, i:number) => <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-medium">#{t}</span>)}
                                          </div>
                                       </div>
-                                      <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
-                                        {app.status}
-                                      </span>
+                                      <div className="flex flex-col items-end gap-2">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                                            {app.status}
+                                        </span>
+                                        {/* ✨ 新增：當已接受時顯示的按鈕 */}
+                                        {app.status === '已接受' && (
+                                            <div className="flex gap-2">
+                                                {/* LINE 聯繫 */}
+                                                {info.lineId ? (
+                                                <a 
+                                                    href={`https://line.me/ti/p/~${info.lineId}`}
+                                                    target="_blank" 
+                                                    rel="noreferrer"
+                                                    className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
+                                                >
+                                                    <MessageCircle size={12}/> LINE
+                                                </a>
+                                                ) : (
+                                                    <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1">
+                                                        <MessageCircle size={12}/> 無 LINE ID
+                                                    </button>
+                                                )}
+                                                {/* 智能合約 */}
+                                                <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
+                                                    <FileSignature size={12}/> 發起合約
+                                                </Link>
+                                            </div>
+                                        )}
+                                      </div>
                                    </div>
                                  </div>
                                </div>
@@ -686,7 +701,7 @@ export default function DashboardPage() {
                                  </div>
                                ) : (
                                  <div className="flex items-center justify-center gap-2 text-xs text-green-600 font-bold bg-green-50 py-3 rounded-xl border border-green-100">
-                                   <CheckCircle2 size={16}/> 此申請已成功媒合
+                                   <CheckCircle2 size={16}/> 此申請已成功媒合，請使用上方按鈕進行後續聯繫
                                  </div>
                                )}
                              </div>
@@ -954,7 +969,7 @@ export default function DashboardPage() {
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
                            <div className="flex gap-2">
-                             {(inv.status === '待回覆' || inv.status === '招募中') ? (
+                             {(inv.status === '待回覆' || inv.status === '招募中' || inv.status === '待審核') ? (
                                <>
                                  <button onClick={() => handleUpdateInviteStatus(inv.id, '已婉拒')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
                                  <button onClick={() => handleUpdateInviteStatus(inv.id, '已接受')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">回覆並接受</button>
