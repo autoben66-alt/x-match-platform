@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Instagram, Youtube
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -62,6 +62,7 @@ interface InvitationData {
   projectId?: string; projectTitle?: string; projectValue?: string; 
   type?: 'invite' | 'application'; 
   creatorInfo?: any;
+  fromLineId?: string; // 新增：來源者的 LINE ID (若有)
 }
 
 interface PaymentItem {
@@ -75,7 +76,6 @@ export default function DashboardPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // 案源管理相關狀態
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
@@ -84,27 +84,21 @@ export default function DashboardPage() {
   });
   const [isUploading, setIsUploading] = useState(false);
   
-  // 管理名單相關狀態
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [currentProjectApplicants, setCurrentProjectApplicants] = useState<InvitationData[]>([]);
   const [currentProjectTitle, setCurrentProjectTitle] = useState('');
   
-  // ✨ 修正：補上 viewApplicant 狀態
   const [viewApplicant, setViewApplicant] = useState<any>(null);
 
-  // 許願行程相關狀態
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
-  // 邀請函狀態
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // 案源詳情檢視狀態
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
   const [activeImage, setActiveImage] = useState<string>('');
 
-  // 創作者履歷狀態
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
@@ -117,12 +111,10 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // 金流狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
-  // 初始化時檢查 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
@@ -136,7 +128,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -146,32 +137,27 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
-    // 案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as ProjectData);
       setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     });
 
-    // 行程
     const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
     const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as TripData);
       setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 邀請函
     const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
     const unsubInv = onSnapshot(invCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as InvitationData);
       setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 創作者履歷
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists() && role === 'creator') {
@@ -558,7 +544,6 @@ export default function DashboardPage() {
               </button>
             </div>
             
-            {/* 案源列表 (連接 Firebase & 即時計算應徵人數) */}
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -617,13 +602,12 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* --- 管理應徵者名單 Modal (New) --- */}
             {showApplicantsModal && (
               <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <div>
-                      <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
+                      <h3 className="font-bold text-xl text-slate-900">應徵者名單</h3>
                       <p className="text-xs text-slate-500 mt-1">案源：{currentProjectTitle}</p>
                     </div>
                     <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
@@ -634,11 +618,9 @@ export default function DashboardPage() {
                      {currentProjectApplicants.length > 0 ? (
                        <div className="space-y-4">
                          {currentProjectApplicants.map(app => {
-                           // 如果有附帶 creatorInfo (來自前端快速應徵)，就使用它，否則用基本資料
                            const info = app.creatorInfo || {};
                            return (
                              <div key={app.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                               {/* 創作者卡片頭部 */}
                                <div className="flex flex-col sm:flex-row items-start gap-5 mb-5 border-b border-slate-100 pb-5">
                                  <div className="relative shrink-0">
                                    <img src={info.avatar || app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-16 h-16 rounded-full border-4 border-slate-50 shadow-sm" alt="Avatar"/>
@@ -652,8 +634,6 @@ export default function DashboardPage() {
                                             <h4 className="font-bold text-slate-900 text-lg">{info.name || app.fromName}</h4>
                                             {info.lineId && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold">LINE OK</span>}
                                          </div>
-                                         
-                                         {/* 數據概覽 */}
                                          <div className="flex gap-3 text-xs text-slate-500 mt-1.5 font-medium">
                                             <span className="flex items-center gap-1"><Users size={12}/> {info.followers ? (info.followers/1000).toFixed(1) + 'k' : 'N/A'} 粉絲</span>
                                             <span className="text-slate-300">|</span>
@@ -661,7 +641,6 @@ export default function DashboardPage() {
                                             <span className="text-slate-300">|</span>
                                             <span className="flex items-center gap-1"><Briefcase size={12}/> {info.completedJobs || 0} 案</span>
                                          </div>
-
                                          <div className="mt-3 flex flex-wrap gap-1.5">
                                             {info.tags?.map((t:string, i:number) => <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-medium">#{t}</span>)}
                                          </div>
@@ -670,25 +649,23 @@ export default function DashboardPage() {
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
                                             {app.status}
                                         </span>
-                                        {/* ✨ 新增：當已接受時顯示的按鈕 */}
                                         {app.status === '已接受' && (
                                             <div className="flex gap-2">
-                                                {/* LINE 聯繫 */}
+                                                {/* ✨ 新增：LINE 聯繫按鈕 (業者端) */}
                                                 {info.lineId ? (
-                                                <a 
-                                                    href={`https://line.me/ti/p/~${info.lineId}`}
-                                                    target="_blank" 
-                                                    rel="noreferrer"
-                                                    className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
-                                                >
-                                                    <MessageCircle size={12}/> LINE
-                                                </a>
+                                                  <a 
+                                                      href={`https://line.me/ti/p/~${info.lineId}`}
+                                                      target="_blank" 
+                                                      rel="noreferrer"
+                                                      className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
+                                                  >
+                                                      <MessageCircle size={12}/> LINE
+                                                  </a>
                                                 ) : (
                                                     <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1">
-                                                        <MessageCircle size={12}/> 無 LINE ID
+                                                        <MessageCircle size={12}/> 無 LINE
                                                     </button>
                                                 )}
-                                                {/* 智能合約 */}
                                                 <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
                                                     <FileSignature size={12}/> 發起合約
                                                 </Link>
@@ -699,7 +676,6 @@ export default function DashboardPage() {
                                  </div>
                                </div>
                                
-                               {/* 詳細履歷按鈕 */}
                                <button 
                                  onClick={() => setViewApplicant(info)}
                                  className="w-full mb-4 py-2 border border-slate-200 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
@@ -707,13 +683,11 @@ export default function DashboardPage() {
                                  <FileText size={16}/> 查看完整履歷 (Media Kit)
                                </button>
                                
-                               {/* 應徵留言 */}
                                <div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl mb-5 italic border border-slate-100 relative">
                                  <div className="absolute top-3 left-3 text-slate-300"><MessageCircle size={16}/></div>
                                  <span className="pl-6 block">"{app.message}"</span>
                                </div>
                                
-                               {/* 操作按鈕 */}
                                {app.status === '待審核' ? (
                                  <div className="flex gap-3">
                                    <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors">婉拒申請</button>
@@ -736,61 +710,6 @@ export default function DashboardPage() {
                          <button onClick={() => { setShowApplicantsModal(false); setActiveTab('wallet'); }} className="px-6 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">前往推廣</button>
                        </div>
                      )}
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* --- 完整履歷詳情 Modal (New) --- */}
-            {viewApplicant && (
-              <div className="fixed inset-0 z-[170] flex items-center justify-center p-0 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
-                  <button onClick={() => setViewApplicant(null)} className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"><X size={20} /></button>
-                  
-                  {/* Cover */}
-                  <div className="relative h-48 sm:h-64 bg-slate-200 shrink-0">
-                    <img src={viewApplicant.coverImage || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3"} className="w-full h-full object-cover" alt="Cover" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                    <div className="absolute -bottom-10 left-6 sm:left-10 flex items-end gap-5">
-                      <img src={viewApplicant.avatar} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-[5px] border-white bg-white shadow-xl object-cover" alt="Avatar" />
-                    </div>
-                  </div>
-
-                  <div className="pt-16 px-6 sm:px-10 pb-8 flex-grow bg-slate-50/50">
-                    <h2 className="text-3xl font-black text-slate-900 mb-1 flex items-center gap-2">{viewApplicant.name} <CheckCircle2 size={24} className="text-sky-400 fill-sky-50" /></h2>
-                    <p className="font-medium text-slate-500 mb-6 text-lg">@{viewApplicant.handle || 'creator'}</p>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                         <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest flex items-center gap-2"><User size={16} className="text-indigo-500"/> 關於我</h3>
-                         <p className="text-slate-600 leading-relaxed font-medium">{viewApplicant.bio || "這位創作者很害羞，還沒寫自我介紹..."}</p>
-                         <div className="mt-4 flex flex-wrap gap-2">
-                           {viewApplicant.tags?.map((t:string, i:number) => <span key={i} className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs font-bold">#{t}</span>)}
-                         </div>
-                       </div>
-
-                       <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                         <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest flex items-center gap-2"><BarChart3 size={16} className="text-green-500"/> 社群數據</h3>
-                         <div className="space-y-4">
-                           <div className="flex justify-between border-b border-slate-50 pb-2"><span className="text-sm text-slate-500">粉絲數</span><span className="font-bold text-slate-800">{(viewApplicant.followers/1000).toFixed(1)}k</span></div>
-                           <div className="flex justify-between border-b border-slate-50 pb-2"><span className="text-sm text-slate-500">互動率</span><span className="font-bold text-slate-800">{viewApplicant.engagement}%</span></div>
-                           <div className="flex justify-between"><span className="text-sm text-slate-500">完成案件</span><span className="font-bold text-slate-800">{viewApplicant.completedJobs || 0}</span></div>
-                         </div>
-                       </div>
-                    </div>
-
-                    <div className="mt-8">
-                       <h3 className="text-sm font-black text-slate-900 mb-4 uppercase tracking-widest">作品集 (Portfolio)</h3>
-                       <div className="grid grid-cols-3 gap-4">
-                          {viewApplicant.portfolio?.length > 0 ? viewApplicant.portfolio.map((img:string, i:number) => (
-                            <img key={i} src={img} className="aspect-square rounded-xl object-cover border border-slate-200" alt="Portfolio"/>
-                          )) : <div className="col-span-3 text-center py-8 text-slate-400 bg-slate-100 rounded-xl border border-dashed border-slate-300">尚未上傳作品集</div>}
-                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end">
-                     <button onClick={() => setViewApplicant(null)} className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg transition-all">關閉履歷</button>
                   </div>
                 </div>
               </div>
@@ -919,6 +838,8 @@ export default function DashboardPage() {
         );
 
       case 'invitations':
+        // ... (這部分內容維持不變，請複製之前的 invitations case 程式碼) ...
+        // 為確保完整性，我再次提供邀請部分
         if (role === 'business') {
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -966,7 +887,7 @@ export default function DashboardPage() {
             </div>
           );
         } else {
-          // 創作者專屬：收到的邀請
+          // 創作者專屬
           const myInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -1018,6 +939,7 @@ export default function DashboardPage() {
         }
 
       case 'trips':
+        // ... (保持原樣，請複製之前的 trips case) ...
         return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
@@ -1124,6 +1046,8 @@ export default function DashboardPage() {
           </div>
         ) : null;
 
+      // ... (其他 contracts, wallet, settings 保持不變，直接沿用上一次的完整代碼) ...
+      // 為了完整性，我再貼一次剩餘的部分
       case 'contracts':
         return (
           <div className="space-y-6">
@@ -1156,7 +1080,6 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Free Plan Card */}
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
                 <div className="relative z-10 flex-grow">
                   <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded mb-4 inline-block">目前方案</span>
@@ -1176,7 +1099,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Pro Plan Card */}
               <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white flex flex-col">
                 <div className="absolute top-0 right-0 bg-yellow-400 text-indigo-900 text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
                 <div className="relative z-10 flex-grow">
