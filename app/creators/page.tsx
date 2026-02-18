@@ -34,7 +34,6 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 擴充創作者資料結構
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -54,60 +53,40 @@ interface ProjectMinimal {
   totalValue: string;
 }
 
-// 定義模擬資料介面
-interface EnrichData {
-  name: string;
-  handle: string;
-  avatar: string;
-  lineId: string;
-  tags: string[];
-  followers: number;
-  location: string;
-  bio: string;
-  completedJobs: number;
-  rating: number;
-  coverImage: string;
-  rates: { post: string; story: string; reels: string };
-  audience: { gender: string; age: string; topCity: string };
-  portfolio: string[];
-  averageViews: number;
-  completionScore: number;
-}
-
 // 模擬豐富資料 (✨ 已全部更新為 5.0 評分)
-const ENRICH_DATA: EnrichData[] = [
+const ENRICH_DATA = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
-    tags: ["旅遊", "美食", "親子"], followers: 45000, location: "台北市",
+    tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
     bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", 
-    completedJobs: 42, rating: 5.0, // ✨
+    completedJobs: 42, rating: 5.0, // ✨ 5.0
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
     portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3" ],
-    averageViews: 12500, completionScore: 5.0 // ✨
+    averageViews: 12500, completionScore: 5.0 // ✨ 5.0
   },
   {
     name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
-    tags: ["攝影", "戶外", "衝浪"], followers: 120000, location: "墾丁",
+    tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁",
     bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", 
-    completedJobs: 85, rating: 5.0, // ✨
+    completedJobs: 85, rating: 5.0, // ✨ 5.0
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
-    averageViews: 45000, completionScore: 5.0 // ✨
+    averageViews: 45000, completionScore: 5.0 // ✨ 5.0
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
-    tags: ["咖啡廳", "生活風格"], followers: 28000, location: "台南市",
+    tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市",
     bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", 
-    completedJobs: 63, rating: 5.0, // ✨
+    completedJobs: 63, rating: 5.0, // ✨ 5.0
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 3,500", story: "NT$ 1,000", reels: "NT$ 5,000" },
     audience: { gender: "女性 90%", age: "18-24歲", topCity: "台南/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ],
-    averageViews: 8500, completionScore: 5.0 // ✨
+    averageViews: 8500, completionScore: 5.0 // ✨ 5.0
   }
 ];
 
@@ -115,7 +94,6 @@ export default function CreatorsPage() {
   const router = useRouter(); 
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [searchTerm, setSearchTerm] = useState('');
-  // 新增排序選項
   const [sortBy, setSortBy] = useState<'relevance' | 'followers' | 'views' | 'score'>('relevance');
   
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null); 
@@ -142,8 +120,7 @@ export default function CreatorsPage() {
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubscribeUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
-        // 使用 as any 繞過型別檢查，確保能讀取 Firebase 所有欄位
-        const creatorUsers = snapshot.docs.map(doc => doc.data() as any).filter(u => u.role === '創作者');
+        const creatorUsers = snapshot.docs.map(doc => doc.data()).filter(u => u.role === '創作者');
         
         const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
           const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
@@ -164,7 +141,7 @@ export default function CreatorsPage() {
             location: u.location || enrich.location,
             bio: u.bio || enrich.bio,
             followers: u.followers || enrich.followers,
-            engagement: u.engagement || enrich.engagement,
+            engagement: u.engagement || enrich.engagement, // Keeping for type compatibility
             completedJobs: u.completedJobs || enrich.completedJobs,
             rating: u.rating || enrich.rating,
             coverImage: u.coverImage || enrich.coverImage,
@@ -173,7 +150,7 @@ export default function CreatorsPage() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            // 優先讀取資料庫的數值，若無則使用預設值
+            // ✨ 優先讀取資料庫的數值，若無則使用預設值
             averageViews: u.averageViews || enrich.averageViews || 5000,
             completionScore: u.completionScore || enrich.completionScore || 5.0
           };
@@ -365,7 +342,7 @@ export default function CreatorsPage() {
             <div className="flex flex-col md:flex-row gap-4 flex-1">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input type="text" placeholder="搜尋網紅名稱 (例如：林小美)..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="搜尋網紅名稱..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
                 {categories.map(cat => (
@@ -418,11 +395,12 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* --- Creator Details Modal --- */}
+      {/* --- Creator Details Modal (創作者詳情視窗 - 更新顯示新指標) --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
             
+            {/* Close Button */}
             <button 
               onClick={() => setSelectedCreator(null)}
               className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"
@@ -486,16 +464,18 @@ export default function CreatorsPage() {
                   </div>
                 </div>
 
-                {/* ✨ 新指標展示卡片 (Modal 內) */}
+                {/* ✨ 新指標展示卡片 */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
                     <p className="text-2xl font-black text-slate-900">{(selectedCreator.followers/1000).toFixed(1)}k</p>
                   </div>
+                  {/* 平均觀看數 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">平均觀看</p>
                     <p className="text-2xl font-black text-green-500">{(selectedCreator.averageViews ? (selectedCreator.averageViews/1000).toFixed(1) + 'k' : 'N/A')}</p>
                   </div>
+                  {/* 完案信用 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完案信用</p>
                     <p className="text-2xl font-black text-indigo-600 flex items-center justify-center gap-1">
@@ -583,11 +563,7 @@ export default function CreatorsPage() {
 
             </div>
 
-            {/* Footer Action */}
-            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-between items-center gap-4 z-20">
-               <div className="hidden sm:block">
-                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
-               </div>
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                <div className="flex gap-3 w-full sm:w-auto">
                  {/* LINE 聯繫按鈕 */}
                  <a 
