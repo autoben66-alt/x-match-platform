@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, RefreshCcw, ChevronRight
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -62,12 +62,15 @@ interface InvitationData {
   projectId?: string; projectTitle?: string; projectValue?: string; 
   type?: 'invite' | 'application'; 
   creatorInfo?: any;
-  fromLineId?: string; // 來源者的 LINE ID
+  fromLineId?: string;
 }
 
 interface PaymentItem {
   id: string; name: string; price: number; type: 'subscription' | 'one-time';
 }
+
+const MOCK_PROJECTS: ProjectData[] = [];
+const MOCK_TRIPS: TripData[] = [];
 
 export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -115,6 +118,7 @@ export default function DashboardPage() {
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
+  // 初始化時檢查 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
@@ -128,6 +132,7 @@ export default function DashboardPage() {
     }
   }, []);
 
+  // Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -137,6 +142,7 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
+  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
@@ -178,6 +184,7 @@ export default function DashboardPage() {
     return () => { unsubProjects(); unsubTrips(); unsubUser(); unsubInv(); };
   }, [fbUser, isLoggedIn, role]);
 
+  // 上傳一般圖片 (案源相簿)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -340,10 +347,17 @@ export default function DashboardPage() {
 
   const handleRoleSwitch = (newRole: 'business' | 'creator') => {
     setRole(newRole);
-    if (isLoggedIn) {
-      localStorage.setItem('xmatch_role', newRole);
-    }
+    localStorage.setItem('xmatch_role', newRole);
+    setActiveTab('overview'); 
   };
+
+  // 顏色配置 (區分業者與創作者)
+  const isBusiness = role === 'business';
+  const themeColor = isBusiness ? 'indigo' : 'purple';
+  const themeBg = isBusiness ? 'bg-indigo-600' : 'bg-purple-600';
+  const themeBgHover = isBusiness ? 'hover:bg-indigo-700' : 'hover:bg-purple-700';
+  const themeText = isBusiness ? 'text-indigo-600' : 'text-purple-600';
+  const themeLightBg = isBusiness ? 'bg-indigo-50' : 'bg-purple-50';
 
   if (!isLoggedIn) {
     return (
@@ -356,16 +370,6 @@ export default function DashboardPage() {
               <p className="text-lg text-slate-200 mb-8">
                 連結在地旅宿與優質創作者，開啟您的互惠旅程。
               </p>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg"><Briefcase size={20}/></div>
-                  <span>超過 500+ 間合作廠商</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 rounded-lg"><Users size={20}/></div>
-                  <span>1,200+ 位認證創作者</span>
-                </div>
-              </div>
             </div>
           </div>
           
@@ -378,15 +382,11 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-slate-900 mb-2">
               {authMode === 'login' ? '歡迎回來' : '建立您的帳號'}
             </h2>
-            <p className="text-slate-500 mb-6 text-sm">
-              {authMode === 'login' ? '請登入以繼續管理您的專案' : '免費加入，探索更多合作機會'}
-            </p>
-            
             <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-              <button onClick={() => handleRoleSwitch('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <button onClick={() => setRole('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 <Briefcase size={16}/> 我是商家
               </button>
-              <button onClick={() => handleRoleSwitch('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <button onClick={() => setRole('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 <User size={16}/> 我是創作者
               </button>
             </div>
@@ -410,7 +410,6 @@ export default function DashboardPage() {
                 {authMode === 'login' ? '登入' : '免費註冊'} {role === 'business' ? '商家後台' : '創作者中心'}
               </button>
             </form>
-
             <div className="mt-6 text-center text-sm text-slate-600">
               {authMode === 'login' ? (
                 <>還沒有帳號？ <button onClick={() => setAuthMode('register')} className="text-sky-600 font-bold hover:underline focus:outline-none">立即註冊</button></>
@@ -444,7 +443,6 @@ export default function DashboardPage() {
     switch (activeTab) {
       case 'overview':
         const myReceivedInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
-
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-bold text-slate-900">
@@ -466,7 +464,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <p className="text-sm text-slate-500 mb-1">剩餘急單點數</p>
-                    <h3 className="text-3xl font-bold text-indigo-600">5 <span className="text-sm text-slate-400 font-normal">點</span></h3>
+                    <h3 className={`text-3xl font-bold ${themeText}`}>5 <span className="text-sm text-slate-400 font-normal">點</span></h3>
                   </div>
                 </>
               ) : (
@@ -491,43 +489,6 @@ export default function DashboardPage() {
                 </>
               )}
             </div>
-            
-            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-bold text-slate-900">近期通知</h3>
-                <button className="text-sm text-sky-600 hover:underline">查看全部</button>
-              </div>
-              <div className="divide-y divide-slate-50">
-                {role === 'creator' && myReceivedInvs.length > 0 ? (
-                  myReceivedInvs.slice(0, 3).map((inv) => (
-                    <div key={inv.id} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                      <div className="w-2 h-2 rounded-full bg-sky-500 mt-2 shrink-0"></div>
-                      <div>
-                        <p className="text-sm text-slate-800">
-                          廠商「<span className="font-bold">{inv.fromName}</span>」向您發送了合作邀請！
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">{inv.date}</p>
-                      </div>
-                      <button onClick={() => setActiveTab('invitations')} className="ml-auto text-xs font-bold text-indigo-600 hover:underline mt-1">查看內容</button>
-                    </div>
-                  ))
-                ) : (
-                  [1, 2, 3].map((i) => (
-                    <div key={i} className="p-4 px-6 flex items-start gap-4 hover:bg-slate-50 transition-colors">
-                      <div className="w-2 h-2 rounded-full bg-slate-300 mt-2 shrink-0"></div>
-                      <div>
-                        <p className="text-sm text-slate-800">
-                          {role === 'business' 
-                            ? `創作者 @user${i} 已簽署了「暑期推廣合約」，合約正式生效。` 
-                            : `您的行程「蘭嶼星空攝影」已獲得 350 次曝光。`}
-                        </p>
-                        <p className="text-xs text-slate-400 mt-1">2 小時前</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
           </div>
         );
 
@@ -538,7 +499,7 @@ export default function DashboardPage() {
               <h2 className="text-2xl font-bold text-slate-900">我的徵才 (案源管理)</h2>
               <button 
                 onClick={() => setShowCreateModal(true)}
-                className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-800 transition-colors shadow-md"
+                className={`text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors shadow-md ${themeBg} hover:opacity-90`}
               >
                 <ListPlus size={16}/> 新增案源
               </button>
@@ -585,7 +546,7 @@ export default function DashboardPage() {
                           </td>
                           <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
                           <td className="px-6 py-4 text-right">
-                            <button onClick={() => handleManageApplicants(project)} className="text-sky-600 font-bold hover:underline">管理名單</button>
+                            <button onClick={() => handleManageApplicants(project)} className={`font-bold hover:underline ${themeText}`}>管理名單</button>
                           </td>
                         </tr>
                       );
@@ -602,121 +563,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* --- 管理應徵者名單 Modal --- */}
-            {showApplicantsModal && (
-              <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                    <div>
-                      <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
-                      <p className="text-xs text-slate-500 mt-1">案源：{currentProjectTitle}</p>
-                    </div>
-                    <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
-                      <X size={24} />
-                    </button>
-                  </div>
-                  <div className="p-6 overflow-y-auto bg-slate-50/50 flex-grow">
-                     {currentProjectApplicants.length > 0 ? (
-                       <div className="space-y-4">
-                         {currentProjectApplicants.map(app => {
-                           const info = app.creatorInfo || {};
-                           return (
-                             <div key={app.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                               {/* 創作者卡片頭部 */}
-                               <div className="flex flex-col sm:flex-row items-start gap-5 mb-5 border-b border-slate-100 pb-5">
-                                 <div className="relative shrink-0">
-                                   <img src={info.avatar || app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-16 h-16 rounded-full border-4 border-slate-50 shadow-sm" alt="Avatar"/>
-                                   {info.followers > 10000 && <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white p-1 rounded-full border-2 border-white"><Crown size={12} fill="currentColor"/></div>}
-                                 </div>
-                                 
-                                 <div className="flex-1 w-full">
-                                   <div className="flex justify-between items-start">
-                                      <div>
-                                         <div className="flex items-center gap-2">
-                                            <h4 className="font-bold text-slate-900 text-lg">{info.name || app.fromName}</h4>
-                                            {info.lineId && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold">LINE OK</span>}
-                                         </div>
-                                         <div className="flex gap-3 text-xs text-slate-500 mt-1.5 font-medium">
-                                            <span className="flex items-center gap-1"><Users size={12}/> {info.followers ? (info.followers/1000).toFixed(1) + 'k' : 'N/A'} 粉絲</span>
-                                            <span className="text-slate-300">|</span>
-                                            <span className="flex items-center gap-1"><TrendingUp size={12}/> {info.engagement || 'N/A'}% 互動</span>
-                                            <span className="text-slate-300">|</span>
-                                            <span className="flex items-center gap-1"><Briefcase size={12}/> {info.completedJobs || 0} 案</span>
-                                         </div>
-                                         <div className="mt-3 flex flex-wrap gap-1.5">
-                                            {info.tags?.map((t:string, i:number) => <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-medium">#{t}</span>)}
-                                         </div>
-                                      </div>
-                                      <div className="flex flex-col items-end gap-2">
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
-                                            {app.status}
-                                        </span>
-                                        {/* ✨ 已接受時顯示的按鈕 */}
-                                        {app.status === '已接受' && (
-                                            <div className="flex gap-2">
-                                                {info.lineId ? (
-                                                  <a 
-                                                      href={`https://line.me/ti/p/~${info.lineId}`}
-                                                      target="_blank" 
-                                                      rel="noreferrer"
-                                                      className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
-                                                  >
-                                                      <MessageCircle size={12}/> LINE
-                                                  </a>
-                                                ) : (
-                                                    <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1">
-                                                        <MessageCircle size={12}/> 無 LINE
-                                                    </button>
-                                                )}
-                                                <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
-                                                    <FileSignature size={12}/> 發起合約
-                                                </Link>
-                                            </div>
-                                        )}
-                                      </div>
-                                   </div>
-                                 </div>
-                               </div>
-                               
-                               <button 
-                                 onClick={() => setViewApplicant(info)}
-                                 className="w-full mb-4 py-2 border border-slate-200 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-                               >
-                                 <FileText size={16}/> 查看完整履歷 (Media Kit)
-                               </button>
-                               
-                               <div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl mb-5 italic border border-slate-100 relative">
-                                 <div className="absolute top-3 left-3 text-slate-300"><MessageCircle size={16}/></div>
-                                 <span className="pl-6 block">"{app.message}"</span>
-                               </div>
-                               
-                               {app.status === '待審核' ? (
-                                 <div className="flex gap-3">
-                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors">婉拒申請</button>
-                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已接受')} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md">接受並開始合作</button>
-                                 </div>
-                               ) : (
-                                 <div className="flex items-center justify-center gap-2 text-xs text-green-600 font-bold bg-green-50 py-3 rounded-xl border border-green-100">
-                                   <CheckCircle2 size={16}/> 此申請已成功媒合，請使用上方按鈕進行後續聯繫
-                                 </div>
-                               )}
-                             </div>
-                           )
-                         })}
-                       </div>
-                     ) : (
-                       <div className="text-center py-24 text-slate-400 flex flex-col items-center">
-                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Users size={40} className="opacity-40"/></div>
-                         <h4 className="font-bold text-slate-600 text-lg">目前尚無人應徵</h4>
-                         <p className="text-sm mt-1 mb-6 max-w-xs">您的案源可能曝光不足，建議購買「置頂推廣」來增加 5 倍以上的瀏覽量。</p>
-                         <button onClick={() => { setShowApplicantsModal(false); setActiveTab('wallet'); }} className="px-6 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">前往推廣</button>
-                       </div>
-                     )}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {showCreateModal && (
               <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -724,15 +570,11 @@ export default function DashboardPage() {
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
                       <ListPlus size={20} className="text-sky-500"/> 發布新案源 (Cloud Sync)
                     </h3>
-                    <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600">
-                      <X size={24} />
-                    </button>
+                    <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                   </div>
-                  
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-6" onSubmit={handleCreateProject}>
-                      {/* ... (新增案源表單內容，保持不變) ... */}
-                      <div>
+                        <div>
                         <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-sky-500 pl-2">基本設定</h4>
                         <div className="space-y-4">
                           <div>
@@ -768,15 +610,13 @@ export default function DashboardPage() {
                                 </div>
                               ))}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">支援多圖上傳，第一張將預設為前台封面主圖。(需在 Firebase 後台開啟 Storage 服務)</p>
                           </div>
                         </div>
                       </div>
-
                       <div className="pt-2">
                         <h4 className="text-sm font-bold text-slate-900 mb-3 border-l-4 border-indigo-500 pl-2">互惠合作詳情</h4>
                         <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <div className="grid grid-cols-2 gap-4">
+                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">合作模式</label>
                               <select className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" value={newProject.type} onChange={(e) => setNewProject({...newProject, type: e.target.value})}>
@@ -790,27 +630,121 @@ export default function DashboardPage() {
                           </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值 (前台顯示金額)</label>
-                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600 placeholder:font-normal" placeholder="例如：NT$ 8,800" value={newProject.totalValue} onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})} />
+                              <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值</label>
+                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600" placeholder="例如：NT$ 8,800" value={newProject.totalValue} onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})} />
                             </div>
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解 (請用 + 號分隔)</label>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解</label>
                               <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="例如：住宿($6800) + 早餐($800)" value={newProject.valueBreakdown} onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})} />
                             </div>
                           </div>
                           <div>
                             <label className="block text-xs font-bold text-slate-700 mb-1">交付內容需求</label>
-                            <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：IG 貼文 1 則 + 限動 3 則 (需標記地點)..." value={newProject.requirements} onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}></textarea>
+                            <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：IG 貼文 1 則 + 限動 3 則..." value={newProject.requirements} onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}></textarea>
                           </div>
                         </div>
                       </div>
-
                       <div className="pt-4 border-t border-slate-200">
                         <button type="submit" className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
                           <CheckCircle2 size={18} /> 立即同步發布
                         </button>
                       </div>
                     </form>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- 管理應徵者名單 Modal --- */}
+            {showApplicantsModal && (
+              <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <div>
+                      <h3 className="font-bold text-lg text-slate-900">應徵者名單</h3>
+                      <p className="text-xs text-slate-500 mt-1">案源：{currentProjectTitle}</p>
+                    </div>
+                    <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={24} />
+                    </button>
+                  </div>
+                  <div className="p-6 overflow-y-auto bg-slate-50/50 flex-grow">
+                     {currentProjectApplicants.length > 0 ? (
+                       <div className="space-y-4">
+                         {currentProjectApplicants.map(app => {
+                           const info = app.creatorInfo || {};
+                           return (
+                             <div key={app.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+                               <div className="flex flex-col sm:flex-row items-start gap-5 mb-5 border-b border-slate-100 pb-5">
+                                 <div className="relative shrink-0">
+                                   <img src={info.avatar || app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-16 h-16 rounded-full border-4 border-slate-50 shadow-sm" alt="Avatar"/>
+                                   {info.followers > 10000 && <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white p-1 rounded-full border-2 border-white"><Crown size={12} fill="currentColor"/></div>}
+                                 </div>
+                                 <div className="flex-1 w-full">
+                                   <div className="flex justify-between items-start">
+                                      <div>
+                                         <div className="flex items-center gap-2">
+                                            <h4 className="font-bold text-slate-900 text-lg">{info.name || app.fromName}</h4>
+                                            {info.lineId && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold">LINE OK</span>}
+                                         </div>
+                                         <div className="flex gap-3 text-xs text-slate-500 mt-1.5 font-medium">
+                                            <span className="flex items-center gap-1"><Users size={12}/> {info.followers ? (info.followers/1000).toFixed(1) + 'k' : 'N/A'} 粉絲</span>
+                                            <span className="text-slate-300">|</span>
+                                            <span className="flex items-center gap-1"><TrendingUp size={12}/> {info.engagement || 'N/A'}% 互動</span>
+                                            <span className="text-slate-300">|</span>
+                                            <span className="flex items-center gap-1"><Briefcase size={12}/> {info.completedJobs || 0} 案</span>
+                                         </div>
+                                         <div className="mt-3 flex flex-wrap gap-1.5">
+                                            {info.tags?.map((t:string, i:number) => <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-medium">#{t}</span>)}
+                                         </div>
+                                      </div>
+                                      <div className="flex flex-col items-end gap-2">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                                            {app.status}
+                                        </span>
+                                        {app.status === '已接受' && (
+                                            <div className="flex gap-2">
+                                                {info.lineId ? (
+                                                  <a href={`https://line.me/ti/p/~${info.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"><MessageCircle size={12}/> LINE</a>
+                                                ) : (
+                                                    <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
+                                                )}
+                                                <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors"><FileSignature size={12}/> 發起合約</Link>
+                                            </div>
+                                        )}
+                                      </div>
+                                   </div>
+                                 </div>
+                               </div>
+                               <button onClick={() => setViewApplicant(info)} className="w-full mb-4 py-2 border border-slate-200 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
+                                 <FileText size={16}/> 查看完整履歷 (Media Kit)
+                               </button>
+                               <div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl mb-5 italic border border-slate-100 relative">
+                                 <div className="absolute top-3 left-3 text-slate-300"><MessageCircle size={16}/></div>
+                                 <span className="pl-6 block">"{app.message}"</span>
+                               </div>
+                               {app.status === '待審核' ? (
+                                 <div className="flex gap-3">
+                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors">婉拒申請</button>
+                                   <button onClick={() => handleUpdateInviteStatus(app.id, '已接受')} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md">接受並開始合作</button>
+                                 </div>
+                               ) : (
+                                 <div className="flex items-center justify-center gap-2 text-xs text-green-600 font-bold bg-green-50 py-3 rounded-xl border border-green-100">
+                                   <CheckCircle2 size={16}/> 此申請已成功媒合，請使用上方按鈕進行後續聯繫
+                                 </div>
+                               )}
+                             </div>
+                           )
+                         })}
+                       </div>
+                     ) : (
+                       <div className="text-center py-24 text-slate-400 flex flex-col items-center">
+                         <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4"><Users size={40} className="opacity-40"/></div>
+                         <h4 className="font-bold text-slate-600 text-lg">目前尚無人應徵</h4>
+                         <p className="text-sm mt-1 mb-6 max-w-xs">您的案源可能曝光不足，建議購買「置頂推廣」來增加 5 倍以上的瀏覽量。</p>
+                         <button onClick={() => { setShowApplicantsModal(false); setActiveTab('wallet'); }} className="px-6 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700">前往推廣</button>
+                       </div>
+                     )}
                   </div>
                 </div>
               </div>
@@ -861,20 +795,13 @@ export default function DashboardPage() {
                              <Briefcase size={16} className="shrink-0" /> <span className="truncate">附件案源：{inv.projectTitle}</span><span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
                            </button>
                          )}
-
-                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
-                           "{inv.message}"
-                         </div>
+                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">"{inv.message}"</div>
                          <div className="flex justify-between items-center">
                            <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
                            <div className="flex items-center gap-2">
-                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                               inv.status === '已接受' ? 'bg-green-100 text-green-700' :
-                               inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                             }`}>{inv.status}</span>
+                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${inv.status === '已接受' ? 'bg-green-100 text-green-700' : inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>{inv.status}</span>
                              {inv.status === '已接受' && (
                                <div className="flex gap-2">
-                                  {/* ✨ 業者端也要有 LINE 按鈕 (當創作者有提供 ID 時) */}
                                   {inv.creatorInfo?.lineId && (
                                     <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
                                   )}
@@ -934,12 +861,8 @@ export default function DashboardPage() {
                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${inv.status === '已接受' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{inv.status}</span>
                                  {inv.status === '已接受' && (
                                    <div className="flex gap-2">
-                                      {inv.fromLineId ? (
-                                         <a href={`https://line.me/ti/p/~${inv.fromLineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
-                                      ) : (
-                                         <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
-                                      )}
-                                      <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 智能合約</Link>
+                                     <button className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</button>
+                                     <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 智能合約</Link>
                                    </div>
                                  )}
                                </div>
@@ -961,8 +884,6 @@ export default function DashboardPage() {
           );
         }
 
-      // ... (其他 trips, contracts, wallet, settings 保持不變，直接沿用上一次的完整代碼) ...
-      // 為了避免再次截斷，這裡完整提供剩餘部分
       case 'trips':
         return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
@@ -970,7 +891,7 @@ export default function DashboardPage() {
               <h2 className="text-2xl font-bold text-slate-900">我的許願行程</h2>
               <button 
                 onClick={() => setShowCreateTripModal(true)}
-                className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-md active:scale-95 transition-all"
+                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-md active:scale-95 transition-all bg-purple-600 text-white hover:bg-purple-700`}
               >
                 <Plus size={16}/> 發布新行程
               </button>
@@ -986,7 +907,7 @@ export default function DashboardPage() {
                           trip.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
                         }`}>{trip.status}</span>
                         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                          <MapPin size={18} className="text-indigo-500" /> {trip.destination}
+                          <MapPin size={18} className="text-purple-500" /> {trip.destination}
                         </h3>
                       </div>
                       <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg inline-flex border border-slate-100">
@@ -1001,11 +922,11 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center items-center min-w-[150px]">
                       <p className="text-xs text-slate-500 mb-1">目前收到</p>
-                      <p className="text-4xl font-black text-indigo-600 mb-1">{trip.offers}</p>
+                      <p className="text-4xl font-black text-purple-600 mb-1">{trip.offers}</p>
                       <p className="text-xs text-slate-500 font-medium">間廠商邀請</p>
                       <button 
                         onClick={() => setActiveTab('invitations')} 
-                        className="mt-4 w-full py-2 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg hover:bg-indigo-100 transition-colors"
+                        className="mt-4 w-full py-2 bg-purple-50 text-purple-700 text-xs font-bold rounded-lg hover:bg-purple-100 transition-colors"
                       >
                         查看邀請
                       </button>
@@ -1026,7 +947,7 @@ export default function DashboardPage() {
                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
-                      <Plane size={20} className="text-indigo-500" /> 發布許願行程
+                      <Plane size={20} className="text-purple-500" /> 發布許願行程
                     </h3>
                     <button onClick={() => setShowCreateTripModal(false)} className="text-slate-400 hover:text-slate-600">
                       <X size={24} />
@@ -1037,28 +958,28 @@ export default function DashboardPage() {
                     <form className="space-y-4" onSubmit={handleCreateTrip}>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">目的地 (城市/區域) <span className="text-red-500">*</span></label>
-                        <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium" placeholder="例如：宜蘭礁溪、台南中西區" value={newTrip.destination} onChange={(e) => setNewTrip({...newTrip, destination: e.target.value})} />
+                        <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm font-medium" placeholder="例如：宜蘭礁溪、台南中西區" value={newTrip.destination} onChange={(e) => setNewTrip({...newTrip, destination: e.target.value})} />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1">預計日期</label>
-                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="例如：2024/07/15 - 07/17" value={newTrip.dates} onChange={(e) => setNewTrip({...newTrip, dates: e.target.value})} />
+                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2024/07/15 - 07/17" value={newTrip.dates} onChange={(e) => setNewTrip({...newTrip, dates: e.target.value})} />
                         </div>
                         <div>
                           <label className="block text-xs font-bold text-slate-500 mb-1">隨行人數</label>
-                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="例如：2大1小、單人" value={newTrip.partySize} onChange={(e) => setNewTrip({...newTrip, partySize: e.target.value})} />
+                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2大1小、單人" value={newTrip.partySize} onChange={(e) => setNewTrip({...newTrip, partySize: e.target.value})} />
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">行程目的 (將產出什麼內容？)</label>
-                        <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：家庭暑假旅遊，預計會拍攝兩支短影音介紹親子友善設施。" value={newTrip.purpose} onChange={(e) => setNewTrip({...newTrip, purpose: e.target.value})}></textarea>
+                        <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none h-20 resize-none text-sm" placeholder="例如：家庭暑假旅遊，預計會拍攝兩支短影音介紹親子友善設施。" value={newTrip.purpose} onChange={(e) => setNewTrip({...newTrip, purpose: e.target.value})}></textarea>
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">許願需求 (希望廠商提供什麼？)</label>
-                        <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：尋求有溫泉設施的飯店住宿贊助兩晚，或周邊親子餐廳體驗。" value={newTrip.needs} onChange={(e) => setNewTrip({...newTrip, needs: e.target.value})}></textarea>
+                        <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none h-20 resize-none text-sm" placeholder="例如：尋求有溫泉設施的飯店住宿贊助兩晚，或周邊親子餐廳體驗。" value={newTrip.needs} onChange={(e) => setNewTrip({...newTrip, needs: e.target.value})}></textarea>
                       </div>
                       <div className="pt-4 border-t border-slate-100">
-                        <button type="submit" className="w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 active:scale-95 transition-all flex justify-center items-center gap-2">
+                        <button type="submit" className="w-full py-3.5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 active:scale-95 transition-all flex justify-center items-center gap-2">
                           確認發布
                         </button>
                       </div>
@@ -1416,23 +1337,44 @@ export default function DashboardPage() {
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
           <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
-          <div className="flex gap-4">
-             <div className="bg-slate-100 p-1 rounded-lg flex">
-                <button onClick={() => handleRoleSwitch('business')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow' : 'text-slate-400'}`}>業者視角</button>
-                <button onClick={() => handleRoleSwitch('creator')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'creator' ? 'bg-white shadow' : 'text-slate-400'}`}>創作者視角</button>
-             </div>
+          <div className="flex gap-3">
+             <span className={`px-3 py-1.5 text-xs font-black rounded-lg uppercase tracking-wider ${role === 'business' ? 'bg-indigo-100 text-indigo-700' : 'bg-purple-100 text-purple-700'}`}>
+               {role === 'business' ? 'Business Pro' : 'Creator Studio'}
+             </span>
              <button onClick={handleLogout} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
           </div>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex gap-8">
-        <div className="w-64 shrink-0 hidden md:block">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex flex-col md:flex-row gap-8">
+        <div className="w-full md:w-64 shrink-0">
           <nav className="space-y-2 sticky top-24">
             {menuItems.map(i => (
-              <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl ${activeTab === i.id ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-white'}`}>
+              <button 
+                key={i.id} 
+                onClick={() => setActiveTab(i.id as Tab)} 
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl transition-all ${
+                  activeTab === i.id 
+                    ? (role === 'business' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-purple-600 text-white shadow-md shadow-purple-200') 
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
                 <i.icon size={18} /> {i.label}
               </button>
             ))}
+
+            {/* ✨ 身分切換按鈕 (位於側邊欄底部) */}
+            <div className="pt-6 mt-6 border-t border-slate-200">
+               <button 
+                 onClick={() => handleRoleSwitch(role === 'business' ? 'creator' : 'business')}
+                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all group"
+               >
+                 <span className="flex items-center gap-2">
+                   <RefreshCcw size={14} className="group-hover:rotate-180 transition-transform duration-500"/>
+                   切換至 {role === 'business' ? '創作者視角' : '業者視角'}
+                 </span>
+                 <ChevronRight size={14} />
+               </button>
+            </div>
           </nav>
         </div>
         <div className="flex-1 pb-32 relative">
@@ -1530,10 +1472,19 @@ export default function DashboardPage() {
           {renderContent()}
         </div>
       </div>
+      
       {/* 行動版底部導覽 */}
       <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 z-40 flex justify-around p-2 pb-safe">
-        {menuItems.slice(0, 4).map(i => (
-          <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`p-2 flex flex-col items-center ${activeTab === i.id ? 'text-indigo-600' : 'text-slate-400'}`}>
+        {menuItems.map(i => (
+          <button 
+            key={i.id} 
+            onClick={() => setActiveTab(i.id as Tab)} 
+            className={`p-2 flex flex-col items-center ${
+              activeTab === i.id 
+                ? (role === 'business' ? 'text-indigo-600' : 'text-purple-600') 
+                : 'text-slate-400'
+            }`}
+          >
             <i.icon size={20} />
             <span className="text-[10px] mt-1 font-bold">{i.label.split(' ')[0]}</span>
           </button>
