@@ -69,9 +69,8 @@ interface InvitationData {
   type?: 'invite' | 'application'; 
   creatorInfo?: any;
   fromLineId?: string;
-  // ✨ 新增評價欄位
-  businessReview?: ReviewData; // 廠商給創作者的評價
-  creatorReview?: ReviewData;  // 創作者給廠商的評價
+  businessReview?: ReviewData;
+  creatorReview?: ReviewData;
 }
 
 interface PaymentItem {
@@ -105,7 +104,7 @@ export default function DashboardPage() {
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // ✨ 評價相關狀態
+  // 評價相關狀態
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewTargetId, setReviewTargetId] = useState<string | null>(null); 
   const [reviewRating, setReviewRating] = useState(5);
@@ -312,7 +311,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 開啟評價視窗
   const handleOpenReviewModal = (invId: string) => {
     setReviewTargetId(invId);
     setReviewRating(5);
@@ -320,7 +318,6 @@ export default function DashboardPage() {
     setShowReviewModal(true);
   };
 
-  // ✨ 送出評價 (結案)
   const handleSubmitReview = async () => {
     if (!db || !reviewTargetId) return;
     
@@ -332,8 +329,6 @@ export default function DashboardPage() {
 
     try {
       const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', reviewTargetId);
-      
-      // 根據角色寫入對應的評價欄位
       if (role === 'business') {
         await updateDoc(invRef, { businessReview: reviewData });
       } else {
@@ -387,7 +382,8 @@ export default function DashboardPage() {
     setTimeout(() => {
       setIsLoggedIn(true);
       localStorage.setItem('xmatch_logged_in', 'true');
-      localStorage.setItem('xmatch_role', role);
+      // 注意：role 在登入前就已經在 Modal 中透過 handleRoleSwitch 設定好了
+      // 這裡只需要確認登入狀態
     }, 800); 
   };
 
@@ -664,7 +660,7 @@ export default function DashboardPage() {
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
                                             {app.status}
                                         </span>
-                                        {/* ✨ 新增：當已接受時顯示的按鈕 */}
+                                        {/* 當已接受時顯示的按鈕 */}
                                         {app.status === '已接受' && (
                                             <div className="flex gap-2 justify-end flex-wrap">
                                                 {/* LINE 聯繫 */}
@@ -741,8 +737,7 @@ export default function DashboardPage() {
             
             {showCreateModal && (
                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                 {/* ... (Create Project Modal - 保持不變) ... */}
-                 {/* 為避免過長，請確保複製完整的表單代碼 */}
+                 {/* ... (Create Project Modal) ... */}
                  <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
@@ -1458,12 +1453,15 @@ export default function DashboardPage() {
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
           <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
-          <div className="flex gap-4">
-             <div className="bg-slate-100 p-1 rounded-lg flex">
-                <button onClick={() => setRole('business')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow' : 'text-slate-400'}`}>業者視角</button>
-                <button onClick={() => setRole('creator')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'creator' ? 'bg-white shadow' : 'text-slate-400'}`}>創作者視角</button>
-             </div>
-             <button onClick={() => setIsLoggedIn(false)} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
+          <div className="flex items-center gap-4">
+             {/* 登入後的身分顯示 (不可切換) */}
+             <span className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 ${role === 'business' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'}`}>
+                {role === 'business' ? <Briefcase size={14}/> : <User size={14}/>}
+                {role === 'business' ? '業者後台' : '創作者中心'}
+             </span>
+             <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 flex items-center gap-1 text-sm font-bold transition-colors">
+               <LogOut size={18}/> 登出
+             </button>
           </div>
         </div>
       </div>
