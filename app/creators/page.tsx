@@ -34,7 +34,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 擴充介面：加入新指標 averageViews, completionScore
+// 擴充創作者資料結構
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -44,8 +44,8 @@ interface CreatorDetail extends Creator {
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
   lineId?: string;
-  averageViews?: number;
-  completionScore?: number;
+  averageViews?: number;    // A. 平均觀看數
+  completionScore?: number; // B. 完案信用評分
 }
 
 interface ProjectMinimal {
@@ -54,37 +54,60 @@ interface ProjectMinimal {
   totalValue: string;
 }
 
-// 模擬豐富資料
-const ENRICH_DATA = [
+// 定義模擬資料介面
+interface EnrichData {
+  name: string;
+  handle: string;
+  avatar: string;
+  lineId: string;
+  tags: string[];
+  followers: number;
+  location: string;
+  bio: string;
+  completedJobs: number;
+  rating: number;
+  coverImage: string;
+  rates: { post: string; story: string; reels: string };
+  audience: { gender: string; age: string; topCity: string };
+  portfolio: string[];
+  averageViews: number;
+  completionScore: number;
+}
+
+// 模擬豐富資料 (✨ 已全部更新為 5.0 評分)
+const ENRICH_DATA: EnrichData[] = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
-    tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
-    bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", completedJobs: 42, rating: 4.9,
+    tags: ["旅遊", "美食", "親子"], followers: 45000, location: "台北市",
+    bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", 
+    completedJobs: 42, rating: 5.0, // ✨
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
     portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3" ],
-    averageViews: 12500, completionScore: 5.0
+    averageViews: 12500, completionScore: 5.0 // ✨
   },
   {
     name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
-    tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁",
-    bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", completedJobs: 85, rating: 5.0,
+    tags: ["攝影", "戶外", "衝浪"], followers: 120000, location: "墾丁",
+    bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", 
+    completedJobs: 85, rating: 5.0, // ✨
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
-    averageViews: 45000, completionScore: 4.9
+    averageViews: 45000, completionScore: 5.0 // ✨
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
-    tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市",
-    bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", completedJobs: 63, rating: 4.8,
+    tags: ["咖啡廳", "生活風格"], followers: 28000, location: "台南市",
+    bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", 
+    completedJobs: 63, rating: 5.0, // ✨
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 3,500", story: "NT$ 1,000", reels: "NT$ 5,000" },
     audience: { gender: "女性 90%", age: "18-24歲", topCity: "台南/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ],
-    averageViews: 8500, completionScore: 4.8
+    averageViews: 8500, completionScore: 5.0 // ✨
   }
 ];
 
@@ -92,6 +115,7 @@ export default function CreatorsPage() {
   const router = useRouter(); 
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [searchTerm, setSearchTerm] = useState('');
+  // 新增排序選項
   const [sortBy, setSortBy] = useState<'relevance' | 'followers' | 'views' | 'score'>('relevance');
   
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null); 
@@ -118,7 +142,8 @@ export default function CreatorsPage() {
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubscribeUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
-        const creatorUsers = snapshot.docs.map(doc => doc.data()).filter(u => u.role === '創作者');
+        // 使用 as any 繞過型別檢查，確保能讀取 Firebase 所有欄位
+        const creatorUsers = snapshot.docs.map(doc => doc.data() as any).filter(u => u.role === '創作者');
         
         const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
           const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
@@ -148,6 +173,7 @@ export default function CreatorsPage() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
+            // 優先讀取資料庫的數值，若無則使用預設值
             averageViews: u.averageViews || enrich.averageViews || 5000,
             completionScore: u.completionScore || enrich.completionScore || 5.0
           };
@@ -160,7 +186,7 @@ export default function CreatorsPage() {
       setIsLoading(false);
     });
 
-    // 監聽廠商案源
+    // 監聽廠商自己的案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubscribeProjects = onSnapshot(projectsCol, (snapshot) => {
       if (!snapshot.empty) {
@@ -225,7 +251,17 @@ export default function CreatorsPage() {
         date: new Date().toLocaleString('zh-TW', { hour12: false }),
         projectId: proj?.id || '',
         projectTitle: proj?.title || '',
-        projectValue: proj?.totalValue || ''
+        projectValue: proj?.totalValue || '',
+        type: 'invite', // 標記為業者邀請
+        creatorInfo: { // 附帶創作者資料
+          name: selectedCreator?.name,
+          avatar: selectedCreator?.avatar,
+          followers: selectedCreator?.followers,
+          averageViews: selectedCreator?.averageViews,
+          completionScore: selectedCreator?.completionScore,
+          tags: selectedCreator?.tags,
+          lineId: selectedCreator?.lineId
+        }
       });
 
       setIsSending(false);
@@ -329,7 +365,7 @@ export default function CreatorsPage() {
             <div className="flex flex-col md:flex-row gap-4 flex-1">
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input type="text" placeholder="搜尋網紅名稱..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="搜尋網紅名稱 (例如：林小美)..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
                 {categories.map(cat => (
@@ -347,7 +383,8 @@ export default function CreatorsPage() {
                 >
                   <option value="relevance">綜合推薦</option>
                   <option value="followers">粉絲數 (高到低)</option>
-                  <option value="views">平均觀看數 (高到低)</option> 
+                  {/* ✨ 新增排序選項 */}
+                  <option value="views">平均觀看數 (高到低)</option>
                   <option value="score">完案信用評分 (高到低)</option>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
@@ -369,6 +406,7 @@ export default function CreatorsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-500">
             {filteredCreators.map(creator => (
               <div key={creator.id} onClick={() => setSelectedCreator(creator)}>
+                {/* 傳遞新指標到 Card 元件 */}
                 <CreatorCard creator={{
                     ...creator, 
                     averageViews: creator.averageViews, 
@@ -385,15 +423,25 @@ export default function CreatorsPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
             
-            <button onClick={() => setSelectedCreator(null)} className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"><X size={20} /></button>
+            <button 
+              onClick={() => setSelectedCreator(null)}
+              className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"
+            >
+              <X size={20} />
+            </button>
 
+            {/* Header / Cover */}
             <div className="relative h-48 sm:h-64 bg-slate-200 shrink-0">
               <img src={selectedCreator.coverImage} className="w-full h-full object-cover" alt="Cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
               
               <div className="absolute -bottom-10 left-6 sm:left-10 flex items-end gap-5">
                 <div className="relative">
-                  <img src={selectedCreator.avatar} className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-[5px] border-white bg-white shadow-xl object-cover" alt={selectedCreator.name} />
+                  <img 
+                    src={selectedCreator.avatar} 
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-[5px] border-white bg-white shadow-xl object-cover" 
+                    alt={selectedCreator.name} 
+                  />
                   {selectedCreator.badges?.includes('創始會員') && (
                     <div className="absolute -bottom-2 right-0 bg-gradient-to-r from-amber-400 to-orange-500 text-white p-2 rounded-full shadow-lg border-2 border-white" title="創始會員">
                       <Crown size={18} className="fill-current" />
@@ -401,18 +449,27 @@ export default function CreatorsPage() {
                   )}
                 </div>
                 <div className="pb-12 text-white hidden sm:block">
-                   <h2 className="text-3xl font-black mb-1 flex items-center gap-2">{selectedCreator.name} <CheckCircle2 size={24} className="text-sky-400 fill-sky-50" /></h2>
+                   <h2 className="text-3xl font-black mb-1 flex items-center gap-2">
+                     {selectedCreator.name}
+                     <CheckCircle2 size={24} className="text-sky-400 fill-sky-50" />
+                   </h2>
                    <p className="font-medium text-white/80">{selectedCreator.handle}</p>
                 </div>
               </div>
             </div>
 
+            {/* Content Body */}
             <div className="pt-16 px-6 sm:px-10 pb-8 flex-grow bg-slate-50/50">
+              
               <div className="sm:hidden mb-6">
-                <h2 className="text-2xl font-black text-slate-900 mb-1 flex items-center gap-2">{selectedCreator.name} <CheckCircle2 size={20} className="text-sky-500 fill-sky-50" /></h2>
+                <h2 className="text-2xl font-black text-slate-900 mb-1 flex items-center gap-2">
+                  {selectedCreator.name}
+                  <CheckCircle2 size={20} className="text-sky-500 fill-sky-50" />
+                </h2>
                 <p className="font-medium text-slate-500">{selectedCreator.handle}</p>
               </div>
 
+              {/* Profile Basic Info */}
               <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-6">
                 <div className="w-full sm:w-auto">
                   <div className="flex flex-wrap gap-2 text-sm text-slate-600 mb-4">
@@ -429,17 +486,16 @@ export default function CreatorsPage() {
                   </div>
                 </div>
 
+                {/* ✨ 新指標展示卡片 (Modal 內) */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
                     <p className="text-2xl font-black text-slate-900">{(selectedCreator.followers/1000).toFixed(1)}k</p>
                   </div>
-                  {/* 平均觀看數 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">平均觀看</p>
                     <p className="text-2xl font-black text-green-500">{(selectedCreator.averageViews ? (selectedCreator.averageViews/1000).toFixed(1) + 'k' : 'N/A')}</p>
                   </div>
-                  {/* 完案信用 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完案信用</p>
                     <p className="text-2xl font-black text-indigo-600 flex items-center justify-center gap-1">
@@ -449,6 +505,7 @@ export default function CreatorsPage() {
                 </div>
               </div>
 
+              {/* Founder Badge Highlights */}
               {selectedCreator.badges?.includes('創始會員') && (
                 <div className="mb-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 rounded-2xl flex items-center gap-4 shadow-inner">
                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl shadow-md">
@@ -461,35 +518,63 @@ export default function CreatorsPage() {
                 </div>
               )}
 
+              {/* Bio */}
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2"><User size={16} className="text-sky-500" /> 關於我</h3>
+                <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2">
+                  <User size={16} className="text-sky-500" /> 關於我
+                </h3>
                 <p className="text-slate-600 leading-relaxed font-medium">{selectedCreator.bio}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Audience Insight */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-                  <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase"><BarChart3 size={18} className="text-indigo-500"/> 受眾分析</h4>
+                  <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase">
+                    <BarChart3 size={18} className="text-indigo-500"/> 受眾分析
+                  </h4>
                   <div className="space-y-4">
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-50"><span className="text-sm font-medium text-slate-500">性別分佈</span><span className="font-bold text-slate-800">{selectedCreator.audience.gender}</span></div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-50"><span className="text-sm font-medium text-slate-500">主力年齡</span><span className="font-bold text-slate-800">{selectedCreator.audience.age}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-sm font-medium text-slate-500">熱門城市</span><span className="font-bold text-slate-800">{selectedCreator.audience.topCity}</span></div>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-50">
+                      <span className="text-sm font-medium text-slate-500">性別分佈</span>
+                      <span className="font-bold text-slate-800">{selectedCreator.audience.gender}</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-50">
+                      <span className="text-sm font-medium text-slate-500">主力年齡</span>
+                      <span className="font-bold text-slate-800">{selectedCreator.audience.age}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-slate-500">熱門城市</span>
+                      <span className="font-bold text-slate-800">{selectedCreator.audience.topCity}</span>
+                    </div>
                   </div>
                 </div>
+
+                {/* Reference Rates */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
-                  <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10"><DollarSign size={18} className="text-green-500"/> 參考報價</h4>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+                  <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
+                    <DollarSign size={18} className="text-green-500"/> 參考報價
+                  </h4>
                   <div className="space-y-4 relative z-10">
-                    <div className="flex justify-between items-center"><span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Camera size={14} className="text-slate-400"/> 圖文貼文</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.post}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-slate-400"></div> 限時動態</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.story}</span></div>
-                    <div className="flex justify-between items-center"><span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Reels 短影音</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.reels}</span></div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Camera size={14} className="text-slate-400"/> 圖文貼文</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.post}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-slate-400"></div> 限時動態</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.story}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Reels 短影音</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.reels}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
+              {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                <div className="grid grid-cols-3 gap-3 sm:gap-4">
                   {selectedCreator.portfolio.map((img, i) => (
-                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer border border-slate-200">
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer">
                       <img src={img} className="w-full h-full object-cover" alt="Portfolio" />
                     </div>
                   ))}
@@ -498,8 +583,13 @@ export default function CreatorsPage() {
 
             </div>
 
-            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
+            {/* Footer Action */}
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-between items-center gap-4 z-20">
+               <div className="hidden sm:block">
+                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
+               </div>
                <div className="flex gap-3 w-full sm:w-auto">
+                 {/* LINE 聯繫按鈕 */}
                  <a 
                    href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
                    target="_blank"
@@ -508,6 +598,7 @@ export default function CreatorsPage() {
                  >
                    <MessageCircle size={18} /> LINE 聯繫
                  </a>
+                 {/* 導向發送邀請 Modal 按鈕 */}
                  <button 
                    onClick={handleOpenInvite}
                    className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
@@ -516,6 +607,7 @@ export default function CreatorsPage() {
                  </button>
                </div>
             </div>
+
           </div>
         </div>
       )}
@@ -569,7 +661,6 @@ export default function CreatorsPage() {
                           setSelectedProjectId(val);
                           const proj = projects.find(p => p.id === val);
                           if (proj) {
-                            // 動態修改邀請訊息
                             setInviteMessage(`哈囉 ${selectedCreator.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源「${proj.title}」，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
                           }
                         }}
