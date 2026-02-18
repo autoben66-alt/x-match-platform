@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, ArrowRight, X, CheckCircle, Send, Loader2 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -213,10 +214,15 @@ export default function TripsPage() {
             網紅公佈行程，在地商家主動提供體驗機會。發現誰正要來你的城市？
           </p>
         </div>
-        <button className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-transform active:scale-95">
+        
+        {/* ✨ 已將按鈕改為 Link 連結至 /dashboard */}
+        <Link 
+          href="/dashboard"
+          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-transform active:scale-95"
+        >
           <Calendar size={18} />
           發布新行程
-        </button>
+        </Link>
       </div>
 
       {/* Filter & Search Toolbar */}
