@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   TrendingUp, Users, CheckCircle, ArrowRight, Search, MessageCircle, Heart, Star, BarChart, Loader2,
-  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote
+  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye
 } from 'lucide-react';
 import CreatorCard, { Creator } from '@/components/CreatorCard';
 
@@ -36,7 +36,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義資料結構 (對應 Admin 後台寫入的欄位)
+// 定義資料結構
 interface Testimonial {
   id: string;
   image: string;
@@ -49,7 +49,7 @@ interface Testimonial {
   rating?: number;
 }
 
-// 擴充創作者資料結構
+// 擴充創作者資料結構 (包含詳情頁所需欄位)
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -59,6 +59,8 @@ interface CreatorDetail extends Creator {
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
   lineId?: string;
+  averageViews?: number;
+  completionScore?: number;
 }
 
 // 模擬豐富的履歷資料 (用於補全 Firebase 僅有的基本資料)
@@ -70,7 +72,8 @@ const ENRICH_DATA = [
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
-    portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
+    portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ],
+    averageViews: 12500, completionScore: 5.0
   },
   {
     name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
@@ -79,7 +82,8 @@ const ENRICH_DATA = [
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
-    portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ]
+    portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80" ],
+    averageViews: 45000, completionScore: 4.9
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
@@ -88,7 +92,8 @@ const ENRICH_DATA = [
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 3,500", story: "NT$ 1,000", reels: "NT$ 5,000" },
     audience: { gender: "女性 90%", age: "18-24歲", topCity: "台南/高雄" },
-    portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ]
+    portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ],
+    averageViews: 8500, completionScore: 4.8
   }
 ];
 
@@ -124,7 +129,7 @@ export default function Home() {
       return;
     }
 
-    // 1. 抓取創作者清單
+    // 1. 抓取創作者清單 (動態顯示在首頁)
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
@@ -157,22 +162,26 @@ export default function Home() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
+            averageViews: u.averageViews || enrich.averageViews,
+            completionScore: u.completionScore || enrich.completionScore
           };
         });
 
+        // 隨機打亂並取前三名作為「本週熱門」
         const shuffled = mappedCreators.sort(() => 0.5 - Math.random());
         setCreators(shuffled.slice(0, 3));
       }
       setIsLoading(false);
     });
 
-    // 2. 抓取成功案例
+    // 2. 抓取成功案例 (聽聽他們怎麼說) - 對應 Admin 後台的新增功能
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => doc.data() as Testimonial);
         setTestimonials(data);
       } else {
+        // 如果資料庫是空的，顯示預設資料
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
     });
@@ -272,7 +281,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Featured Creators Section */}
+      {/* Featured Creators Section (Cloud Sync) */}
       <div className="bg-slate-50 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
@@ -317,7 +326,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Success Stories */}
+      {/* Success Stories / Case Studies */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="text-center mb-16">
           <span className="text-sky-600 font-bold tracking-wider uppercase text-sm mb-2 block">Success Stories</span>
@@ -411,8 +420,8 @@ export default function Home() {
                 </div>
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]"><p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p><p className="text-2xl font-black text-slate-900">{(selectedCreator.followers/1000).toFixed(1)}k</p></div>
-                  <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]"><p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">互動率</p><p className="text-2xl font-black text-green-500">{selectedCreator.engagement}%</p></div>
-                  <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]"><p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完成案件</p><p className="text-2xl font-black text-indigo-600">{selectedCreator.completedJobs}</p></div>
+                  <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]"><p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">平均觀看</p><p className="text-2xl font-black text-green-500">{(selectedCreator.averageViews ? (selectedCreator.averageViews/1000).toFixed(1) + 'k' : 'N/A')}</p></div>
+                  <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]"><p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完案信用</p><p className="text-2xl font-black text-indigo-600 flex items-center justify-center gap-1">{selectedCreator.completionScore || '5.0'} <Star size={16} className="fill-yellow-400 text-yellow-400"/></p></div>
                 </div>
               </div>
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
