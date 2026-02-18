@@ -1,19 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-// 移除 next/link，改用標準 a 標籤
-// import Link from 'next/link'; 
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye, Trash2, AlertTriangle, ExternalLink
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, query, where, getDoc } from 'firebase/firestore';
+import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 // --- Firebase 初始化 ---
@@ -44,14 +43,12 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// --- 資料型別定義 ---
 type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'settings' | 'invitations';
 
 interface ProjectData {
   id: string; title: string; category: string; type: string; location: string; 
   totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
   status: string; applicants: number; date: string; image?: string; gallery?: string[];
-  description?: string;
 }
 
 interface TripData {
@@ -72,8 +69,9 @@ interface InvitationData {
   type?: 'invite' | 'application'; 
   creatorInfo?: any;
   fromLineId?: string;
-  businessReview?: ReviewData; 
-  creatorReview?: ReviewData;  
+  // ✨ 新增評價欄位
+  businessReview?: ReviewData; // 廠商給創作者的評價
+  creatorReview?: ReviewData;  // 創作者給廠商的評價
 }
 
 interface PaymentItem {
@@ -81,44 +79,41 @@ interface PaymentItem {
 }
 
 export default function DashboardPage() {
-  // --- 基礎核心狀態 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<'business' | 'creator'>('business');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // --- 案源管理相關狀態 ---
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
     title: '', category: '住宿', type: '互惠體驗', location: '',
-    totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[],
-    description: ''
+    totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[]
   });
   const [isUploading, setIsUploading] = useState(false);
-  const [viewProject, setViewProject] = useState<ProjectData | null>(null);
-  const [activeImage, setActiveImage] = useState<string>('');
   
-  // --- 管理名單/應徵者狀態 ---
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [currentProjectApplicants, setCurrentProjectApplicants] = useState<InvitationData[]>([]);
   const [currentProjectTitle, setCurrentProjectTitle] = useState('');
-  const [viewApplicant, setViewApplicant] = useState<any>(null); // 查看創作者詳情
+  
+  const [viewApplicant, setViewApplicant] = useState<any>(null);
 
-  // --- 許願行程相關狀態 ---
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
-  // --- 邀請函與評價 ---
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
+  
+  // ✨ 評價相關狀態
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewTargetId, setReviewTargetId] = useState<string | null>(null); 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
+  
+  const [viewProject, setViewProject] = useState<ProjectData | null>(null);
+  const [activeImage, setActiveImage] = useState<string>('');
 
-  // --- 創作者履歷狀態 (Media Kit) ---
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
@@ -133,12 +128,11 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // --- 金流與支付狀態 ---
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
-  // --- 初始化時檢查 localStorage (保持登入狀態) ---
+  // 初始化時檢查 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
@@ -146,82 +140,65 @@ export default function DashboardPage() {
       if (savedLoginStatus === 'true') {
         setIsLoggedIn(true);
         if (savedRole === 'business' || savedRole === 'creator') {
-          // @ts-ignore
-          setRole(savedRole);
+          setRole(savedRole as 'business' | 'creator');
         }
       }
     }
   }, []);
 
-  // --- Firebase Auth ---
+  // Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) setFbUser(user);
-      else { try { await signInAnonymously(auth); } catch (e) { console.error("Auth Error", e); } }
+      else { try { await signInAnonymously(auth); } catch (e) { console.error("匿名登入失敗:", e); } }
     });
     return () => unsubscribe();
   }, []);
 
-  // --- 監聽 Firestore 實時資料 ---
+  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !fbUser || !isLoggedIn) return;
     
-    // 監聽案源
-    const unsubProjects = onSnapshot(collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects'), (snapshot) => {
+    const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
+    const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as ProjectData);
       setProjects(data.sort((a, b) => Number(b.id) - Number(a.id)));
     });
 
-    // 監聽許願
-    const unsubTrips = onSnapshot(collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips'), (snapshot) => {
+    const tripsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'trips');
+    const unsubTrips = onSnapshot(tripsCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as TripData);
       setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 監聽邀請/應徵
-    const unsubInv = onSnapshot(collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations'), (snapshot) => {
+    const invCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
+    const unsubInv = onSnapshot(invCol, (snapshot) => {
       const data = snapshot.docs.map(d => d.data() as InvitationData);
       setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 監聽個人資料 (創作者)
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists() && role === 'creator') {
         const d = docSnap.data();
-        setCreatorProfile(prev => ({
-          ...prev,
-          name: d.name || prev.name, handle: d.handle || prev.handle, lineId: d.lineId || prev.lineId,
-          location: d.location || prev.location, tags: d.tags ? d.tags.join(', ') : prev.tags,
-          bio: d.bio || prev.bio, coverImage: d.coverImage || '',
-          avatar: d.avatar || '', portfolio: d.portfolio || [],
-          rates: d.rates || prev.rates, audience: d.audience || prev.audience,
-          averageViews: d.averageViews || prev.averageViews,
-          completionScore: d.completionScore || prev.completionScore
-        }));
+        if (d.role === '創作者') {
+          setCreatorProfile(prev => ({
+            ...prev,
+            name: d.name || prev.name, handle: d.handle || prev.handle, lineId: d.lineId || prev.lineId,
+            location: d.location || prev.location, tags: d.tags ? d.tags.join(', ') : prev.tags,
+            bio: d.bio || prev.bio, coverImage: d.coverImage || '',
+            avatar: d.avatar || '', portfolio: d.portfolio || [],
+            rates: d.rates || prev.rates, audience: d.audience || prev.audience,
+            averageViews: d.averageViews || prev.averageViews,
+            completionScore: d.completionScore || prev.completionScore
+          }));
+        }
       }
     });
 
     return () => { unsubProjects(); unsubTrips(); unsubUser(); unsubInv(); };
   }, [fbUser, isLoggedIn, role]);
-
-  // --- 處理函式 ---
-  const handleAuth = (e: React.FormEvent) => { 
-    e.preventDefault(); 
-    setTimeout(() => {
-      setIsLoggedIn(true);
-      localStorage.setItem('xmatch_logged_in', 'true');
-      localStorage.setItem('xmatch_role', role);
-      setActiveTab('overview'); 
-    }, 800); 
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-    localStorage.removeItem('xmatch_logged_in');
-    localStorage.removeItem('xmatch_role');
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -236,51 +213,70 @@ export default function DashboardPage() {
         urls.push(await getDownloadURL(uploadTask.ref));
       }
       setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, ...urls] }));
-    } catch (error) { console.error(error); } finally { setIsUploading(false); }
+    } catch (error) {
+      console.error("上傳失敗:", error);
+    } finally { setIsUploading(false); }
   };
 
-  const handleRemovePhoto = (index: number) => {
-    setNewProject(prev => ({ ...prev, gallery: prev.gallery.filter((_, i) => i !== index) }));
+  const handleRemovePhoto = (indexToRemove: number) => {
+    setNewProject(prev => ({ ...prev, gallery: prev.gallery.filter((_, idx) => idx !== indexToRemove) }));
   };
 
   const handleCreatorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar' | 'portfolio') => {
     const files = e.target.files;
-    if (!files || !files.length || !storage) return;
+    if (!files || files.length === 0) return;
+    if (!storage || !fbUser) return;
+
+    if (type === 'cover') setIsUploadingCover(true);
+    else if (type === 'avatar') setIsUploadingAvatar(true);
+    else setIsUploadingPortfolio(true);
+
     try {
       const urls: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        const fileRef = ref(storage, `artifacts/${internalAppId}/public/data/creators/${fbUser?.uid}_${type}_${Date.now()}_${files[i].name}`);
+        const fileRef = ref(storage, `artifacts/${internalAppId}/public/data/creators/${fbUser.uid}_${type}_${Date.now()}_${files[i].name}`);
         const uploadTask = await uploadBytesResumable(fileRef, files[i]);
         urls.push(await getDownloadURL(uploadTask.ref));
       }
       if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: urls[0] }));
       else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: urls[0] }));
       else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, ...urls] }));
-    } catch (err) { console.error(err); }
+    } catch (error) {
+      console.error("照片上傳失敗:", error);
+    } finally {
+      if (type === 'cover') setIsUploadingCover(false);
+      else if (type === 'avatar') setIsUploadingAvatar(false);
+      else setIsUploadingPortfolio(false);
+    }
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProject.title || !db || !fbUser) return;
+    if (!newProject.title || !newProject.location) { alert("請填寫必填欄位"); return; }
+    if (!db || !fbUser) return;
     const newId = Date.now().toString();
     try {
       await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId), {
-        ...newProject,
-        id: newId, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
-        image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+        id: newId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
+        totalValue: newProject.totalValue || 'NT$ 未定', valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
+        spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
+        image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+        gallery: newProject.gallery
       });
       setShowCreateModal(false);
-      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [], description: '' });
+      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
     } catch (err) { console.error(err); }
   };
 
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTrip.destination || !db) return;
+    if (!newTrip.destination) { alert("請填寫目的地"); return; }
+    if (!db || !fbUser) return;
     const newId = `t${Date.now()}`;
     try {
       await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'trips', newId), {
-        ...newTrip, id: newId, creatorName: creatorProfile.name, status: '招募中', offers: 0
+        id: newId, creatorName: creatorProfile.name || '創作者', destination: newTrip.destination, dates: newTrip.dates,
+        partySize: newTrip.partySize, purpose: newTrip.purpose, needs: newTrip.needs, status: '招募中', offers: 0
       });
       setShowCreateTripModal(false);
       setNewTrip({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
@@ -292,10 +288,12 @@ export default function DashboardPage() {
     setIsSavingProfile(true);
     try {
       await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid), {
-        ...creatorProfile,
-        id: fbUser.uid, role: '創作者', status: '活躍', plan: 'Free',
-        joinDate: new Date().toLocaleDateString('zh-TW'),
-        tags: creatorProfile.tags.toString().split(',').map(t => t.trim()).filter(Boolean)
+        id: fbUser.uid, name: creatorProfile.name, email: `${creatorProfile.handle.replace('@', '')}@creator.com`, role: '創作者', status: '活躍', plan: 'Free',
+        joinDate: new Date().toLocaleDateString('zh-TW'), handle: creatorProfile.handle, lineId: creatorProfile.lineId, location: creatorProfile.location,
+        tags: creatorProfile.tags.split(',').map(t => t.trim()).filter(Boolean), bio: creatorProfile.bio, coverImage: creatorProfile.coverImage,
+        avatar: creatorProfile.avatar, portfolio: creatorProfile.portfolio, rates: creatorProfile.rates, audience: creatorProfile.audience,
+        followers: 12000, engagement: 4.5, completedJobs: 0,
+        averageViews: creatorProfile.averageViews, completionScore: creatorProfile.completionScore
       }, { merge: true });
       alert("🎉 履歷更新成功！");
     } catch (error) { console.error(error); } 
@@ -305,25 +303,67 @@ export default function DashboardPage() {
   const handleUpdateInviteStatus = async (invId: string, newStatus: string) => {
     if (!db) return;
     try {
-      await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', invId), { status: newStatus });
-      alert(`已成功將狀態變更為「${newStatus}」！`);
-    } catch (e) { console.error(e); }
+      const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', invId);
+      await updateDoc(invRef, { status: newStatus });
+      alert(`已將狀態標示為「${newStatus}」！`);
+    } catch (e) {
+      console.error("更新狀態失敗:", e);
+      alert("更新狀態失敗，請稍後再試。");
+    }
   };
 
+  // ✨ 開啟評價視窗
+  const handleOpenReviewModal = (invId: string) => {
+    setReviewTargetId(invId);
+    setReviewRating(5);
+    setReviewComment('');
+    setShowReviewModal(true);
+  };
+
+  // ✨ 送出評價 (結案)
   const handleSubmitReview = async () => {
     if (!db || !reviewTargetId) return;
+    
     const reviewData: ReviewData = {
       rating: reviewRating,
       comment: reviewComment,
       date: new Date().toLocaleDateString('zh-TW')
     };
+
     try {
       const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', reviewTargetId);
-      if (role === 'business') await updateDoc(invRef, { businessReview: reviewData });
-      else await updateDoc(invRef, { creatorReview: reviewData });
-      alert("🎉 結案評價已送出！");
+      
+      // 根據角色寫入對應的評價欄位
+      if (role === 'business') {
+        await updateDoc(invRef, { businessReview: reviewData });
+      } else {
+        await updateDoc(invRef, { creatorReview: reviewData });
+      }
+      
+      alert("🎉 評價已送出！案件成功結案。");
       setShowReviewModal(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error("送出評價失敗:", e);
+      alert("發生錯誤，請稍後再試。");
+    }
+  };
+
+  const handleViewProject = (projectId?: string) => {
+    if (!projectId) return;
+    const proj = projects.find(p => p.id === projectId);
+    if (proj) {
+      setViewProject(proj);
+      setActiveImage(proj.image || (proj.gallery && proj.gallery.length > 0 ? proj.gallery[0] : ''));
+    } else {
+      alert("此案源可能已關閉或被移除。");
+    }
+  };
+
+  const handleManageApplicants = (project: ProjectData) => {
+    const apps = invitations.filter(inv => inv.projectId === project.id && inv.type === 'application');
+    setCurrentProjectApplicants(apps);
+    setCurrentProjectTitle(project.title);
+    setShowApplicantsModal(true);
   };
 
   const handlePaymentSubmit = async () => {
@@ -342,33 +382,25 @@ export default function DashboardPage() {
     }, 2000);
   };
 
-  const handleManageApplicants = (project: ProjectData) => {
-    const apps = invitations.filter(inv => inv.projectId === project.id && inv.type === 'application');
-    setCurrentProjectApplicants(apps);
-    setCurrentProjectTitle(project.title);
-    setShowApplicantsModal(true);
+  const handleAuth = (e: React.FormEvent) => { 
+    e.preventDefault(); 
+    setTimeout(() => {
+      setIsLoggedIn(true);
+      localStorage.setItem('xmatch_logged_in', 'true');
+      localStorage.setItem('xmatch_role', role);
+    }, 800); 
   };
 
-  // 僅在登入頁使用
-  const handleRoleSelect = (selectedRole: 'business' | 'creator') => {
-    setRole(selectedRole);
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    localStorage.removeItem('xmatch_logged_in');
+    localStorage.removeItem('xmatch_role');
   };
 
-  // 補充遺漏的開啟評價 Modal 函式
-  const handleOpenReviewModal = (id: string) => {
-    setReviewTargetId(id);
-    setReviewRating(5);
-    setReviewComment('');
-    setShowReviewModal(true);
-  };
-
-  // 補充遺漏的查看案源詳情函式
-  const handleViewProject = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
-    if (project) {
-        setViewProject(project);
-        setActiveImage(project.image || (project.gallery && project.gallery[0]) || '');
-    }
+  const handleRoleSwitch = (newRole: 'business' | 'creator') => {
+    setRole(newRole);
+    localStorage.setItem('xmatch_role', newRole);
+    setActiveTab('overview'); 
   };
 
   const themeText = role === 'business' ? 'text-indigo-600' : 'text-purple-600';
@@ -377,49 +409,66 @@ export default function DashboardPage() {
   if (!isLoggedIn) {
     return (
       <div className="fixed inset-0 z-[9999] bg-slate-50 flex items-center justify-center p-4 overflow-y-auto">
-        <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row my-auto border border-slate-200">
+        <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row my-auto">
           <div className="md:w-1/2 bg-slate-900 p-12 text-white flex flex-col justify-center relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-600 to-indigo-900 opacity-50"></div>
-            <div className="relative z-10"><h1 className="text-4xl font-extrabold mb-4 tracking-tighter italic uppercase">X-Match</h1><p className="text-lg text-slate-200 mb-8 font-medium leading-relaxed">連結在地旅宿與優質創作者，<br/>開啟您的互惠旅程。</p></div>
+            <div className="relative z-10">
+              <h1 className="text-4xl font-extrabold mb-4">X-Match</h1>
+              <p className="text-lg text-slate-200 mb-8">
+                連結在地旅宿與優質創作者，開啟您的互惠旅程。
+              </p>
+            </div>
           </div>
-          <div className="md:w-1/2 p-12 flex flex-col justify-center bg-white">
-            <h2 className="text-3xl font-black text-slate-900 mb-2 uppercase tracking-tighter">Welcome back</h2>
-            <p className="text-slate-400 text-sm mb-8 font-medium">請選擇您的帳號身分以進入控制中心。</p>
-            
-            {/* 修改的部分：身分選擇按鈕，增加互斥的灰色效果 */}
-            <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-8">
-              <button 
-                onClick={() => handleRoleSelect('business')} 
-                className={`flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-300 
-                  ${role === 'business' 
-                    ? 'bg-white text-indigo-600 shadow-xl ring-1 ring-slate-200 opacity-100 scale-100' 
-                    : 'text-slate-400 bg-transparent opacity-40 grayscale hover:grayscale-0 hover:opacity-80 scale-95'}`}
-              >
-                <Briefcase size={18}/> 我是商家
+          
+          <div className="md:w-1/2 p-12 flex flex-col justify-center">
+            <div className="mb-8">
+              <Link href="/" className="text-sm font-bold text-slate-400 hover:text-sky-600 transition-colors">
+                &larr; 返回前台首頁
+              </Link>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+              {authMode === 'login' ? '歡迎回來' : '建立您的帳號'}
+            </h2>
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+              <button onClick={() => handleRoleSwitch('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <Briefcase size={16}/> 我是商家
               </button>
-              <button 
-                onClick={() => handleRoleSelect('creator')} 
-                className={`flex-1 py-3 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all duration-300 
-                  ${role === 'creator' 
-                    ? 'bg-white text-purple-600 shadow-xl ring-1 ring-slate-200 opacity-100 scale-100' 
-                    : 'text-slate-400 bg-transparent opacity-40 grayscale hover:grayscale-0 hover:opacity-80 scale-95'}`}
-              >
-                <User size={18}/> 我是創作者
+              <button onClick={() => handleRoleSwitch('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <User size={16}/> 我是創作者
               </button>
             </div>
-            
-            <form onSubmit={handleAuth} className="space-y-5">
-              <div><label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Email Address</label><input type="email" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold shadow-inner" placeholder="admin@xmatch.com" required /></div>
-              <div><label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Secure Password</label><input type="password" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold shadow-inner" placeholder="••••••••" required /></div>
-              <button type="submit" className={`w-full py-4 text-white font-black rounded-2xl transition-all shadow-lg active:scale-95 uppercase tracking-widest text-sm ${role === 'business' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-100' : 'bg-purple-600 hover:bg-purple-700 shadow-purple-100'}`}>登入控制中心</button>
+            <form onSubmit={handleAuth} className="space-y-4">
+              {authMode === 'register' && (
+                <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">{role === 'business' ? '商家/品牌名稱' : '創作者暱稱'}</label>
+                  <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder={role === 'business' ? "例如：海角七號民宿" : "例如：林小美"} required />
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
+                <input type="email" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder="example@mail.com" required />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">密碼</label>
+                <input type="password" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder="••••••••" required />
+              </div>
+              <button type="submit" className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg transition-colors shadow-lg shadow-sky-200 active:scale-95 transform duration-150">
+                {authMode === 'login' ? '登入' : '免費註冊'} {role === 'business' ? '商家後台' : '創作者中心'}
+              </button>
             </form>
+            <div className="mt-6 text-center text-sm text-slate-600">
+              {authMode === 'login' ? (
+                <>還沒有帳號？ <button onClick={() => setAuthMode('register')} className="text-sky-600 font-bold hover:underline focus:outline-none">立即註冊</button></>
+              ) : (
+                <>已經有帳號了？ <button onClick={() => setAuthMode('login')} className="text-sky-600 font-bold hover:underline focus:outline-none">直接登入</button></>
+              )}
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  // --- 選單定義 ---
   const menuItems = role === 'business' ? [
     { id: 'overview', icon: LayoutDashboard, label: '總覽 Dashboard' },
     { id: 'projects', icon: Briefcase, label: '我的徵才 (案源)' },
@@ -431,9 +480,9 @@ export default function DashboardPage() {
     { id: 'overview', icon: LayoutDashboard, label: '創作者中心' },
     { id: 'invitations', icon: Mail, label: '收到的邀請' },
     { id: 'trips', icon: Plane, label: '我的許願行程' },
-    { id: 'projects', icon: FileText, label: '我的應徵紀錄' },
+    { id: 'projects', icon: FileText, label: '我的應徵' },
     { id: 'contracts', icon: FileSignature, label: '合約管理' },
-    { id: 'settings', icon: User, label: '編輯履歷 (Media Kit)' },
+    { id: 'settings', icon: User, label: '履歷 (Media Kit)' },
   ];
 
   const renderContent = () => {
@@ -441,25 +490,53 @@ export default function DashboardPage() {
       case 'overview':
         const myReceivedInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
         return (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-bold text-slate-900">{role === 'business' ? '早安，海角七號民宿 👋' : `早安，${creatorProfile.name} 👋`}</h2>
+          <div className="space-y-6">
+            <h2 className="text-2xl font-bold text-slate-900">
+              {role === 'business' ? '早安，海角七號民宿 👋' : `早安，${creatorProfile.name} 👋`}
+            </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {role === 'business' ? (
                 <>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><p className="text-sm text-slate-500 mb-1">本月總曝光 (Reach)</p><div className="flex items-baseline gap-2"><h3 className="text-3xl font-bold text-slate-900">12.5k</h3><span className="text-xs font-bold text-green-600 flex items-center"><TrendingUp size={12}/> +12%</span></div></div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><p className="text-sm text-slate-500 mb-1">進行中案源</p><h3 className="text-3xl font-bold text-slate-900">{projects.length}</h3></div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><p className="text-sm text-slate-500 mb-1">剩餘急單點數</p><h3 className={`text-3xl font-bold ${themeText}`}>5 <span className="text-sm text-slate-400 font-normal">點</span></h3></div>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-sm text-slate-500 mb-1">本月總曝光 (Reach)</p>
+                    <div className="flex items-baseline gap-2">
+                      <h3 className="text-3xl font-bold text-slate-900">12.5k</h3>
+                      <span className="text-xs font-bold text-green-600 flex items-center"><TrendingUp size={12}/> +12%</span>
+                    </div>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-sm text-slate-500 mb-1">進行中案源</p>
+                    <h3 className="text-3xl font-bold text-slate-900">{projects.length}</h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-sm text-slate-500 mb-1">剩餘急單點數</p>
+                    <h3 className={`text-3xl font-bold ${themeText}`}>5 <span className="text-sm text-slate-400 font-normal">點</span></h3>
+                  </div>
                 </>
               ) : (
                 <>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><p className="text-sm text-slate-500 mb-1">Media Kit 瀏覽數</p><div className="flex items-baseline gap-2"><h3 className="text-3xl font-bold text-slate-900">856</h3><span className="text-xs font-bold text-green-600 flex items-center"><TrendingUp size={12}/> +24%</span></div></div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><p className="text-sm text-slate-500 mb-1">收到的邀請</p><h3 className="text-3xl font-bold text-slate-900">{invitations.filter(i => i.toName === creatorProfile.name).length}</h3></div>
-                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm"><p className="text-sm text-slate-500 mb-1">完案信用評分</p><h3 className="text-3xl font-bold text-purple-600 flex items-center gap-1">{creatorProfile.completionScore} <Star size={20} className="fill-current"/></h3></div>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-sm text-slate-500 mb-1">Media Kit 瀏覽數</p>
+                    <div className="flex items-baseline gap-2">
+                      <h3 className="text-3xl font-bold text-slate-900">856</h3>
+                      <span className="text-xs font-bold text-green-600 flex items-center"><TrendingUp size={12}/> +24%</span>
+                    </div>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-300" onClick={() => setActiveTab('invitations')}>
+                    <p className="text-sm text-slate-500 mb-1">收到的邀請</p>
+                    <h3 className="text-3xl font-bold text-slate-900">
+                      {myReceivedInvs.length} {myReceivedInvs.length > 0 && <span className="text-sm text-red-500 font-bold text-base ml-2">New!</span>}
+                    </h3>
+                  </div>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-sm text-slate-500 mb-1">待簽署合約</p>
+                    <h3 className="text-3xl font-bold text-amber-500">1</h3>
+                  </div>
                 </>
               )}
             </div>
             
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
                 <h3 className="font-bold text-slate-900">近期通知</h3>
                 <button className="text-sm text-sky-600 hover:underline">查看全部</button>
@@ -542,7 +619,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* --- 管理應徵者名單 Modal --- */}
+            {/* --- 管理應徵者名單 Modal (Upgrade) --- */}
             {showApplicantsModal && (
               <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
@@ -604,9 +681,9 @@ export default function DashboardPage() {
                                                     <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
                                                 )}
                                                 {/* 智能合約 */}
-                                                <a href="#" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
+                                                <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
                                                     <FileSignature size={12}/> 合約
-                                                </a>
+                                                </Link>
                                                 {/* 結案評價 */}
                                                 {myReview ? (
                                                   <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
@@ -664,6 +741,8 @@ export default function DashboardPage() {
             
             {showCreateModal && (
                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                 {/* ... (Create Project Modal - 保持不變) ... */}
+                 {/* 為避免過長，請確保複製完整的表單代碼 */}
                  <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
@@ -796,7 +875,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="md:w-2/3 flex flex-col justify-center">
                          {inv.projectTitle && (
-                           <button onClick={() => handleViewProject(inv.projectId || '')} className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group">
+                           <button onClick={() => handleViewProject(inv.projectId)} className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group">
                              <Briefcase size={16} className="shrink-0" /> <span className="truncate">附件案源：{inv.projectTitle}</span><span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
                            </button>
                          )}
@@ -816,7 +895,7 @@ export default function DashboardPage() {
                                   {inv.creatorInfo?.lineId && (
                                     <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
                                   )}
-                                  <a href="#" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</a>
+                                  <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
                                   {/* 評價按鈕 or 已評價顯示 */}
                                   {inv.businessReview ? (
                                     <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
@@ -843,9 +922,9 @@ export default function DashboardPage() {
                   <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
-                    <a href="#" className="text-indigo-600 font-bold hover:underline">前往「找網紅」尋找適合的對象</a>
+                    <Link href="/creators" className="text-indigo-600 font-bold hover:underline">前往「找網紅」尋找適合的對象</Link>
                     <span className="hidden sm:block text-slate-300">|</span>
-                    <a href="#" className="text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</a>
+                    <Link href="/trips" className="text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</Link>
                   </div>
                 </div>
               )}
@@ -867,7 +946,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="md:w-3/4 flex flex-col justify-center">
                          {inv.projectTitle && (
-                           <button onClick={() => handleViewProject(inv.projectId || '')} className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group">
+                           <button onClick={() => handleViewProject(inv.projectId)} className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group">
                              <Briefcase size={16} className="shrink-0" /> <span className="truncate">附件案源：{inv.projectTitle}</span><span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
                            </button>
                          )}
@@ -890,7 +969,7 @@ export default function DashboardPage() {
                                      ) : (
                                         <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
                                      )}
-                                     <a href="#" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</a>
+                                     <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
                                      
                                      {/* 創作者評價按鈕 */}
                                      {inv.creatorReview ? (
@@ -1038,9 +1117,9 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">合約管理</h2>
-              <a href="#" className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
+              <Link href="/calculator" className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
                 <Plus size={16}/> 建立新合約
-              </a>
+              </Link>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer">
@@ -1365,26 +1444,6 @@ export default function DashboardPage() {
                      </div>
                    </div>
                  </div>
-                 
-                 {/* ✨ 新增：數據表現與信用評分 (整合至創作者履歷) */}
-                 <div className="bg-purple-50 p-6 rounded-2xl border border-purple-100 shadow-sm">
-                   <h3 className="font-black text-purple-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><Eye size={18} className="text-purple-600"/> 數據表現</h3>
-                   <div className="space-y-4">
-                     <div>
-                       <label className="block text-xs font-bold text-purple-700 mb-1.5">平均觀看數 (Average Views)</label>
-                       <input type="number" className="w-full p-3 border border-purple-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-purple-500 bg-white" 
-                              value={creatorProfile.averageViews} onChange={(e) => setCreatorProfile(p => ({...p, averageViews: Number(e.target.value)}))} />
-                     </div>
-                     <div>
-                       <label className="block text-xs font-bold text-purple-700 mb-1.5">完案信用評分 (系統自動計算)</label>
-                       <div className="w-full p-3 border border-purple-200 rounded-xl text-sm font-black text-slate-500 bg-purple-100 flex items-center gap-2">
-                          <Star size={16} className="fill-yellow-400 text-yellow-400" />
-                          {creatorProfile.completionScore || '5.0'}
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-
                </div>
              </div>
            </div>
@@ -1398,14 +1457,13 @@ export default function DashboardPage() {
     <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col overflow-y-auto m-0 p-0 font-sans">
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-          <a href="#" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</a>
+          <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
           <div className="flex gap-4">
-             <div className="bg-slate-100 p-1 rounded-lg flex items-center">
-                <span className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>
-                   {role === 'business' ? 'Business Pro' : 'Creator Studio'}
-                </span>
+             <div className="bg-slate-100 p-1 rounded-lg flex">
+                <button onClick={() => setRole('business')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow' : 'text-slate-400'}`}>業者視角</button>
+                <button onClick={() => setRole('creator')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'creator' ? 'bg-white shadow' : 'text-slate-400'}`}>創作者視角</button>
              </div>
-             <button onClick={handleLogout} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
+             <button onClick={() => setIsLoggedIn(false)} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
           </div>
         </div>
       </div>
@@ -1413,7 +1471,7 @@ export default function DashboardPage() {
         <div className="w-64 shrink-0 hidden md:block">
           <nav className="space-y-2 sticky top-24">
             {menuItems.map(i => (
-              <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl ${activeTab === i.id ? (role === 'business' ? 'bg-indigo-600 text-white' : 'bg-purple-600 text-white') : 'text-slate-600 hover:bg-white'}`}>
+              <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl ${activeTab === i.id ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-white'}`}>
                 <i.icon size={18} /> {i.label}
               </button>
             ))}
@@ -1510,7 +1568,9 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          
+
+          {renderContent()}
+
           {/* ✨ 評價填寫 Modal (全域) */}
           {showReviewModal && (
             <div className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1545,20 +1605,17 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-
-          {renderContent()}
-       </div>
-       
-       {/* 行動版底部導覽 */}
-       <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 z-40 flex justify-around p-2 pb-safe">
+        </div>
+      </div>
+      {/* 行動版底部導覽 */}
+      <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 z-40 flex justify-around p-2 pb-safe">
         {menuItems.slice(0, 4).map(i => (
-          <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`p-2 flex flex-col items-center ${activeTab === i.id ? (role === 'business' ? 'text-indigo-600' : 'text-purple-600') : 'text-slate-400'}`}>
+          <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`p-2 flex flex-col items-center ${activeTab === i.id ? 'text-indigo-600' : 'text-slate-400'}`}>
             <i.icon size={20} />
             <span className="text-[10px] mt-1 font-bold">{i.label.split(' ')[0]}</span>
           </button>
         ))}
       </div>
     </div>
-   </div>
   );
 }
