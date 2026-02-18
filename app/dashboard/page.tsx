@@ -745,6 +745,7 @@ export default function DashboardPage() {
             {showCreateModal && (
                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                  {/* ... (Create Project Modal) ... */}
+                 {/* ... code ... */}
                  <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
@@ -838,6 +839,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">
+            {/* ... creator projects ... */}
             <h2 className="text-2xl font-bold text-slate-900">我的應徵紀錄</h2>
             <div className="grid gap-4">
               <div className="bg-white p-6 rounded-xl border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
@@ -861,6 +863,7 @@ export default function DashboardPage() {
 
       case 'invitations':
         if (role === 'business') {
+          // ... business invitations ...
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
@@ -935,7 +938,7 @@ export default function DashboardPage() {
             </div>
           );
         } else {
-          // 創作者專屬：收到的邀請
+          // ... creator invitations ...
           const myInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -1010,6 +1013,7 @@ export default function DashboardPage() {
         }
 
       case 'trips':
+        // ... trips ...
         return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
@@ -1117,6 +1121,7 @@ export default function DashboardPage() {
         ) : null;
 
       case 'contracts':
+        // ... contracts ...
         return (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -1143,6 +1148,7 @@ export default function DashboardPage() {
         );
 
       case 'wallet':
+        // ... wallet ...
         return role === 'business' ? (
           <div className="space-y-8">
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
@@ -1224,6 +1230,7 @@ export default function DashboardPage() {
       case 'settings':
         return role === 'business' ? (
            <div className="space-y-6">
+             {/* ... business settings ... */}
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">基本資料設定</h2>
                <button onClick={() => alert("儲存成功！")} className="hidden sm:flex bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-slate-800 transition-colors shadow-sm">
@@ -1300,6 +1307,7 @@ export default function DashboardPage() {
                  
                  {/* 形象照片區塊 */}
                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                   {/* ... photo upload ... */}
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18} className="text-sky-500"/> 形象照片 (Cloud Sync)</h3>
                    
                    {/* Cover Image Upload */}
@@ -1446,6 +1454,15 @@ export default function DashboardPage() {
                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
                               value={creatorProfile.audience.topCity} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, topCity: e.target.value}}))} />
                      </div>
+                     {/* ✨ 新增：平均觀看數輸入欄位 */}
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5">平均觀看數 (Average Views)</label>
+                       <div className="flex items-center relative">
+                          <Eye size={16} className="absolute left-3 text-slate-400"/>
+                          <input type="number" className="w-full pl-9 p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
+                                 value={creatorProfile.averageViews} onChange={(e) => setCreatorProfile(p => ({...p, averageViews: Number(e.target.value)}))} />
+                       </div>
+                     </div>
                    </div>
                  </div>
                </div>
@@ -1571,6 +1588,134 @@ export default function DashboardPage() {
                 
                 <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                    <button onClick={() => setViewProject(null)} className="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉詳情</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ✨ 新增：查看申請者完整履歷 Modal */}
+          {viewApplicant && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
+                
+                {/* 封面圖與大頭貼 */}
+                <div className="relative h-48 bg-slate-200 shrink-0">
+                  <img 
+                    src={viewApplicant.coverImage || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=800&q=80"} 
+                    alt="Cover" 
+                    className="w-full h-full object-cover" 
+                  />
+                  <button onClick={() => setViewApplicant(null)} className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"><X size={20} /></button>
+                  <div className="absolute -bottom-10 left-6 sm:left-8">
+                    <img 
+                      src={viewApplicant.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+                      alt="Avatar" 
+                      className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-md bg-white" 
+                    />
+                  </div>
+                </div>
+
+                <div className="p-6 sm:p-8 pt-12 sm:pt-14 flex-grow overflow-y-auto bg-slate-50/50">
+                  <div className="flex flex-col sm:flex-row justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                        {viewApplicant.name} 
+                        {viewApplicant.handle && <span className="text-sm font-medium text-slate-500">{viewApplicant.handle}</span>}
+                      </h2>
+                      <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
+                        <span className="flex items-center gap-1"><MapPin size={14}/> {viewApplicant.location || '台灣'}</span>
+                        {viewApplicant.lineId && <span className="flex items-center gap-1 text-green-600 font-bold"><MessageCircle size={14}/> LINE ID: {viewApplicant.lineId}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {viewApplicant.tags?.split(',').map((tag: string, i: number) => (
+                          <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-md">#{tag.trim()}</span>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 數據概覽 */}
+                    <div className="flex gap-4 mt-4 sm:mt-0">
+                      <div className="text-center">
+                        <p className="text-xs text-slate-400 font-bold mb-1">粉絲數</p>
+                        <p className="text-xl font-black text-slate-900">{(viewApplicant.followers / 1000).toFixed(1)}k</p>
+                      </div>
+                      <div className="text-center border-l border-slate-200 pl-4">
+                        <p className="text-xs text-slate-400 font-bold mb-1">平均觀看</p>
+                        <p className="text-xl font-black text-slate-900">{(viewApplicant.averageViews / 1000).toFixed(1)}k</p>
+                      </div>
+                      <div className="text-center border-l border-slate-200 pl-4">
+                        <p className="text-xs text-slate-400 font-bold mb-1">信用評分</p>
+                        <p className="text-xl font-black text-yellow-500 flex items-center justify-center gap-1">
+                          {viewApplicant.completionScore} <Star size={14} fill="currentColor"/>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* 自我介紹 */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2"><User size={18} className="text-indigo-500"/> 關於創作者</h4>
+                      <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{viewApplicant.bio || "這位創作者尚未填寫簡介。"}</p>
+                    </div>
+
+                    {/* 數據與報價 */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart3 size={18} className="text-sky-500"/> 受眾分析</h4>
+                        <ul className="space-y-3 text-sm">
+                          <li className="flex justify-between border-b border-slate-50 pb-2">
+                            <span className="text-slate-500">性別分佈</span>
+                            <span className="font-bold text-slate-900">{viewApplicant.audience?.gender || 'N/A'}</span>
+                          </li>
+                          <li className="flex justify-between border-b border-slate-50 pb-2">
+                            <span className="text-slate-500">主力年齡</span>
+                            <span className="font-bold text-slate-900">{viewApplicant.audience?.age || 'N/A'}</span>
+                          </li>
+                          <li className="flex justify-between">
+                            <span className="text-slate-500">熱門城市</span>
+                            <span className="font-bold text-slate-900">{viewApplicant.audience?.topCity || 'N/A'}</span>
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                        <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><DollarSign size={18} className="text-green-600"/> 合作參考報價</h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
+                            <span className="text-xs font-bold text-slate-500">圖文貼文</span>
+                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.post?.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
+                            <span className="text-xs font-bold text-slate-500">限時動態</span>
+                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.story?.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
+                            <span className="text-xs font-bold text-slate-500">短影音 Reels</span>
+                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.reels?.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 作品集 */}
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18} className="text-purple-500"/> 近期作品</h4>
+                      {viewApplicant.portfolio && viewApplicant.portfolio.length > 0 ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {viewApplicant.portfolio.map((img: string, i: number) => (
+                            <div key={i} className="aspect-square rounded-lg overflow-hidden bg-slate-100 relative group cursor-pointer">
+                              <img src={img} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={`Portfolio ${i}`} />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-400 italic">尚無作品集。</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end z-20">
+                   <button onClick={() => setViewApplicant(null)} className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉履歷</button>
                 </div>
               </div>
             </div>
