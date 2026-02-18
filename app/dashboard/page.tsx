@@ -69,16 +69,14 @@ interface InvitationData {
   type?: 'invite' | 'application'; 
   creatorInfo?: any;
   fromLineId?: string;
-  businessReview?: ReviewData; 
-  creatorReview?: ReviewData;  
+  // ✨ 新增評價欄位
+  businessReview?: ReviewData; // 廠商給創作者的評價
+  creatorReview?: ReviewData;  // 創作者給廠商的評價
 }
 
 interface PaymentItem {
   id: string; name: string; price: number; type: 'subscription' | 'one-time';
 }
-
-const MOCK_PROJECTS: ProjectData[] = [];
-const MOCK_TRIPS: TripData[] = [];
 
 export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -87,7 +85,6 @@ export default function DashboardPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // 案源管理相關狀態
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
@@ -96,33 +93,27 @@ export default function DashboardPage() {
   });
   const [isUploading, setIsUploading] = useState(false);
   
-  // 管理名單相關狀態
   const [showApplicantsModal, setShowApplicantsModal] = useState(false);
   const [currentProjectApplicants, setCurrentProjectApplicants] = useState<InvitationData[]>([]);
   const [currentProjectTitle, setCurrentProjectTitle] = useState('');
   
-  // 查看應徵者完整履歷
   const [viewApplicant, setViewApplicant] = useState<any>(null);
 
-  // 許願行程相關狀態
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
   const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
 
-  // 邀請函狀態
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // 評價相關狀態
+  // ✨ 評價相關狀態
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewTargetId, setReviewTargetId] = useState<string | null>(null); 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   
-  // 案源詳情檢視狀態
   const [viewProject, setViewProject] = useState<ProjectData | null>(null);
   const [activeImage, setActiveImage] = useState<string>('');
 
-  // 創作者履歷狀態
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
@@ -137,12 +128,11 @@ export default function DashboardPage() {
   const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  // 金流狀態
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
-  // 初始化時檢查 localStorage (保持登入狀態)
+  // 初始化時檢查 localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
@@ -322,7 +312,7 @@ export default function DashboardPage() {
     }
   };
 
-  // 開啟評價視窗
+  // ✨ 開啟評價視窗
   const handleOpenReviewModal = (invId: string) => {
     setReviewTargetId(invId);
     setReviewRating(5);
@@ -330,7 +320,7 @@ export default function DashboardPage() {
     setShowReviewModal(true);
   };
 
-  // 送出評價
+  // ✨ 送出評價 (結案)
   const handleSubmitReview = async () => {
     if (!db || !reviewTargetId) return;
     
@@ -392,7 +382,6 @@ export default function DashboardPage() {
     }, 2000);
   };
 
-  // 登入並寫入 localStorage
   const handleAuth = (e: React.FormEvent) => { 
     e.preventDefault(); 
     setTimeout(() => {
@@ -402,16 +391,16 @@ export default function DashboardPage() {
     }, 800); 
   };
 
-  // 登出並清除 localStorage
   const handleLogout = () => {
     setIsLoggedIn(false);
     localStorage.removeItem('xmatch_logged_in');
     localStorage.removeItem('xmatch_role');
   };
 
-  // 僅在登入頁面使用，用來設定初始角色
-  const handleRoleSelect = (selectedRole: 'business' | 'creator') => {
-    setRole(selectedRole);
+  const handleRoleSwitch = (newRole: 'business' | 'creator') => {
+    setRole(newRole);
+    localStorage.setItem('xmatch_role', newRole);
+    setActiveTab('overview'); 
   };
 
   const themeText = role === 'business' ? 'text-indigo-600' : 'text-purple-600';
@@ -441,10 +430,10 @@ export default function DashboardPage() {
               {authMode === 'login' ? '歡迎回來' : '建立您的帳號'}
             </h2>
             <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
-              <button onClick={() => handleRoleSelect('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <button onClick={() => handleRoleSwitch('business')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'business' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 <Briefcase size={16}/> 我是商家
               </button>
-              <button onClick={() => handleRoleSelect('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              <button onClick={() => handleRoleSwitch('creator')} className={`flex-1 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${role === 'creator' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                 <User size={16}/> 我是創作者
               </button>
             </div>
@@ -480,7 +469,6 @@ export default function DashboardPage() {
     );
   }
 
-  // 根據角色動態顯示不同的選單
   const menuItems = role === 'business' ? [
     { id: 'overview', icon: LayoutDashboard, label: '總覽 Dashboard' },
     { id: 'projects', icon: Briefcase, label: '我的徵才 (案源)' },
@@ -869,48 +857,592 @@ export default function DashboardPage() {
           </div>
         );
 
-      // ... settings ...
+      case 'invitations':
+        if (role === 'business') {
+          return (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
+              {invitations.length > 0 ? (
+                <div className="grid gap-4">
+                  {invitations.map((inv) => (
+                    <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 md:w-1/3 shrink-0">
+                        <img src={inv.toAvatar} className="w-12 h-12 rounded-full border border-slate-200" alt="avatar" />
+                        <div>
+                          <p className="font-bold text-slate-900">{inv.toName}</p>
+                          <p className="text-xs text-slate-500">{inv.toHandle}</p>
+                        </div>
+                      </div>
+                      <div className="md:w-2/3 flex flex-col justify-center">
+                         {inv.projectTitle && (
+                           <button onClick={() => handleViewProject(inv.projectId)} className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group">
+                             <Briefcase size={16} className="shrink-0" /> <span className="truncate">附件案源：{inv.projectTitle}</span><span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
+                           </button>
+                         )}
+
+                         <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm text-slate-600 mb-3 line-clamp-2">
+                           "{inv.message}"
+                         </div>
+                         <div className="flex justify-between items-center">
+                           <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
+                           <div className="flex items-center gap-2">
+                             <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                               inv.status === '已接受' ? 'bg-green-100 text-green-700' :
+                               inv.status === '已婉拒' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                             }`}>{inv.status}</span>
+                             {inv.status === '已接受' && (
+                               <div className="flex gap-2">
+                                  {inv.creatorInfo?.lineId && (
+                                    <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
+                                  )}
+                                  <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
+                                  {/* 評價按鈕 or 已評價顯示 */}
+                                  {inv.businessReview ? (
+                                    <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
+                                      <Star size={12} className="fill-yellow-500 text-yellow-500"/> {inv.businessReview.rating} 已評價
+                                    </div>
+                                  ) : (
+                                    <button 
+                                      onClick={() => handleOpenReviewModal(inv.id)}
+                                      className="px-3 py-1.5 bg-yellow-400 text-yellow-900 rounded-lg text-xs font-bold hover:bg-yellow-500 shadow-sm flex items-center gap-1"
+                                    >
+                                      <Crown size={14} /> 評價
+                                    </button>
+                                  )}
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+                  <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
+                    <Link href="/creators" className="text-indigo-600 font-bold hover:underline">前往「找網紅」尋找適合的對象</Link>
+                    <span className="hidden sm:block text-slate-300">|</span>
+                    <Link href="/trips" className="text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</Link>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        } else {
+          // 創作者專屬：收到的邀請
+          const myInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
+          return (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <h2 className="text-2xl font-bold text-slate-900">收到的邀請</h2>
+              {myInvs.length > 0 ? (
+                <div className="grid gap-4">
+                  {myInvs.map((inv) => (
+                    <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-4 md:w-1/4 shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-lg border border-indigo-100">{inv.fromName.charAt(0)}</div>
+                        <div><p className="font-bold text-slate-900">{inv.fromName}</p><p className="text-xs text-slate-500">合作廠商</p></div>
+                      </div>
+                      <div className="md:w-3/4 flex flex-col justify-center">
+                         {inv.projectTitle && (
+                           <button onClick={() => handleViewProject(inv.projectId)} className="w-full text-left mb-3 flex items-center gap-2 bg-indigo-50 border border-indigo-100 text-indigo-700 px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-100 hover:shadow-sm transition-all group">
+                             <Briefcase size={16} className="shrink-0" /> <span className="truncate">附件案源：{inv.projectTitle}</span><span className="text-indigo-400 group-hover:text-indigo-600 ml-1 text-xs underline underline-offset-2 shrink-0">查看詳情</span>
+                           </button>
+                         )}
+                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-sm text-slate-700 mb-4 whitespace-pre-wrap leading-relaxed">{inv.message}</div>
+                         <div className="flex justify-between items-center">
+                           <span className="text-xs text-slate-400 font-mono">{inv.date}</span>
+                           <div className="flex gap-2">
+                             {(inv.status === '待回覆' || inv.status === '招募中' || inv.status === '待審核') ? (
+                               <>
+                                 <button onClick={() => handleUpdateInviteStatus(inv.id, '已婉拒')} className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors">婉拒</button>
+                                 <button onClick={() => handleUpdateInviteStatus(inv.id, '已接受')} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm">回覆並接受</button>
+                               </>
+                             ) : (
+                               <div className="flex items-center gap-2">
+                                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${inv.status === '已接受' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{inv.status}</span>
+                                 {inv.status === '已接受' && (
+                                   <div className="flex gap-2">
+                                     {inv.fromLineId ? (
+                                        <a href={`https://line.me/ti/p/~${inv.fromLineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
+                                     ) : (
+                                        <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
+                                     )}
+                                     <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
+                                     
+                                     {/* 創作者評價按鈕 */}
+                                     {inv.creatorReview ? (
+                                        <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
+                                          <Star size={12} className="fill-yellow-500 text-yellow-500"/> {inv.creatorReview.rating} 已評價
+                                        </div>
+                                     ) : (
+                                        <button 
+                                          onClick={() => handleOpenReviewModal(inv.id)}
+                                          className="px-3 py-1.5 bg-yellow-400 text-yellow-900 rounded-lg text-xs font-bold hover:bg-yellow-500 shadow-sm flex items-center gap-1"
+                                        >
+                                          <Crown size={14} /> 評價
+                                        </button>
+                                     )}
+                                   </div>
+                                 )}
+                               </div>
+                             )}
+                           </div>
+                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl border border-slate-200 p-12 text-center flex flex-col items-center">
+                   <Mail className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                   <p className="font-bold text-slate-700 text-lg mb-1">尚未收到任何邀請</p>
+                   <p className="text-sm text-slate-500">完善您的 Media Kit，或是發布更多許願行程來吸引廠商吧！</p>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+      case 'trips':
+        return role === 'creator' ? (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">我的許願行程</h2>
+              <button 
+                onClick={() => setShowCreateTripModal(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-md active:scale-95 transition-all bg-purple-600 text-white hover:bg-purple-700`}
+              >
+                <Plus size={16}/> 發布新行程
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-6">
+               {trips.length > 0 ? (
+                 trips.map(trip => (
+                  <div key={trip.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                          trip.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
+                        }`}>{trip.status}</span>
+                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                          <MapPin size={18} className="text-purple-500" /> {trip.destination}
+                        </h3>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600 mb-4 bg-slate-50 p-2 rounded-lg inline-flex border border-slate-100">
+                        <span className="flex items-center gap-1"><Calendar size={14} className="text-slate-400"/> {trip.dates}</span>
+                        <span className="text-slate-300">|</span>
+                        <span className="flex items-center gap-1"><Users size={14} className="text-slate-400"/> {trip.partySize}</span>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm text-slate-700"><span className="text-xs font-bold text-slate-400 mr-2 bg-slate-100 px-1.5 py-0.5 rounded">目的</span> {trip.purpose}</p>
+                        <p className="text-sm text-slate-700"><span className="text-xs font-bold text-slate-400 mr-2 bg-slate-100 px-1.5 py-0.5 rounded">許願</span> {trip.needs}</p>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 flex flex-col justify-center items-center min-w-[150px]">
+                      <p className="text-xs text-slate-500 mb-1">目前收到</p>
+                      <p className="text-4xl font-black text-purple-600 mb-1">{trip.offers}</p>
+                      <p className="text-xs text-slate-500 font-medium">間廠商邀請</p>
+                      <button 
+                        onClick={() => setActiveTab('invitations')} 
+                        className="mt-4 w-full py-2 bg-purple-50 text-purple-700 text-xs font-bold rounded-lg hover:bg-purple-100 transition-colors"
+                      >
+                        查看邀請
+                      </button>
+                    </div>
+                  </div>
+                 ))
+               ) : (
+                 <div className="bg-white rounded-xl border border-slate-200 p-12 text-center flex flex-col items-center">
+                    <Plane size={32} className="text-slate-300 mb-3" />
+                    <p className="font-bold text-slate-700">尚未發布任何行程</p>
+                    <p className="text-sm text-slate-500 mt-1">主動告訴廠商您的旅遊計畫，獲取更多專屬贊助機會！</p>
+                 </div>
+               )}
+            </div>
+
+            {showCreateTripModal && (
+              <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col">
+                  <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                    <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
+                      <Plane size={20} className="text-purple-500" /> 發布許願行程
+                    </h3>
+                    <button onClick={() => setShowCreateTripModal(false)} className="text-slate-400 hover:text-slate-600">
+                      <X size={24} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-6 overflow-y-auto">
+                    <form className="space-y-4" onSubmit={handleCreateTrip}>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">目的地 (城市/區域) <span className="text-red-500">*</span></label>
+                        <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm font-medium" placeholder="例如：宜蘭礁溪、台南中西區" value={newTrip.destination} onChange={(e) => setNewTrip({...newTrip, destination: e.target.value})} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1">預計日期</label>
+                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2024/07/15 - 07/17" value={newTrip.dates} onChange={(e) => setNewTrip({...newTrip, dates: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-500 mb-1">隨行人數</label>
+                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2大1小、單人" value={newTrip.partySize} onChange={(e) => setNewTrip({...newTrip, partySize: e.target.value})} />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">行程目的 (將產出什麼內容？)</label>
+                        <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none h-20 resize-none text-sm" placeholder="例如：家庭暑假旅遊，預計會拍攝兩支短影音介紹親子友善設施。" value={newTrip.purpose} onChange={(e) => setNewTrip({...newTrip, purpose: e.target.value})}></textarea>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">許願需求 (希望廠商提供什麼？)</label>
+                        <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none h-20 resize-none text-sm" placeholder="例如：尋求有溫泉設施的飯店住宿贊助兩晚，或周邊親子餐廳體驗。" value={newTrip.needs} onChange={(e) => setNewTrip({...newTrip, needs: e.target.value})}></textarea>
+                      </div>
+                      <div className="pt-4 border-t border-slate-100">
+                        <button type="submit" className="w-full py-3.5 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 active:scale-95 transition-all flex justify-center items-center gap-2">
+                          確認發布
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : null;
+
+      case 'contracts':
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">合約管理</h2>
+              <Link href="/calculator" className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
+                <Plus size={16}/> 建立新合約
+              </Link>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-green-100 text-green-600 rounded-lg"><FileSignature size={24}/></div>
+                  <div>
+                    <h3 className="font-bold text-slate-900">暑期親子專案推廣合約</h3>
+                    <p className="text-sm text-slate-500">{role === 'business' ? '合作對象：林小美' : '合作廠商：海角七號民宿'} • 2024/06/01</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold"><CheckCircle2 size={12}/> 生效中 Active</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'wallet':
+        return role === 'business' ? (
+          <div className="space-y-8">
+            <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
+                <div className="relative z-10 flex-grow">
+                  <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded mb-4 inline-block">目前方案</span>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">Free 免費體驗版</h3>
+                  <div className="flex items-baseline mb-4">
+                    <span className="text-4xl font-extrabold text-slate-900">$0</span><span className="text-slate-500 ml-2">/ 月</span>
+                  </div>
+                  <ul className="space-y-3 mb-6">
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 每月 3 次合作邀請</li>
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 查看所有公開行程許願池</li>
+                    <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約 (每月 1 份)</li>
+                    <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅深度數據</li>
+                  </ul>
+                </div>
+                <div className="mt-auto">
+                  <button className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl cursor-not-allowed">使用中</button>
+                </div>
+              </div>
+
+              <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white flex flex-col">
+                <div className="absolute top-0 right-0 bg-yellow-400 text-indigo-900 text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
+                <div className="relative z-10 flex-grow">
+                  <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">專業成長版 Pro <Crown size={20} className="text-yellow-400 fill-yellow-400"/></h3>
+                  <div className="flex items-baseline mb-4">
+                    <span className="text-4xl font-extrabold">$999</span><span className="text-indigo-200 ml-2">/ 月</span>
+                  </div>
+                  <ul className="space-y-3 mb-6 text-indigo-100">
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送合作邀請</li>
+                    <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 網紅深度數據解鎖 (受眾分析)</li>
+                    <li className="flex items-center text-sm"><Shield className="w-4 h-4 text-white mr-2"/> 無限使用智能合約與數位簽署</li>
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 優先客服支援</li>
+                    <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 贈送每月置頂推廣 ($300) 每月一次</li>
+                    <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 贈送每月精準推播 每月一次</li>
+                  </ul>
+                </div>
+                <div className="mt-auto">
+                  <button onClick={() => { setPurchaseItem({ id: 'pro', name: '專業成長版 Pro (月費)', price: 999, type: 'subscription' }); setPaymentStep('form'); }} className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg active:scale-95">
+                    立即升級 Pro
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2"><Rocket className="text-indigo-600" size={20}/> 單次付費推廣 (Boost)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="p-2 bg-amber-100 text-amber-600 rounded-lg group-hover:scale-110 transition-transform"><Zap size={20} fill="currentColor"/></div>
+                    <span className="font-bold text-slate-900">$300</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 flex-grow">置頂推廣 (Featured)</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">讓您的徵才需求置頂 3 天，曝光加倍。</p>
+                  <button onClick={() => { setPurchaseItem({ id: 'boost-featured', name: '置頂推廣 (單次)', price: 300, type: 'one-time' }); setPaymentStep('form'); }} className="mt-auto text-xs font-bold text-indigo-600 hover:underline text-left">
+                    購買點數 &rarr;
+                  </button>
+                </div>
+                <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="p-2 bg-sky-100 text-sky-600 rounded-lg group-hover:scale-110 transition-transform"><Rocket size={20} fill="currentColor"/></div>
+                    <span className="font-bold text-slate-900">$100</span>
+                  </div>
+                  <h4 className="font-bold text-slate-900 flex-grow">精準推播 (Smart Push)</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">主動推播給附近 10 位符合條件的網紅。</p>
+                  <button onClick={() => { setPurchaseItem({ id: 'boost-push', name: '精準推播 (單次)', price: 100, type: 'one-time' }); setPaymentStep('form'); }} className="mt-auto text-xs font-bold text-indigo-600 hover:underline text-left">
+                    購買點數 &rarr;
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null;
+
       case 'settings':
         return role === 'business' ? (
-           <div className="p-8">商家設定 (略)</div>
+           <div className="space-y-6">
+             <div className="flex justify-between items-center">
+               <h2 className="text-2xl font-bold text-slate-900">基本資料設定</h2>
+               <button onClick={() => alert("儲存成功！")} className="hidden sm:flex bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-slate-800 transition-colors shadow-sm">
+                 <Save size={16}/> 儲存變更
+               </button>
+             </div>
+             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="lg:col-span-1 space-y-6">
+                 <div className="bg-white p-6 rounded-xl border border-slate-200">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18}/> 商家封面圖 (Logo)</h3>
+                   <div className="relative h-48 bg-slate-100 rounded-lg flex items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-50">
+                     <div className="text-center text-slate-400">
+                       <Upload size={24} className="mx-auto mb-2"/>
+                       <span className="text-sm font-bold">點擊上傳封面大圖</span>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+               <div className="lg:col-span-2 space-y-6">
+                 <div className="bg-white p-6 rounded-xl border border-slate-200 space-y-5">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Building2 size={18}/> 商家資訊</h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">商家名稱</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="海角七號民宿" />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">所在地 (縣市/區域)</label>
+                       <div className="flex items-center relative">
+                          <MapPin size={16} className="absolute left-3 text-slate-400"/>
+                          <input type="text" className="w-full pl-9 p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="屏東縣恆春鎮" />
+                       </div>
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">主營類別</label>
+                       <select className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                          <option>住宿</option><option>餐飲</option><option>體驗</option>
+                       </select>
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1">特色標籤 (用逗號分隔)</label>
+                       <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="海景, 早餐, 寵物友善" />
+                     </div>
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 mb-1">關於商家 (品牌介紹)</label>
+                     <textarea className="w-full p-3 border border-slate-300 rounded-lg h-32 resize-none text-sm focus:ring-2 focus:ring-sky-500 outline-none" defaultValue="位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景。我們致力於提供旅人最放鬆的度假體驗..."></textarea>
+                   </div>
+                 </div>
+               </div>
+             </div>
+             <div className="block sm:hidden mt-6 pb-6">
+                <button onClick={() => alert("儲存成功！")} className="w-full bg-slate-900 text-white px-4 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-slate-800 shadow-lg">
+                  <Save size={18}/> 儲存所有變更
+                </button>
+             </div>
+           </div>
         ) : (
            <div className="space-y-6 animate-in fade-in duration-500">
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">編輯履歷 (Media Kit)</h2>
-               <button onClick={handleSaveCreatorProfile} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-md">
+               <button 
+                 onClick={handleSaveCreatorProfile}
+                 disabled={isSavingProfile}
+                 className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-indigo-700 shadow-md active:scale-95 transition-all disabled:opacity-70"
+               >
                  {isSavingProfile ? <Loader2 size={16} className="animate-spin" /> : <Save size={16}/>} 
                  {isSavingProfile ? '雲端寫入中...' : '儲存履歷並公開'}
                </button>
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-               {/* 左側照片區塊 (略，使用前版) */}
-               
-               {/* 右側：數據與受眾 */}
-               <div className="space-y-6">
-                 {/* ✨ 新增：數據表現區塊 (可編輯) */}
-                 <div className="bg-purple-50 p-6 rounded-2xl border border-purple-100 shadow-sm">
-                   <h3 className="font-black text-purple-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><BarChart3 size={18} className="text-purple-600"/> 數據表現</h3>
-                   <div className="space-y-4">
+               <div className="lg:col-span-2 space-y-6">
+                 
+                 {/* 形象照片區塊 */}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18} className="text-sky-500"/> 形象照片 (Cloud Sync)</h3>
+                   
+                   {/* Cover Image Upload */}
+                   <div className="relative h-48 bg-slate-50 rounded-xl mb-6 flex items-center justify-center border-2 border-dashed border-slate-300 hover:bg-slate-100 transition-colors overflow-hidden group">
+                     {creatorProfile.coverImage ? (
+                        <>
+                          <img src={creatorProfile.coverImage} className="w-full h-full object-cover" alt="Cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="text-white font-bold text-sm bg-black/50 px-4 py-2 rounded-lg backdrop-blur-sm">點擊更換封面圖</span>
+                          </div>
+                        </>
+                     ) : (
+                        <div className="text-center text-slate-400">
+                          {isUploadingCover ? <Loader2 size={24} className="mx-auto mb-2 animate-spin text-sky-500"/> : <Upload size={24} className="mx-auto mb-2"/>}
+                          <span className="text-sm font-bold">{isUploadingCover ? '照片上傳中...' : '點擊上傳封面大圖'}</span>
+                        </div>
+                     )}
+                     <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleCreatorImageUpload(e, 'cover')} disabled={isUploadingCover} />
+                   </div>
+                   
+                   {/* Avatar Upload */}
+                   <div className="flex items-center gap-5">
+                     <div className="relative w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center border-2 border-dashed border-slate-300 hover:bg-slate-200 transition-colors overflow-hidden shrink-0 group">
+                       {creatorProfile.avatar ? (
+                          <>
+                            <img src={creatorProfile.avatar} className="w-full h-full object-cover" alt="Avatar" />
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Camera size={20} className="text-white"/>
+                            </div>
+                          </>
+                       ) : (
+                          isUploadingAvatar ? <Loader2 size={24} className="animate-spin text-sky-500"/> : <Camera size={24} className="text-slate-400"/>
+                       )}
+                       <input type="file" accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => handleCreatorImageUpload(e, 'avatar')} disabled={isUploadingAvatar} />
+                     </div>
+                     <div className="flex-1">
+                       <p className="text-sm font-bold text-slate-900 mb-1">個人頭像 (Avatar)</p>
+                       <p className="text-xs text-slate-500 leading-relaxed">建議尺寸 200x200px。<br/>清晰的人像能提升 40% 的媒合率。</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 {/* 基本資料區塊 */}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                   <h3 className="font-bold text-slate-900 mb-2">基本資料</h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                      <div>
-                       <label className="block text-xs font-bold text-purple-700 mb-1.5">平均觀看數 (Average Views)</label>
-                       <input type="number" className="w-full p-3 border border-purple-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-purple-500 bg-white" 
-                              value={creatorProfile.averageViews} onChange={(e) => setCreatorProfile(p => ({...p, averageViews: Number(e.target.value)}))} />
-                       <p className="text-[10px] text-purple-600 mt-1">* 建議填寫最近 5 支 Reels 的平均觀看數</p>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">顯示名稱</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+                              value={creatorProfile.name} onChange={(e) => setCreatorProfile(p => ({...p, name: e.target.value}))} />
                      </div>
                      <div>
-                       <label className="block text-xs font-bold text-purple-700 mb-1.5">完案信用評分 (系統自動計算)</label>
-                       <div className="w-full p-3 border border-purple-200 rounded-xl text-sm font-black text-slate-500 bg-purple-100 flex items-center gap-2">
-                          <Star size={16} className="fill-yellow-400 text-yellow-400" />
-                          {creatorProfile.completionScore || '5.0'}
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Handle (社群 ID)</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+                              value={creatorProfile.handle} onChange={(e) => setCreatorProfile(p => ({...p, handle: e.target.value}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">LINE ID (聯絡用)</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+                              placeholder="例如：may_travel"
+                              value={creatorProfile.lineId} onChange={(e) => setCreatorProfile(p => ({...p, lineId: e.target.value}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">主要所在地</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+                              value={creatorProfile.location} onChange={(e) => setCreatorProfile(p => ({...p, location: e.target.value}))} />
+                     </div>
+                     <div className="md:col-span-2">
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">風格標籤 (逗號分隔)</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-indigo-600 outline-none focus:ring-2 focus:ring-indigo-500 bg-indigo-50 focus:bg-white transition-all" 
+                              value={creatorProfile.tags} onChange={(e) => setCreatorProfile(p => ({...p, tags: e.target.value}))} />
+                     </div>
+                   </div>
+                   <div>
+                     <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">個人簡介 (Bio)</label>
+                     <textarea className="w-full p-4 border border-slate-200 rounded-xl h-28 resize-none text-sm leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
+                               value={creatorProfile.bio} onChange={(e) => setCreatorProfile(p => ({...p, bio: e.target.value}))} />
+                   </div>
+                 </div>
+
+                 {/* 作品集上傳 */}
+                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                   <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18} className="text-purple-500"/> 近期作品集 (Portfolio)</h3>
+                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
+                     <label className="aspect-square bg-slate-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors">
+                       {isUploadingPortfolio ? <Loader2 className="animate-spin text-purple-500" size={24}/> : <Plus size={24}/>}
+                       <span className="text-[10px] font-bold mt-1">新增作品</span>
+                       <input type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleCreatorImageUpload(e, 'portfolio')} disabled={isUploadingPortfolio} />
+                     </label>
+                     {creatorProfile.portfolio.map((img, i) => (
+                       <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-200 relative group shadow-sm border border-slate-100">
+                         <img src={img} className="w-full h-full object-cover" alt="Portfolio" />
+                         <button 
+                           type="button" 
+                           onClick={() => setCreatorProfile(p => ({...p, portfolio: p.portfolio.filter((_, idx) => idx !== i)}))}
+                           className="absolute top-1.5 right-1.5 bg-black/60 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all scale-75 group-hover:scale-100"
+                         >
+                           <X size={12} strokeWidth={3}/>
+                         </button>
                        </div>
+                     ))}
+                   </div>
+                 </div>
+               </div>
+
+               {/* 右側：報價與受眾 */}
+               <div className="space-y-6">
+                 <div className="bg-green-50 p-6 rounded-2xl border border-green-100 shadow-sm">
+                   <h3 className="font-black text-green-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><DollarSign size={18} className="text-green-600"/> 合作參考報價</h3>
+                   <div className="space-y-4">
+                     <div>
+                       <label className="block text-xs font-bold text-green-700 mb-1.5">圖文貼文 (Post) NT$</label>
+                       <input type="number" className="w-full p-3 border border-green-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-green-500 bg-white" 
+                              value={creatorProfile.rates.post} onChange={(e) => setCreatorProfile(p => ({...p, rates: {...p.rates, post: Number(e.target.value)}}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-green-700 mb-1.5">限時動態 (Story) NT$</label>
+                       <input type="number" className="w-full p-3 border border-green-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-green-500 bg-white" 
+                              value={creatorProfile.rates.story} onChange={(e) => setCreatorProfile(p => ({...p, rates: {...p.rates, story: Number(e.target.value)}}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-green-700 mb-1.5">短影音 (Reels) NT$</label>
+                       <input type="number" className="w-full p-3 border border-green-200 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-green-500 bg-white" 
+                              value={creatorProfile.rates.reels} onChange={(e) => setCreatorProfile(p => ({...p, rates: {...p.rates, reels: Number(e.target.value)}}))} />
                      </div>
                    </div>
                  </div>
 
                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                   <h3 className="font-black text-slate-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><Users size={18} className="text-indigo-500"/> 社群受眾分析</h3>
-                   {/* ... (受眾分析輸入框，保持不變) ... */}
+                   <h3 className="font-black text-slate-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><BarChart3 size={18} className="text-indigo-500"/> 社群受眾分析</h3>
+                   <div className="space-y-4">
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5">性別分佈</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
+                              value={creatorProfile.audience.gender} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, gender: e.target.value}}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5">主力年齡層</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
+                              value={creatorProfile.audience.age} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, age: e.target.value}}))} />
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5">熱門分佈城市</label>
+                       <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
+                              value={creatorProfile.audience.topCity} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, topCity: e.target.value}}))} />
+                     </div>
+                   </div>
                  </div>
                </div>
              </div>
@@ -923,9 +1455,122 @@ export default function DashboardPage() {
 
   return (
     <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col overflow-y-auto m-0 p-0 font-sans">
-       {/* (Layout 保持不變，請複製前版) */}
-       <div className="flex-1 pb-32 relative">
-           
+      <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
+          <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
+          <div className="flex gap-4">
+             <div className="bg-slate-100 p-1 rounded-lg flex">
+                <button onClick={() => setRole('business')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow' : 'text-slate-400'}`}>業者視角</button>
+                <button onClick={() => setRole('creator')} className={`px-3 py-1 text-xs font-bold rounded ${role === 'creator' ? 'bg-white shadow' : 'text-slate-400'}`}>創作者視角</button>
+             </div>
+             <button onClick={() => setIsLoggedIn(false)} className="text-slate-400 hover:text-red-500"><LogOut size={20}/></button>
+          </div>
+        </div>
+      </div>
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex gap-8">
+        <div className="w-64 shrink-0 hidden md:block">
+          <nav className="space-y-2 sticky top-24">
+            {menuItems.map(i => (
+              <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-xl ${activeTab === i.id ? 'bg-indigo-600 text-white' : 'text-slate-600 hover:bg-white'}`}>
+                <i.icon size={18} /> {i.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <div className="flex-1 pb-32 relative">
+          
+          {/* 金流 Modal */}
+          {purchaseItem && (
+            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden flex flex-col">
+                <div className="p-4 border-b border-slate-200 flex justify-between bg-slate-50">
+                  <h3 className="font-bold">結帳確認</h3>
+                  {paymentStep === 'form' && <button onClick={() => setPurchaseItem(null)}><X size={20} /></button>}
+                </div>
+                {paymentStep === 'form' && (
+                  <div className="p-6">
+                    <div className="bg-indigo-50 p-4 rounded-xl mb-6">
+                      <p className="text-xs text-indigo-600 font-bold mb-1">購買項目</p>
+                      <div className="flex justify-between items-end"><p className="font-bold">{purchaseItem.name}</p><p className="font-black text-2xl text-indigo-700">NT$ {purchaseItem.price}</p></div>
+                    </div>
+                    <div className="flex p-1 bg-slate-100 rounded-lg mb-6">
+                      <button onClick={() => setPaymentMethod('credit_card')} className={`flex-1 py-2 text-sm font-bold flex justify-center gap-2 rounded ${paymentMethod === 'credit_card' ? 'bg-white shadow' : 'text-slate-500'}`}><CreditCard size={16}/> 信用卡</button>
+                      <button onClick={() => setPaymentMethod('bank_transfer')} className={`flex-1 py-2 text-sm font-bold flex justify-center gap-2 rounded ${paymentMethod === 'bank_transfer' ? 'bg-white shadow' : 'text-slate-500'}`}><Landmark size={16}/> 銀行匯款</button>
+                    </div>
+                    <button onClick={handlePaymentSubmit} className="w-full py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">確認付款</button>
+                  </div>
+                )}
+                {paymentStep === 'processing' && (<div className="p-12 text-center"><Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" /><h3 className="font-bold">處理中...</h3></div>)}
+                {paymentStep === 'success' && (<div className="p-12 text-center"><CheckCircle2 className="w-12 h-12 text-green-600 mx-auto mb-4" /><h3 className="font-bold mb-4">交易成功！</h3><button onClick={() => {setPurchaseItem(null); setActiveTab('overview');}} className="w-full py-3 bg-slate-100 rounded-xl font-bold">返回</button></div>)}
+              </div>
+            </div>
+          )}
+          
+          {/* 案源詳情 Modal */}
+          {viewProject && (
+            <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+              <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
+                <button onClick={() => setViewProject(null)} className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"><X size={20} /></button>
+                
+                <div className="relative h-64 sm:h-72 shrink-0 bg-slate-200">
+                  <img src={activeImage || 'https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} className="w-full h-full object-cover transition-opacity duration-300" alt="Cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                  {viewProject.gallery && viewProject.gallery.length > 0 && (
+                    <div className="absolute bottom-4 left-4 flex gap-2 overflow-x-auto max-w-[calc(100%-2rem)]">
+                      {viewProject.gallery.map((img, i) => (
+                        <img key={i} src={img} onClick={() => setActiveImage(img)} className={`w-16 h-12 object-cover rounded-md border-2 cursor-pointer transition-colors ${activeImage === img ? 'border-indigo-500' : 'border-white/50 hover:border-white'}`} alt="Gallery" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="p-6 sm:p-8 flex-grow bg-slate-50/50">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${viewProject.type === '付費推廣' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700'}`}>{viewProject.type}</span>
+                        <span className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} /> {viewProject.location}</span>
+                      </div>
+                      <h2 className="text-2xl font-bold text-slate-900 mb-2">{viewProject.title}</h2>
+                      <div className="flex gap-2">
+                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">{viewProject.category}</span>
+                      </div>
+                    </div>
+                    <div className="text-left sm:text-right w-full sm:w-auto bg-white sm:bg-transparent p-4 sm:p-0 rounded-xl border sm:border-0 border-slate-100">
+                      <p className="text-xs text-slate-500 mb-1">合作總價值</p>
+                      <p className="text-2xl font-black text-indigo-600">{viewProject.totalValue}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm"><DollarSign size={18} className="text-green-600"/> 互惠價值詳情</h4>
+                      <ul className="space-y-3 text-sm text-slate-600">
+                        {viewProject.valueBreakdown?.split('+').map((item, i) => (
+                          <li key={i} className="flex items-start gap-2"><CheckCircle2 size={16} className="text-green-500 mt-0.5 shrink-0"/><span className="font-medium">{item.trim()}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                      <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm"><Camera size={18} className="text-blue-600"/> 內容需求</h4>
+                      <p className="text-sm text-slate-600 mb-4 leading-relaxed font-medium">{viewProject.requirements}</p>
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                        <Users size={16} className="text-indigo-500"/>
+                        <span>剩餘 <span className="text-indigo-600 text-base">{viewProject.spots || 0}</span> 個名額</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
+                   <button onClick={() => setViewProject(null)} className="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉詳情</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {renderContent()}
+
           {/* ✨ 評價填寫 Modal (全域) */}
           {showReviewModal && (
             <div className="fixed inset-0 z-[180] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -960,22 +1605,12 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-
-          {renderContent()}
-       </div>
-       
-       {/* 行動版底部導覽 */}
-       <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 z-40 flex justify-around p-2 pb-safe">
-        {menuItems.map(i => (
-          <button 
-            key={i.id} 
-            onClick={() => setActiveTab(i.id as Tab)} 
-            className={`p-2 flex flex-col items-center ${
-              activeTab === i.id 
-                ? (role === 'business' ? 'text-indigo-600' : 'text-purple-600') 
-                : 'text-slate-400'
-            }`}
-          >
+        </div>
+      </div>
+      {/* 行動版底部導覽 */}
+      <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 z-40 flex justify-around p-2 pb-safe">
+        {menuItems.slice(0, 4).map(i => (
+          <button key={i.id} onClick={() => setActiveTab(i.id as Tab)} className={`p-2 flex flex-col items-center ${activeTab === i.id ? 'text-indigo-600' : 'text-slate-400'}`}>
             <i.icon size={20} />
             <span className="text-[10px] mt-1 font-bold">{i.label.split(' ')[0]}</span>
           </button>
