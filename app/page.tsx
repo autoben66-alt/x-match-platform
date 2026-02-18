@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   TrendingUp, Users, CheckCircle, ArrowRight, Search, MessageCircle, Heart, Star, BarChart, Loader2,
-  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye
+  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye, Building2, Briefcase
 } from 'lucide-react';
 import CreatorCard, { Creator } from '@/components/CreatorCard';
 
@@ -63,6 +63,20 @@ interface CreatorDetail extends Creator {
   completionScore?: number; // 新增：完案信用評分
 }
 
+// 新增：廠商資料結構
+interface ProviderDetail {
+  id: string | number;
+  name: string;
+  location: string;
+  coverImage: string;
+  logo: string;
+  category: string;     // e.g., "度假飯店", "特色餐廳"
+  lookingFor: string[]; // e.g., ["美食", "攝影"]
+  budgetType: string;   // e.g., "住宿互惠", "有稿酬"
+  rating: number;
+  activeCampaigns: number; // 正在進行的招募活動
+}
+
 // ✨ 定義豐富資料的介面，解決 TypeScript 報錯
 interface EnrichData {
   name: string;
@@ -84,7 +98,7 @@ interface EnrichData {
   completionScore: number; // 新增
 }
 
-// 模擬豐富的履歷資料 (已補上 lineId, averageViews, completionScore，並將評分設為 5.0)
+// 模擬豐富的履歷資料
 const ENRICH_DATA: EnrichData[] = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
@@ -118,6 +132,28 @@ const ENRICH_DATA: EnrichData[] = [
   }
 ];
 
+// 新增：模擬優質廠商資料 (Fallback Data)
+const ENRICH_PROVIDERS: ProviderDetail[] = [
+    {
+        id: "p1", name: "海灣森旅", location: "花蓮縣", 
+        coverImage: "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+        logo: "https://api.dicebear.com/7.x/initials/svg?seed=HL&backgroundColor=0ea5e9",
+        category: "度假飯店", lookingFor: ["旅遊", "空拍"], budgetType: "住宿互惠", rating: 4.9, activeCampaigns: 2
+    },
+    {
+        id: "p2", name: "慢活・私廚", location: "台北市", 
+        coverImage: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+        logo: "https://api.dicebear.com/7.x/initials/svg?seed=SK&backgroundColor=f59e0b",
+        category: "精緻餐飲", lookingFor: ["美食", "探店"], budgetType: "有稿酬", rating: 4.8, activeCampaigns: 1
+    },
+    {
+        id: "p3", name: "極光露營區", location: "苗栗縣", 
+        coverImage: "https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+        logo: "https://api.dicebear.com/7.x/initials/svg?seed=AC&backgroundColor=10b981",
+        category: "戶外體驗", lookingFor: ["親子", "露營"], budgetType: "體驗互惠", rating: 5.0, activeCampaigns: 3
+    }
+];
+
 // 預設的精美首頁評價資料
 const FALLBACK_TESTIMONIALS: Testimonial[] = [
   {
@@ -138,6 +174,7 @@ const FALLBACK_TESTIMONIALS: Testimonial[] = [
 
 export default function Home() {
   const [creators, setCreators] = useState<CreatorDetail[]>([]);
+  const [providers, setProviders] = useState<ProviderDetail[]>([]); // 新增：廠商 State
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null);
@@ -147,16 +184,18 @@ export default function Home() {
     if (!db) {
       setIsLoading(false);
       setTestimonials(FALLBACK_TESTIMONIALS);
+      setProviders(ENRICH_PROVIDERS); // 若無 DB，使用預設廠商
       return;
     }
 
-    // 1. 抓取創作者清單 (動態顯示在首頁)
+    // 1. 抓取使用者清單 (同時處理 創作者 與 廠商)
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
-        // 使用 'as any' 暫時繞過 Firebase 資料型別檢查
-        const creatorUsers = snapshot.docs.map(doc => doc.data() as any).filter(u => u.role === '創作者');
+        const allUsers = snapshot.docs.map(doc => doc.data() as any);
         
+        // --- 處理創作者 ---
+        const creatorUsers = allUsers.filter(u => u.role === '創作者');
         const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
           const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
           const isFounder = index < 50; 
@@ -170,7 +209,7 @@ export default function Home() {
             id: Number(u.id) || Date.now() + index,
             name: u.name || enrich.name,
             handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
-            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''), // 修正處：現在 enrich.lineId 存在了
+            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
             avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
             location: u.location || enrich.location,
             bio: u.bio || enrich.bio,
@@ -184,27 +223,49 @@ export default function Home() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            // ✨ 優先讀取資料庫的數值，若無則使用預設值 (這裡的預設值都已經是更新後的)
             averageViews: u.averageViews || enrich.averageViews || 5000,
             completionScore: u.completionScore || enrich.completionScore || 5.0
           };
         });
+        setCreators(mappedCreators.slice(0, 3)); // 只取前三
 
-        // 隨機打亂並取前三名作為「本週熱門」
-        const shuffled = mappedCreators.sort(() => 0.5 - Math.random());
-        setCreators(shuffled.slice(0, 3));
+        // --- 處理廠商 (新增邏輯) ---
+        const providerUsers = allUsers.filter(u => u.role === '廠商');
+        if (providerUsers.length > 0) {
+            const mappedProviders: ProviderDetail[] = providerUsers.map((u, index) => {
+                const enrich = ENRICH_PROVIDERS[index % ENRICH_PROVIDERS.length];
+                return {
+                    id: u.id || `db-provider-${index}`,
+                    name: u.name || enrich.name,
+                    location: u.location || enrich.location,
+                    coverImage: u.coverImage || enrich.coverImage,
+                    logo: u.avatar || enrich.logo, // 廠商使用 avatar 作為 logo
+                    category: u.category || enrich.category,
+                    lookingFor: u.lookingFor || enrich.lookingFor,
+                    budgetType: u.budgetType || enrich.budgetType,
+                    rating: u.rating || enrich.rating,
+                    activeCampaigns: u.activeCampaigns || enrich.activeCampaigns
+                };
+            });
+            setProviders(mappedProviders.slice(0, 3));
+        } else {
+            setProviders(ENRICH_PROVIDERS); // 若 DB 無廠商資料，顯示預設
+        }
+
+      } else {
+          // 若整個 Collection 為空
+          setProviders(ENRICH_PROVIDERS);
       }
       setIsLoading(false);
     });
 
-    // 2. 抓取成功案例 (聽聽他們怎麼說) - 對應 Admin 後台的新增功能
+    // 2. 抓取成功案例
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => doc.data() as Testimonial);
         setTestimonials(data);
       } else {
-        // 如果資料庫是空的，顯示預設資料
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
     });
@@ -336,7 +397,6 @@ export default function Home() {
                   className="cursor-pointer transition-transform hover:-translate-y-1"
                   onClick={() => setSelectedCreator(creator)}
                 >
-                  {/* 注意：這裡將 averageViews 和 completionScore 傳給 CreatorCard */}
                   <CreatorCard creator={{
                       ...creator, 
                       averageViews: creator.averageViews, 
@@ -351,6 +411,104 @@ export default function Home() {
                <Link href="/dashboard" className="mt-4 inline-block text-sky-600 font-bold hover:underline">立即註冊入駐</Link>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* --- ✨ New Section: Featured Providers (本週優質廠商) --- */}
+      <div className="bg-white py-20 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-3xl font-bold text-slate-900">本週優質廠商體驗</h2>
+                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 border border-amber-200 rounded-full text-[10px] font-bold text-amber-700 uppercase tracking-widest shadow-sm">
+                   Featured
+                </span>
+              </div>
+              <p className="text-slate-600">正在尋找合作夥伴的精選飯店與餐廳</p>
+            </div>
+            <Link href="/creators" className="text-slate-600 font-semibold hover:text-slate-900 flex items-center gap-1 bg-slate-50 px-4 py-2 rounded-full transition-colors border border-slate-200">
+              我是網紅，查看更多招募 <ArrowRight size={16} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {providers.map((provider) => (
+              <div key={provider.id} className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative">
+                
+                {/* Image Area */}
+                <div className="h-48 relative overflow-hidden">
+                  <img 
+                    src={provider.coverImage} 
+                    alt={provider.name} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                  
+                  {/* Category Badge */}
+                  <div className="absolute top-4 left-4">
+                    <span className="px-3 py-1 bg-white/90 backdrop-blur text-xs font-bold text-slate-800 rounded-full shadow-sm flex items-center gap-1">
+                      <Building2 size={12} className="text-sky-500"/>
+                      {provider.category}
+                    </span>
+                  </div>
+
+                  {/* Logo Overlap */}
+                  <div className="absolute -bottom-6 right-4">
+                    <img 
+                      src={provider.logo} 
+                      alt={provider.name} 
+                      className="w-12 h-12 rounded-lg border-4 border-white shadow-md bg-white object-cover" 
+                    />
+                  </div>
+
+                  <div className="absolute bottom-3 left-4 text-white">
+                    <h3 className="text-xl font-bold flex items-center gap-1">
+                        {provider.name}
+                        {provider.rating >= 4.8 && <Award size={16} className="text-yellow-400 fill-yellow-400"/>}
+                    </h3>
+                    <p className="text-sm text-slate-200 flex items-center gap-1 opacity-90">
+                        <MapPin size={12}/> {provider.location}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="p-5 pt-8 flex-grow flex flex-col">
+                  
+                  {/* Looking For Tags */}
+                  <div className="mb-4">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">尋找合作對象</p>
+                    <div className="flex flex-wrap gap-2">
+                        {provider.lookingFor.map(tag => (
+                            <span key={tag} className="px-2 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded-md border border-sky-100">
+                                #{tag}
+                            </span>
+                        ))}
+                    </div>
+                  </div>
+
+                  {/* Badges/Stats */}
+                  <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
+                     <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
+                        <p className="text-xs text-slate-500 mb-1">合作預算</p>
+                        <p className="font-bold text-slate-800 text-sm">{provider.budgetType}</p>
+                     </div>
+                     <div className="bg-green-50 p-2 rounded-lg text-center border border-green-100">
+                        <p className="text-xs text-green-600 mb-1">正在招募</p>
+                        <p className="font-bold text-green-700 text-sm flex items-center justify-center gap-1">
+                            <Briefcase size={12}/> {provider.activeCampaigns} 個專案
+                        </p>
+                     </div>
+                  </div>
+
+                  <button className="w-full py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-sky-600 transition-colors flex items-center justify-center gap-2 group-hover:shadow-lg">
+                    查看合作詳情
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
