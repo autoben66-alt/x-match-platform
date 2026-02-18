@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+// 移除 next/link，改用標準 a 標籤
+// import Link from 'next/link'; 
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
@@ -603,9 +604,9 @@ export default function DashboardPage() {
                                                     <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
                                                 )}
                                                 {/* 智能合約 */}
-                                                <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
+                                                <a href="#" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
                                                     <FileSignature size={12}/> 合約
-                                                </Link>
+                                                </a>
                                                 {/* 結案評價 */}
                                                 {myReview ? (
                                                   <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
@@ -815,7 +816,7 @@ export default function DashboardPage() {
                                   {inv.creatorInfo?.lineId && (
                                     <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
                                   )}
-                                  <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
+                                  <a href="#" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</a>
                                   {/* 評價按鈕 or 已評價顯示 */}
                                   {inv.businessReview ? (
                                     <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
@@ -842,9 +843,9 @@ export default function DashboardPage() {
                   <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
-                    <Link href="/creators" className="text-indigo-600 font-bold hover:underline">前往「找網紅」尋找適合的對象</Link>
+                    <a href="#" className="text-indigo-600 font-bold hover:underline">前往「找網紅」尋找適合的對象</a>
                     <span className="hidden sm:block text-slate-300">|</span>
-                    <Link href="/trips" className="text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</Link>
+                    <a href="#" className="text-indigo-600 font-bold hover:underline">前往「行程許願池」尋找適合的對象</a>
                   </div>
                 </div>
               )}
@@ -889,7 +890,7 @@ export default function DashboardPage() {
                                      ) : (
                                         <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
                                      )}
-                                     <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
+                                     <a href="#" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</a>
                                      
                                      {/* 創作者評價按鈕 */}
                                      {inv.creatorReview ? (
@@ -1037,9 +1038,9 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">合約管理</h2>
-              <Link href="/calculator" className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
+              <a href="#" className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
                 <Plus size={16}/> 建立新合約
-              </Link>
+              </a>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
               <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer">
@@ -1397,7 +1398,7 @@ export default function DashboardPage() {
     <div className="fixed inset-0 z-[9999] bg-slate-50 flex flex-col overflow-y-auto m-0 p-0 font-sans">
       <div className="bg-white border-b border-slate-200 sticky top-0 z-30 shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
-          <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
+          <a href="#" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</a>
           <div className="flex gap-4">
              <div className="bg-slate-100 p-1 rounded-lg flex items-center">
                 <span className={`px-3 py-1 text-xs font-bold rounded ${role === 'business' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>
@@ -1558,5 +1559,6 @@ export default function DashboardPage() {
         ))}
       </div>
     </div>
+   </div>
   );
 }
