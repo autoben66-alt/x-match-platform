@@ -7,8 +7,8 @@ export interface Creator {
   avatar: string;
   tags: string[];
   followers: number;
-  averageViews?: number; // ✨ 新增：平均觀看數
-  completionScore?: number; // ✨ 新增：完案信用評分
+  averageViews?: number;
+  completionScore?: number;
   location: string;
   bio: string;
   coverImage?: string;
@@ -17,9 +17,18 @@ export interface Creator {
 export default function CreatorCard({ creator }: { creator: Creator }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
-      <div className="h-24 bg-slate-100 relative overflow-hidden">
-        {creator.coverImage && <img src={creator.coverImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="cover"/>}
+      {/* ✨ 修正：將高度從 h-24 改為 h-40，讓圖片展示更完整 */}
+      <div className="h-40 bg-slate-100 relative overflow-hidden">
+        {creator.coverImage && (
+          <img 
+            src={creator.coverImage} 
+            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500" 
+            alt="cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
       </div>
+      
       <div className="px-6 pb-6 pt-0 flex-1 flex flex-col">
         <div className="relative -mt-10 mb-3 flex justify-between items-end">
           <img src={creator.avatar} alt={creator.name} className="w-20 h-20 rounded-full border-4 border-white shadow-md bg-white object-cover" />
@@ -32,7 +41,6 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
         <h3 className="font-bold text-lg text-slate-900 mb-0.5 flex items-center gap-1">{creator.name}</h3>
         <p className="text-sm text-slate-400 mb-3 font-medium">{creator.handle}</p>
         
-        {/* ✨ 新指標顯示區 (取代原本的互動率) */}
         <div className="flex items-center gap-4 mb-4 text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
            <div className="flex items-center gap-1.5">
              <Eye size={14} className="text-sky-500"/>

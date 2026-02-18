@@ -49,7 +49,7 @@ interface Testimonial {
   rating?: number;
 }
 
-// 擴充創作者資料結構 (包含詳情頁所需欄位)
+// 擴充創作者資料結構
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -63,12 +63,12 @@ interface CreatorDetail extends Creator {
   completionScore?: number;
 }
 
-// 定義豐富資料的型別，確保 lineId 存在，解決編譯錯誤
+// 定義豐富資料的介面
 interface EnrichData {
   name: string;
   handle: string;
   avatar: string;
-  lineId: string; // 確保此欄位存在
+  lineId: string;
   tags: string[];
   followers: number;
   engagement: number;
@@ -84,12 +84,12 @@ interface EnrichData {
   completionScore: number;
 }
 
-// 模擬豐富的履歷資料 (已補上 lineId, averageViews, completionScore)
+// 模擬豐富的履歷資料 (✨ 評分統一改為 5.0)
 const ENRICH_DATA: EnrichData[] = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
     tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
-    bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", completedJobs: 42, rating: 4.9,
+    bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", completedJobs: 42, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
@@ -104,21 +104,21 @@ const ENRICH_DATA: EnrichData[] = [
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
-    averageViews: 45000, completionScore: 4.9
+    averageViews: 45000, completionScore: 5.0
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
     tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市",
-    bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", completedJobs: 63, rating: 4.8,
+    bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", completedJobs: 63, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 3,500", story: "NT$ 1,000", reels: "NT$ 5,000" },
     audience: { gender: "女性 90%", age: "18-24歲", topCity: "台南/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ],
-    averageViews: 8500, completionScore: 4.8
+    averageViews: 8500, completionScore: 5.0
   }
 ];
 
-// 預設的精美首頁評價資料 (當資料庫沒有資料時顯示)
+// 預設的精美首頁評價資料
 const FALLBACK_TESTIMONIALS: Testimonial[] = [
   {
     id: "case-1",
@@ -142,7 +142,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null);
 
-  // 監聽 Firebase 資料
   useEffect(() => {
     if (!db) {
       setIsLoading(false);
@@ -150,11 +149,11 @@ export default function Home() {
       return;
     }
 
-    // 1. 抓取創作者清單 (動態顯示在首頁)
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
-        const creatorUsers = snapshot.docs.map(doc => doc.data()).filter(u => u.role === '創作者');
+        // ✨ 修正：使用 'as any' 來避免 u.lineId 的型別檢查錯誤，讓 Firebase 資料順利通過
+        const creatorUsers = snapshot.docs.map(doc => doc.data() as any).filter(u => u.role === '創作者');
         
         const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
           const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
@@ -169,7 +168,7 @@ export default function Home() {
             id: Number(u.id) || Date.now() + index,
             name: u.name || enrich.name,
             handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
-            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''), // 修正處：現在 enrich.lineId 存在了
+            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''), 
             avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
             location: u.location || enrich.location,
             bio: u.bio || enrich.bio,
@@ -183,27 +182,23 @@ export default function Home() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            // ✨ 優先讀取資料庫的數值，若無則使用預設值
-            averageViews: u.averageViews || enrich.averageViews || 5000,
-            completionScore: u.completionScore || enrich.completionScore || 5.0
+            averageViews: u.averageViews || enrich.averageViews,
+            completionScore: u.completionScore || enrich.completionScore
           };
         });
 
-        // 隨機打亂並取前三名作為「本週熱門」
         const shuffled = mappedCreators.sort(() => 0.5 - Math.random());
         setCreators(shuffled.slice(0, 3));
       }
       setIsLoading(false);
     });
 
-    // 2. 抓取成功案例 (聽聽他們怎麼說) - 對應 Admin 後台的新增功能
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => doc.data() as Testimonial);
         setTestimonials(data);
       } else {
-        // 如果資料庫是空的，顯示預設資料
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
     });
@@ -335,7 +330,6 @@ export default function Home() {
                   className="cursor-pointer transition-transform hover:-translate-y-1"
                   onClick={() => setSelectedCreator(creator)}
                 >
-                  {/* 注意：這裡將 averageViews 和 completionScore 傳給 CreatorCard */}
                   <CreatorCard creator={creator} />
                 </div>
               ))}
@@ -411,7 +405,6 @@ export default function Home() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
             
-            {/* Close Button */}
             <button 
               onClick={() => setSelectedCreator(null)}
               className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"
@@ -458,7 +451,6 @@ export default function Home() {
                 <p className="font-medium text-slate-500">{selectedCreator.handle}</p>
               </div>
 
-              {/* Profile Basic Info */}
               <div className="flex flex-col sm:flex-row justify-between items-start mb-8 gap-6">
                 <div className="w-full sm:w-auto">
                   <div className="flex flex-wrap gap-2 text-sm text-slate-600 mb-4">
@@ -475,18 +467,17 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* ✨ 新指標展示卡片 */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
                     <p className="text-2xl font-black text-slate-900">{(selectedCreator.followers/1000).toFixed(1)}k</p>
                   </div>
-                  {/* 平均觀看數 */}
+                  {/* 新指標：平均觀看 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">平均觀看</p>
                     <p className="text-2xl font-black text-green-500">{(selectedCreator.averageViews ? (selectedCreator.averageViews/1000).toFixed(1) + 'k' : 'N/A')}</p>
                   </div>
-                  {/* 完案信用 */}
+                  {/* 新指標：完案信用 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完案信用</p>
                     <p className="text-2xl font-black text-indigo-600 flex items-center justify-center gap-1">
@@ -496,7 +487,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Founder Badge Highlights */}
               {selectedCreator.badges?.includes('創始會員') && (
                 <div className="mb-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 rounded-2xl flex items-center gap-4 shadow-inner">
                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl shadow-md">
@@ -509,7 +499,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* Bio */}
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2">
                   <User size={16} className="text-sky-500" /> 關於我
@@ -518,7 +507,6 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Audience Insight */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase">
                     <BarChart3 size={18} className="text-indigo-500"/> 受眾分析
@@ -539,7 +527,6 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Reference Rates */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
@@ -560,7 +547,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
