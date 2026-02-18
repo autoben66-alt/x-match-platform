@@ -17,7 +17,7 @@ export interface Creator {
 export default function CreatorCard({ creator }: { creator: Creator }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
-      {/* ✨ 修正：將高度從 h-24 改為 h-40，讓圖片展示更完整 */}
+      {/* 封面圖區域：維持 h-40 高度 */}
       <div className="h-40 bg-slate-100 relative overflow-hidden">
         {creator.coverImage && (
           <img 
@@ -30,12 +30,22 @@ export default function CreatorCard({ creator }: { creator: Creator }) {
       </div>
       
       <div className="px-6 pb-6 pt-0 flex-1 flex flex-col">
-        <div className="relative -mt-10 mb-3 flex justify-between items-end">
-          <img src={creator.avatar} alt={creator.name} className="w-20 h-20 rounded-full border-4 border-white shadow-md bg-white object-cover" />
-          <div className="flex flex-col items-end">
+        {/* ✨ 版面修正重點：分離頭像與數據 */}
+        <div className="flex justify-between items-start mb-2">
+           {/* 左側：頭像 (向上位移，跨越封面) */}
+           <div className="-mt-10 relative">
+             <img 
+               src={creator.avatar} 
+               alt={creator.name} 
+               className="w-20 h-20 rounded-full border-4 border-white shadow-md bg-white object-cover" 
+             />
+           </div>
+           
+           {/* 右側：粉絲數 (保持在內容區，不向上位移，避免與封面重疊) */}
+           <div className="flex flex-col items-end pt-3">
              <span className="text-xs text-slate-400 font-bold mb-0.5">粉絲數</span>
              <span className="font-black text-slate-900 text-lg">{(creator.followers / 1000).toFixed(1)}k</span>
-          </div>
+           </div>
         </div>
         
         <h3 className="font-bold text-lg text-slate-900 mb-0.5 flex items-center gap-1">{creator.name}</h3>
