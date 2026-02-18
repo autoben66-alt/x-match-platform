@@ -36,7 +36,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義資料結構
+// 定義成功案例資料結構
 interface Testimonial {
   id: string;
   image: string;
@@ -49,7 +49,7 @@ interface Testimonial {
   rating?: number;
 }
 
-// 擴充創作者資料結構
+// 擴充創作者資料結構 (包含詳情頁所需欄位)
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -59,16 +59,16 @@ interface CreatorDetail extends Creator {
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
   lineId?: string;
-  averageViews?: number;
-  completionScore?: number;
+  averageViews?: number;    // 新增：平均觀看數
+  completionScore?: number; // 新增：完案信用評分
 }
 
-// 定義豐富資料的介面
+// ✨ 定義豐富資料的介面，解決 TypeScript 報錯
 interface EnrichData {
   name: string;
   handle: string;
   avatar: string;
-  lineId: string;
+  lineId: string; // 確保此欄位存在
   tags: string[];
   followers: number;
   engagement: number;
@@ -80,11 +80,11 @@ interface EnrichData {
   rates: { post: string; story: string; reels: string };
   audience: { gender: string; age: string; topCity: string };
   portfolio: string[];
-  averageViews: number;
-  completionScore: number;
+  averageViews: number;    // 新增
+  completionScore: number; // 新增
 }
 
-// 模擬豐富的履歷資料 (✨ 評分統一改為 5.0)
+// 模擬豐富的履歷資料 (已補上 lineId, averageViews, completionScore，並將評分設為 5.0)
 const ENRICH_DATA: EnrichData[] = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
@@ -142,6 +142,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null);
 
+  // 監聽 Firebase 資料
   useEffect(() => {
     if (!db) {
       setIsLoading(false);
@@ -149,10 +150,11 @@ export default function Home() {
       return;
     }
 
+    // 1. 抓取創作者清單 (動態顯示在首頁)
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
-        // ✨ 修正：使用 'as any' 來避免 u.lineId 的型別檢查錯誤，讓 Firebase 資料順利通過
+        // 使用 'as any' 暫時繞過 Firebase 資料型別檢查
         const creatorUsers = snapshot.docs.map(doc => doc.data() as any).filter(u => u.role === '創作者');
         
         const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
@@ -168,7 +170,7 @@ export default function Home() {
             id: Number(u.id) || Date.now() + index,
             name: u.name || enrich.name,
             handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
-            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''), 
+            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''), // 修正處：現在 enrich.lineId 存在了
             avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
             location: u.location || enrich.location,
             bio: u.bio || enrich.bio,
@@ -182,23 +184,27 @@ export default function Home() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            averageViews: u.averageViews || enrich.averageViews,
-            completionScore: u.completionScore || enrich.completionScore
+            // ✨ 優先讀取資料庫的數值，若無則使用預設值 (這裡的預設值都已經是更新後的)
+            averageViews: u.averageViews || enrich.averageViews || 5000,
+            completionScore: u.completionScore || enrich.completionScore || 5.0
           };
         });
 
+        // 隨機打亂並取前三名作為「本週熱門」
         const shuffled = mappedCreators.sort(() => 0.5 - Math.random());
         setCreators(shuffled.slice(0, 3));
       }
       setIsLoading(false);
     });
 
+    // 2. 抓取成功案例 (聽聽他們怎麼說) - 對應 Admin 後台的新增功能
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => doc.data() as Testimonial);
         setTestimonials(data);
       } else {
+        // 如果資料庫是空的，顯示預設資料
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
     });
@@ -330,7 +336,12 @@ export default function Home() {
                   className="cursor-pointer transition-transform hover:-translate-y-1"
                   onClick={() => setSelectedCreator(creator)}
                 >
-                  <CreatorCard creator={creator} />
+                  {/* 注意：這裡將 averageViews 和 completionScore 傳給 CreatorCard */}
+                  <CreatorCard creator={{
+                      ...creator, 
+                      averageViews: creator.averageViews, 
+                      completionScore: creator.completionScore
+                  }} />
                 </div>
               ))}
             </div>
@@ -400,7 +411,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- Creator Details Modal --- */}
+      {/* --- Creator Details Modal (熱門創作者詳情 - 與 creators 頁面一致) --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -467,17 +478,18 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* ✨ 新指標展示卡片 */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
                     <p className="text-2xl font-black text-slate-900">{(selectedCreator.followers/1000).toFixed(1)}k</p>
                   </div>
-                  {/* 新指標：平均觀看 */}
+                  {/* 平均觀看數 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">平均觀看</p>
                     <p className="text-2xl font-black text-green-500">{(selectedCreator.averageViews ? (selectedCreator.averageViews/1000).toFixed(1) + 'k' : 'N/A')}</p>
                   </div>
-                  {/* 新指標：完案信用 */}
+                  {/* 完案信用 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完案信用</p>
                     <p className="text-2xl font-black text-indigo-600 flex items-center justify-center gap-1">
@@ -487,18 +499,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {selectedCreator.badges?.includes('創始會員') && (
-                <div className="mb-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 rounded-2xl flex items-center gap-4 shadow-inner">
-                   <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl shadow-md">
-                     <Award className="text-white w-6 h-6" />
-                   </div>
-                   <div>
-                     <h4 className="font-bold text-orange-900 text-sm">官方認證創始會員</h4>
-                     <p className="text-xs text-orange-700 mt-0.5">身為平台前 50 名入駐創作者，享有信譽加成與推薦優先權。</p>
-                   </div>
-                </div>
-              )}
-
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2">
                   <User size={16} className="text-sky-500" /> 關於我
@@ -507,6 +507,7 @@ export default function Home() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Audience Insight */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase">
                     <BarChart3 size={18} className="text-indigo-500"/> 受眾分析
@@ -527,6 +528,7 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Reference Rates */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
@@ -547,11 +549,12 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                   {selectedCreator.portfolio.map((img, i) => (
-                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer">
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer border border-slate-200">
                       <img src={img} className="w-full h-full object-cover" alt="Portfolio" />
                     </div>
                   ))}
@@ -560,8 +563,26 @@ export default function Home() {
 
             </div>
 
-            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
-               <button onClick={() => setSelectedCreator(null)} className="px-8 py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉詳情</button>
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex flex-col sm:flex-row justify-between items-center gap-4 z-20">
+               <div className="hidden sm:block">
+                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">最近上線：2 小時前</p>
+               </div>
+               <div className="flex gap-3 w-full sm:w-auto">
+                 <a 
+                   href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 >
+                   <MessageCircle size={18} /> LINE 聯繫
+                 </a>
+                 <Link 
+                   href="/dashboard"
+                   className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 >
+                   <Mail size={18} /> 發送合作邀請
+                 </Link>
+               </div>
             </div>
           </div>
         </div>
