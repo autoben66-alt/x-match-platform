@@ -24,7 +24,7 @@ export default function Footer() {
               <li><Link href="/creators" className="hover:text-indigo-600">搜尋創作者</Link></li>
               <li><Link href="/opportunities" className="hover:text-indigo-600">廠商案源</Link></li>
               <li><Link href="/trips" className="hover:text-indigo-600">行程許願池</Link></li>
-              <li><Link href="/calculator" className="hover:text-indigo-600">互惠計算機</Link></li>
+              <li><Link href="/calculator" className="hover:text-indigo-600">智能合約</Link></li>
             </ul>
           </div>
           <div>
