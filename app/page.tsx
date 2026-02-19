@@ -1,12 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+// 移除 next/link 改用自定義 Link 元件以避免預覽環境錯誤
+// import Link from 'next/link';
 import { 
   TrendingUp, Users, CheckCircle, ArrowRight, Search, MessageCircle, Heart, Star, BarChart, Loader2,
-  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye, Building2, Briefcase
+  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye, Building2, Briefcase, Flame
 } from 'lucide-react';
 import CreatorCard, { Creator } from '@/components/CreatorCard';
+
+// --- 自定義 Link 元件 (解決預覽環境無法解析 next/link 的問題) ---
+const Link = ({ href, children, className, ...props }: any) => {
+  return (
+    <a href={href} className={className} {...props}>
+      {children}
+    </a>
+  );
+};
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -63,18 +73,20 @@ interface CreatorDetail extends Creator {
   completionScore?: number; // 新增：完案信用評分
 }
 
-// 新增：廠商資料結構
+// 修改：廠商資料結構 (對應真實案源 Projects)
 interface ProviderDetail {
-  id: string | number;
-  name: string;
+  id: string;
+  name: string;         // 對應 project.business (廠商名稱)
+  title: string;        // 對應 project.title (案源標題)
   location: string;
   coverImage: string;
   logo: string;
-  category: string;     // e.g., "度假飯店", "特色餐廳"
-  lookingFor: string[]; // e.g., ["美食", "攝影"]
-  budgetType: string;   // e.g., "住宿互惠", "有稿酬"
+  category: string;     
+  lookingFor: string[]; // 對應 tags
+  budgetType: string;   // 對應 project.type
+  totalValue: string;   // 對應 project.totalValue
   rating: number;
-  activeCampaigns: number; // 正在進行的招募活動
+  spotsLeft: number;    // 對應 project.spotsLeft
 }
 
 // ✨ 定義豐富資料的介面，解決 TypeScript 報錯
@@ -132,25 +144,49 @@ const ENRICH_DATA: EnrichData[] = [
   }
 ];
 
-// 新增：模擬優質廠商資料 (Fallback Data)
-const ENRICH_PROVIDERS: ProviderDetail[] = [
+// 新增：模擬優質廠商資料 (當 DB 無連線時使用，與案源頁面一致)
+const FALLBACK_PROJECTS: ProviderDetail[] = [
     {
-        id: "p1", name: "海灣森旅", location: "花蓮縣", 
+        id: "p1", 
+        name: "海角七號民宿", 
+        title: "海景房開箱體驗",
+        location: "屏東恆春", 
         coverImage: "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
         logo: "https://api.dicebear.com/7.x/initials/svg?seed=HL&backgroundColor=0ea5e9",
-        category: "度假飯店", lookingFor: ["旅遊", "空拍"], budgetType: "住宿互惠", rating: 4.9, activeCampaigns: 2
+        category: "住宿", 
+        lookingFor: ["海景", "寵物友善"], 
+        budgetType: "互惠體驗", 
+        totalValue: "NT$ 8,800",
+        rating: 4.9, 
+        spotsLeft: 1
     },
     {
-        id: "p2", name: "慢活・私廚", location: "台北市", 
+        id: "p2", 
+        name: "慢活・私廚", 
+        title: "春季無菜單料理試吃",
+        location: "台北市", 
         coverImage: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
         logo: "https://api.dicebear.com/7.x/initials/svg?seed=SK&backgroundColor=f59e0b",
-        category: "精緻餐飲", lookingFor: ["美食", "探店"], budgetType: "有稿酬", rating: 4.8, activeCampaigns: 1
+        category: "餐飲", 
+        lookingFor: ["美食", "探店"], 
+        budgetType: "有稿酬", 
+        totalValue: "NT$ 3,000+",
+        rating: 4.8, 
+        spotsLeft: 3
     },
     {
-        id: "p3", name: "極光露營區", location: "苗栗縣", 
+        id: "p3", 
+        name: "極光露營區", 
+        title: "豪華露營一泊二食",
+        location: "苗栗縣", 
         coverImage: "https://images.unsplash.com/photo-1523987355523-c7b5b0dd90a7?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
         logo: "https://api.dicebear.com/7.x/initials/svg?seed=AC&backgroundColor=10b981",
-        category: "戶外體驗", lookingFor: ["親子", "露營"], budgetType: "體驗互惠", rating: 5.0, activeCampaigns: 3
+        category: "體驗", 
+        lookingFor: ["親子", "露營"], 
+        budgetType: "體驗互惠", 
+        totalValue: "NT$ 6,500",
+        rating: 5.0, 
+        spotsLeft: 2
     }
 ];
 
@@ -184,11 +220,11 @@ export default function Home() {
     if (!db) {
       setIsLoading(false);
       setTestimonials(FALLBACK_TESTIMONIALS);
-      setProviders(ENRICH_PROVIDERS); // 若無 DB，使用預設廠商
+      setProviders(FALLBACK_PROJECTS); // 若無 DB，使用 Fallback Projects
       return;
     }
 
-    // 1. 抓取使用者清單 (同時處理 創作者 與 廠商)
+    // 1. 抓取創作者清單 (維持不變，抓取 users)
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
@@ -227,39 +263,43 @@ export default function Home() {
             completionScore: u.completionScore || enrich.completionScore || 5.0
           };
         });
-        setCreators(mappedCreators.slice(0, 3)); // 只取前三
-
-        // --- 處理廠商 (新增邏輯) ---
-        const providerUsers = allUsers.filter(u => u.role === '廠商');
-        if (providerUsers.length > 0) {
-            const mappedProviders: ProviderDetail[] = providerUsers.map((u, index) => {
-                const enrich = ENRICH_PROVIDERS[index % ENRICH_PROVIDERS.length];
-                return {
-                    id: u.id || `db-provider-${index}`,
-                    name: u.name || enrich.name,
-                    location: u.location || enrich.location,
-                    coverImage: u.coverImage || enrich.coverImage,
-                    logo: u.avatar || enrich.logo, // 廠商使用 avatar 作為 logo
-                    category: u.category || enrich.category,
-                    lookingFor: u.lookingFor || enrich.lookingFor,
-                    budgetType: u.budgetType || enrich.budgetType,
-                    rating: u.rating || enrich.rating,
-                    activeCampaigns: u.activeCampaigns || enrich.activeCampaigns
-                };
-            });
-            setProviders(mappedProviders.slice(0, 3));
-        } else {
-            setProviders(ENRICH_PROVIDERS); // 若 DB 無廠商資料，顯示預設
-        }
-
-      } else {
-          // 若整個 Collection 為空
-          setProviders(ENRICH_PROVIDERS);
+        setCreators(mappedCreators.slice(0, 3)); 
       }
       setIsLoading(false);
     });
 
-    // 2. 抓取成功案例
+    // 2. 抓取真實廠商案源 (改為監聽 projects 集合)
+    const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
+    const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
+        if (!snapshot.empty) {
+            const data = snapshot.docs.map((doc, index) => {
+                const raw = doc.data() as any;
+                return {
+                    id: doc.id,
+                    name: raw.business || "優質廠商",
+                    title: raw.title || "體驗招募",
+                    location: raw.location || "台灣",
+                    coverImage: raw.image || "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+                    logo: `https://api.dicebear.com/7.x/initials/svg?seed=${raw.business || 'P'}&backgroundColor=${['f59e0b', '0ea5e9', '10b981', 'ef4444'][index % 4]}`,
+                    category: raw.category || "體驗",
+                    lookingFor: raw.tags || ["熱門"],
+                    budgetType: raw.type || "互惠體驗",
+                    totalValue: raw.totalValue || "洽談中",
+                    rating: 5.0, // 案源無評分，給予預設好評
+                    spotsLeft: raw.spotsLeft !== undefined ? raw.spotsLeft : 3
+                } as ProviderDetail;
+            });
+            // 只顯示最新的 3 個案源
+            setProviders(data.slice(0, 3));
+        } else {
+            setProviders(FALLBACK_PROJECTS);
+        }
+    }, (error) => {
+        console.error("Fetching projects failed:", error);
+        setProviders(FALLBACK_PROJECTS);
+    });
+
+    // 3. 抓取成功案例
     const testimonialsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'testimonials');
     const unsubTestimonials = onSnapshot(testimonialsCol, (snapshot) => {
       if (!snapshot.empty) {
@@ -272,6 +312,7 @@ export default function Home() {
 
     return () => {
       unsubUsers();
+      unsubProjects();
       unsubTestimonials();
     };
   }, []);
@@ -414,7 +455,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* --- ✨ New Section: Featured Providers (本週優質廠商) --- */}
+      {/* --- Featured Providers (本週優質廠商體驗 - 更新為真實案源) --- */}
       <div className="bg-white py-20 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
@@ -427,7 +468,7 @@ export default function Home() {
               </div>
               <p className="text-slate-600">正在尋找合作夥伴的精選飯店與餐廳</p>
             </div>
-            <Link href="/creators" className="text-slate-600 font-semibold hover:text-slate-900 flex items-center gap-1 bg-slate-50 px-4 py-2 rounded-full transition-colors border border-slate-200">
+            <Link href="/opportunities" className="text-slate-600 font-semibold hover:text-slate-900 flex items-center gap-1 bg-slate-50 px-4 py-2 rounded-full transition-colors border border-slate-200">
               我是網紅，查看更多招募 <ArrowRight size={16} />
             </Link>
           </div>
@@ -476,9 +517,13 @@ export default function Home() {
                 {/* Content Area */}
                 <div className="p-5 pt-8 flex-grow flex flex-col">
                   
+                  {/* Title (New) */}
+                  <h4 className="font-bold text-slate-900 text-lg mb-2 line-clamp-1 group-hover:text-sky-600 transition-colors">
+                    {provider.title || provider.name}
+                  </h4>
+
                   {/* Looking For Tags */}
                   <div className="mb-4">
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">尋找合作對象</p>
                     <div className="flex flex-wrap gap-2">
                         {provider.lookingFor.map(tag => (
                             <span key={tag} className="px-2 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded-md border border-sky-100">
@@ -491,13 +536,13 @@ export default function Home() {
                   {/* Badges/Stats */}
                   <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
                      <div className="bg-slate-50 p-2 rounded-lg text-center border border-slate-100">
-                        <p className="text-xs text-slate-500 mb-1">合作預算</p>
-                        <p className="font-bold text-slate-800 text-sm">{provider.budgetType}</p>
+                        <p className="text-xs text-slate-500 mb-1">合作價值</p>
+                        <p className="font-bold text-slate-800 text-sm truncate px-1">{provider.totalValue || provider.budgetType}</p>
                      </div>
                      <div className="bg-green-50 p-2 rounded-lg text-center border border-green-100">
-                        <p className="text-xs text-green-600 mb-1">正在招募</p>
+                        <p className="text-xs text-green-600 mb-1">剩餘名額</p>
                         <p className="font-bold text-green-700 text-sm flex items-center justify-center gap-1">
-                            <Briefcase size={12}/> {provider.activeCampaigns} 個專案
+                            <Flame size={12}/> {provider.spotsLeft} 位
                         </p>
                      </div>
                   </div>
