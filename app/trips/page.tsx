@@ -1,11 +1,21 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+// 移除 next/link 改用自定義 Link 元件以避免預覽環境錯誤
+// import Link from 'next/link';
 import { 
   Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, 
-  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User
+  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2
 } from 'lucide-react';
+
+// --- 自定義 Link 元件 (解決預覽環境無法解析 next/link 的問題) ---
+const Link = ({ href, children, className, ...props }: any) => {
+  return (
+    <a href={href} className={className} {...props}>
+      {children}
+    </a>
+  );
+};
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
