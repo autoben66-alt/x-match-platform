@@ -1,7 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, ArrowRight, Users, CheckCircle, X, CheckCircle2, ChevronLeft, ChevronRight, Info, Loader2, Building2 } from 'lucide-react';
+import { 
+  MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, 
+  ArrowRight, Users, CheckCircle, X, CheckCircle2, ChevronLeft, ChevronRight, Info, 
+  Loader2, Building2, Briefcase, Award, Link as LinkIcon, AtSign, MessageSquare
+} from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -9,14 +13,21 @@ import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } 
 import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 // --- Firebase 初始化 ---
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
+const getFirebaseConfig = () => {
+  if (typeof window !== 'undefined' && (window as any).__firebase_config) {
+    try { return JSON.parse((window as any).__firebase_config); } catch (e) {}
+  }
+  return {
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "",
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "",
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "",
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ""
+  };
 };
+
+const firebaseConfig = getFirebaseConfig();
 
 let app: any = null;
 let auth: any = null;
@@ -34,7 +45,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義案源資料結構 (需與 Dashboard 寫入的結構一致)
+// 定義案源資料結構
 interface Opportunity {
   id: string;
   title: string;           
@@ -55,7 +66,7 @@ interface Opportunity {
   date?: string;
 }
 
-// 備用模擬資料 (當連線失敗或資料庫為空時顯示)
+// 備用模擬資料
 const FALLBACK_DATA: Opportunity[] = [
   {
     id: 'fallback-1',
@@ -87,11 +98,19 @@ export default function OpportunitiesPage() {
   const [categoryFilter, setCategoryFilter] = useState('全部');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
+  // --- 新增：應徵表單狀態 ---
+  const [formData, setFormData] = useState({
+    name: '',
+    contact: '',
+    socialLink: '',
+    message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！'
+  });
+
   // Firebase 資料狀態
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. 初始化 Auth (為了取得 user ID 寫入應徵紀錄)
+  // 1. 初始化 Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -141,18 +160,30 @@ export default function OpportunitiesPage() {
     return () => unsubscribe();
   }, []);
 
-  // 開啟快速應徵
+  // 開啟快速應徵 (同時重置表單)
   const handleQuickApply = (job: Opportunity) => {
     setViewJob(null);
     setApplyJob(job);
     setIsSuccess(false);
+    setFormData({
+        name: '',
+        contact: '',
+        socialLink: '',
+        message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！'
+    });
   };
 
-  // 確認應徵：寫入 Firestore (type: 'application')
+  // 確認應徵：寫入 Firestore (使用表單資料)
   const confirmApply = async () => {
     if (!db) {
       alert("尚未連線至資料庫，請稍候再試。");
       return;
+    }
+
+    // 簡單驗證
+    if (!formData.name || !formData.contact || !formData.socialLink) {
+        alert("請填寫您的稱呼、聯絡方式與作品連結，以便廠商聯繫您。");
+        return;
     }
     
     try {
@@ -163,20 +194,23 @@ export default function OpportunitiesPage() {
       await setDoc(invRef, {
         id: newId,
         type: 'application', // 標記為「應徵」
-        fromName: '林小美',  // 模擬當前創作者
+        fromName: formData.name,  // 使用使用者填寫的名字
         toName: applyJob?.business || '廠商',
-        message: '您好，我對這個案源非常有興趣，這是我的履歷資料，期待有機會合作！',
+        message: formData.message,
         status: '待審核',
         date: new Date().toLocaleString('zh-TW', { hour12: false }),
         projectId: applyJob?.id,
         projectTitle: applyJob?.title,
-        // 附帶創作者履歷快照 (模擬)
+        // 使用者填寫的資料封裝
         creatorInfo: {
-          name: '林小美',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-          followers: 12000,
-          engagement: 4.5,
-          tags: ['旅遊', '親子']
+          name: formData.name,
+          // 使用名字生成頭像
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${formData.name}&backgroundColor=0ea5e9`,
+          link: formData.socialLink,
+          contact: formData.contact,
+          followers: 'N/A', // 未知
+          engagement: 'N/A', // 未知
+          tags: ['主動應徵']
         }
       });
 
@@ -199,7 +233,7 @@ export default function OpportunitiesPage() {
   const categories = [ { id: '全部', label: '全部' }, { id: '住宿', label: '住宿' }, { id: '餐飲', label: '餐飲' }, { id: '體驗', label: '體驗' } ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-32">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-3">
@@ -237,113 +271,126 @@ export default function OpportunitiesPage() {
           <p className="font-medium tracking-widest uppercase text-xs">正在從資料庫同步案源...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {filteredOpportunities.map(job => (
-            <div 
-              key={job.id} 
-              onClick={() => {
-                setViewJob(job);
-                setActiveImage(job.image || ''); 
-              }} 
-              className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col sm:flex-row hover:shadow-xl hover:border-indigo-200 transition-all duration-300 group cursor-pointer h-full relative"
-            >
-              
-              {job.matchScore && job.matchScore >= 90 && (
-                <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 animate-in fade-in zoom-in">
-                  <Sparkles size={12} fill="currentColor" />
-                  {job.matchScore}% 適合你
-                </div>
-              )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {filteredOpportunities.map((job, index) => {
+             // 動態生成 Logo，確保即使沒有 business 欄位也有顯示
+             const logoUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${job.business || 'Provider'}&backgroundColor=${['f59e0b', '0ea5e9', '10b981', 'ef4444'][index % 4]}`;
+             
+             return (
+              <div 
+                key={job.id} 
+                onClick={() => {
+                  setViewJob(job);
+                  setActiveImage(job.image || ''); 
+                }} 
+                className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative cursor-pointer"
+              >
+                
+                {job.matchScore && job.matchScore >= 90 && (
+                  <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 animate-in fade-in zoom-in">
+                    <Sparkles size={12} fill="currentColor" />
+                    {job.matchScore}% 推薦
+                  </div>
+                )}
 
-              <div className="sm:w-2/5 relative h-56 sm:h-auto overflow-hidden">
-                 <img 
-                    src={job.image}
-                    alt={job.title || job.business}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                 />
-                 <div className="absolute top-3 left-3">
-                    <span className={`px-2.5 py-1 rounded-md text-xs font-bold shadow-sm backdrop-blur-md ${
-                      job.type === '付費推廣' ? 'bg-amber-100/90 text-amber-800' : 'bg-white/90 text-indigo-800'
+                {/* Image Area - 首頁風格 */}
+                <div className="h-56 relative overflow-hidden">
+                  <img 
+                    src={job.image} 
+                    alt={job.business} 
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                  
+                  {/* Category Badge */}
+                  <div className="absolute top-4 left-4">
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full shadow-sm flex items-center gap-1 backdrop-blur-md ${
+                        job.type === '付費推廣' ? 'bg-amber-100/90 text-amber-800' : 'bg-white/90 text-slate-800'
                     }`}>
+                      {job.category === '住宿' && <Hotel size={12} />}
+                      {job.category === '餐飲' && <Utensils size={12} />}
+                      {job.category === '體驗' && <Tent size={12} />}
                       {job.type}
                     </span>
-                 </div>
-                 
-                 {job.spotsLeft !== undefined && job.spotsLeft <= 3 && (
-                   <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/80 to-transparent p-3 pt-8">
-                      <div className="flex items-center gap-1 text-red-400 text-xs font-bold animate-pulse">
-                        <Flame size={14} fill="currentColor" />
-                        只剩 {job.spotsLeft} 個名額
-                      </div>
-                   </div>
-                 )}
-              </div>
+                  </div>
 
-              <div className="sm:w-3/5 p-5 flex flex-col">
-                 <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                      <MapPin size={14} />
-                      {job.location}
+                  {/* Logo Overlap */}
+                  <div className="absolute -bottom-6 right-4 z-20">
+                    <img 
+                      src={logoUrl} 
+                      alt={job.business} 
+                      className="w-12 h-12 rounded-lg border-4 border-white shadow-md bg-white object-cover" 
+                    />
+                  </div>
+
+                  <div className="absolute bottom-3 left-4 text-white max-w-[75%]">
+                    <h3 className="text-lg font-bold flex items-center gap-1 line-clamp-1">
+                        {job.business}
+                    </h3>
+                    <p className="text-xs text-slate-200 flex items-center gap-1 opacity-90 font-medium">
+                        <MapPin size={12}/> {job.location}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                <div className="p-5 pt-8 flex-grow flex flex-col">
+                  
+                  {/* Title */}
+                  <div className="mb-4">
+                     <h4 className="font-bold text-slate-900 text-lg mb-2 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-2 min-h-[3rem]">
+                        {job.title}
+                     </h4>
+                     <div className="flex flex-wrap gap-1.5">
+                        {job.tags?.slice(0, 3).map(tag => (
+                            <span key={tag} className="px-2 py-0.5 bg-slate-50 text-slate-500 text-[10px] font-medium rounded border border-slate-100">
+                                #{tag}
+                            </span>
+                        ))}
                     </div>
-                    <div className="text-slate-300">
-                      {job.category === '住宿' && <Hotel size={16} />}
-                      {job.category === '餐飲' && <Utensils size={16} />}
-                      {job.category === '體驗' && <Tent size={16} />}
-                    </div>
-                 </div>
+                  </div>
 
-                 <h3 className="font-bold text-slate-900 text-lg mb-1 group-hover:text-indigo-600 transition-colors line-clamp-1">
-                   {job.title}
-                 </h3>
-                 <p className="text-xs text-slate-400 mb-3 font-medium flex items-center gap-1">
-                   <Building2 size={12} /> {job.business}
-                 </p>
-                 
-                 <div className="mb-4 space-y-3 flex-grow">
-                   <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                     <div className="flex items-center justify-between mb-1">
-                       <p className="text-xs text-slate-500 font-medium">總價值</p>
-                       <p className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 rounded">{job.totalValue}</p>
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-5 mt-auto">
+                     <div className="bg-slate-50 p-2.5 rounded-xl text-center border border-slate-100">
+                        <p className="text-[10px] text-slate-400 mb-0.5 uppercase tracking-wider">總價值</p>
+                        <p className="font-bold text-indigo-600 text-sm">{job.totalValue}</p>
                      </div>
-                     <p className="text-xs text-slate-500 line-clamp-1 border-t border-slate-200 pt-1 mt-1">
-                       {job.valueBreakdown}
-                     </p>
-                   </div>
+                     <div className={`p-2.5 rounded-xl text-center border ${
+                         job.spotsLeft !== undefined && job.spotsLeft <= 3 
+                         ? 'bg-red-50 border-red-100' 
+                         : 'bg-green-50 border-green-100'
+                     }`}>
+                        <p className={`text-[10px] mb-0.5 uppercase tracking-wider ${
+                             job.spotsLeft !== undefined && job.spotsLeft <= 3 ? 'text-red-500' : 'text-green-500'
+                        }`}>
+                            {job.spotsLeft !== undefined && job.spotsLeft <= 3 ? '即將額滿' : '剩餘名額'}
+                        </p>
+                        <p className={`font-bold text-sm flex items-center justify-center gap-1 ${
+                             job.spotsLeft !== undefined && job.spotsLeft <= 3 ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                           {job.spotsLeft !== undefined && job.spotsLeft <= 3 && <Flame size={12} fill="currentColor"/>}
+                           {job.spotsLeft !== undefined ? job.spotsLeft : 5} 位
+                        </p>
+                     </div>
+                  </div>
 
-                   <div className="flex items-start gap-2.5 px-1">
-                     <div className="text-slate-400 mt-0.5">
-                       <Camera className="w-3.5 h-3.5" />
-                     </div>
-                     <div>
-                        <p className="text-xs text-slate-500 mb-0.5">合作需求</p>
-                        <p className="text-sm font-medium text-slate-700 line-clamp-2">{job.requirements}</p>
-                     </div>
-                   </div>
-                 </div>
-
-                 <div className="flex items-center justify-between mt-auto pt-3 border-t border-slate-100">
-                    <div className="flex items-center gap-1 text-xs text-slate-500">
-                      <Users size={14} />
-                      已應徵 {job.applicants || 0} 人
-                    </div>
-                    
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation(); // 避免觸發卡片點擊
+                  <button 
+                    onClick={(e) => {
+                        e.stopPropagation();
                         handleQuickApply(job);
-                      }}
-                      className="flex items-center gap-1 bg-indigo-600 text-white px-3 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-all hover:shadow-md hover:scale-105 active:scale-95 group/btn"
-                    >
-                      <Zap size={14} className="fill-yellow-400 text-yellow-400 group-hover/btn:animate-pulse" />
-                      快速應徵
-                    </button>
-                 </div>
+                    }}
+                    className="w-full py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-indigo-600 transition-all hover:shadow-lg flex items-center justify-center gap-2 group/btn active:scale-95"
+                  >
+                    <Zap size={16} className="text-yellow-400 fill-yellow-400 group-hover/btn:animate-pulse"/>
+                    快速應徵
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+          )})}
           
           {filteredOpportunities.length === 0 && (
-            <div className="col-span-1 lg:col-span-2 text-center py-20 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+            <div className="col-span-1 md:col-span-3 text-center py-20 bg-slate-50 rounded-xl border border-dashed border-slate-300">
               <Filter className="mx-auto h-12 w-12 text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">目前暫無案源或正在更新中</p>
               <button 
@@ -362,7 +409,7 @@ export default function OpportunitiesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-2xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
             
-            {/* Header Image / Gallery */}
+            {/* Header Image */}
             <div className="relative h-64 sm:h-72 shrink-0 bg-slate-200">
                <img 
                  src={activeImage} 
@@ -408,11 +455,6 @@ export default function OpportunitiesPage() {
                     </div>
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">{viewJob.title}</h2>
                     <p className="text-sm text-slate-500 flex items-center gap-1 mb-4"><Building2 size={16}/> {viewJob.business}</p>
-                    <div className="flex gap-2">
-                      {viewJob.tags?.map(tag => (
-                        <span key={tag} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded">#{tag}</span>
-                      ))}
-                    </div>
                  </div>
                  <div className="text-right hidden sm:block">
                     <p className="text-xs text-slate-500 mb-1">合作總價值</p>
@@ -420,7 +462,6 @@ export default function OpportunitiesPage() {
                  </div>
                </div>
 
-               {/* Description */}
                <div className="mb-8">
                  <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
                    <Info size={18} className="text-indigo-500"/> 關於合作與商家
@@ -452,10 +493,6 @@ export default function OpportunitiesPage() {
                        <Camera size={16} className="text-blue-600"/> 內容需求
                      </h4>
                      <p className="text-sm text-slate-600 mb-3">{viewJob.requirements}</p>
-                     <div className="flex items-center gap-2 text-xs text-slate-500 bg-white p-2 rounded border border-slate-200">
-                       <Users size={14}/>
-                       <span>目前已有 {viewJob.applicants || 0} 人應徵 / 剩餘 {viewJob.spotsLeft !== undefined ? viewJob.spotsLeft : 5} 個名額</span>
-                     </div>
                   </div>
                </div>
             </div>
@@ -486,7 +523,7 @@ export default function OpportunitiesPage() {
         </div>
       )}
 
-      {/* --- 快速應徵視窗 (Quick Apply Modal) --- */}
+      {/* --- 修正後的：快速應徵表單視窗 --- */}
       {applyJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
@@ -495,39 +532,87 @@ export default function OpportunitiesPage() {
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-180 duration-500">
                   <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">應徵已送出！</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">應徵資料已送出！</h3>
                 <p className="text-slate-500 text-sm">
-                  廠商將會收到您的 Media Kit，<br/>並透過站內訊息與您聯繫。
+                  我們已通知廠商，若您的條件符合需求，<br/>廠商將會主動聯繫您。
                 </p>
               </div>
             ) : (
               <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-slate-900">確認快速應徵</h3>
+                <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-900">快速應徵</h3>
+                    <p className="text-xs text-slate-500">請填寫基本資料以便廠商聯繫</p>
+                  </div>
                   <button onClick={() => setApplyJob(null)} className="text-slate-400 hover:text-slate-600 transition-colors">
                     <X size={24} />
                   </button>
                 </div>
                 
-                <div className="flex items-center gap-4 mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <img src={applyJob.image} className="w-16 h-16 rounded-lg object-cover" alt={applyJob.title} />
+                {/* 應徵項目摘要 */}
+                <div className="flex items-center gap-4 mb-6 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                  <img src={applyJob.image} className="w-12 h-12 rounded-lg object-cover" alt={applyJob.title} />
                   <div>
-                    <p className="font-bold text-slate-900 line-clamp-1">{applyJob.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
-                       <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{applyJob.category}</span>
-                       <span className="font-bold text-indigo-600">{applyJob.totalValue}</span>
-                    </div>
+                    <p className="font-bold text-slate-900 line-clamp-1 text-sm">{applyJob.title}</p>
+                    <p className="text-xs text-slate-500">{applyJob.business}</p>
                   </div>
                 </div>
 
+                {/* 填寫表單 */}
                 <div className="space-y-4 mb-8">
-                  <div className="flex gap-3 text-sm text-slate-600">
-                    <CheckCircle2 size={18} className="text-indigo-600 shrink-0" />
-                    <p>系統將自動發送您的 <span className="font-bold text-slate-900">預設履歷 (Media Kit)</span></p>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">您的稱呼 (Name) <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                        <Users size={16} className="absolute left-3 top-3 text-slate-400"/>
+                        <input 
+                            type="text" 
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            placeholder="請輸入您的名字或暱稱"
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        />
+                    </div>
                   </div>
-                  <div className="flex gap-3 text-sm text-slate-600">
-                    <CheckCircle2 size={18} className="text-indigo-600 shrink-0" />
-                    <p>同意授權廠商查看您的 <span className="font-bold text-slate-900">歷史合作評價</span></p>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">社群/作品連結 (Social Link) <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                        <LinkIcon size={16} className="absolute left-3 top-3 text-slate-400"/>
+                        <input 
+                            type="text" 
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            placeholder="IG / Blog / YouTube 連結"
+                            value={formData.socialLink}
+                            onChange={(e) => setFormData({...formData, socialLink: e.target.value})}
+                        />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">聯絡方式 (Line / Email) <span className="text-red-500">*</span></label>
+                    <div className="relative">
+                        <AtSign size={16} className="absolute left-3 top-3 text-slate-400"/>
+                        <input 
+                            type="text" 
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                            placeholder="請留下方便聯繫的 Line ID 或 Email"
+                            value={formData.contact}
+                            onChange={(e) => setFormData({...formData, contact: e.target.value})}
+                        />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">給廠商的話 (Message)</label>
+                    <div className="relative">
+                        <MessageSquare size={16} className="absolute left-3 top-3 text-slate-400"/>
+                        <textarea 
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 min-h-[80px]"
+                            placeholder="簡單自我介紹..."
+                            value={formData.message}
+                            onChange={(e) => setFormData({...formData, message: e.target.value})}
+                        />
+                    </div>
                   </div>
                 </div>
 
@@ -542,7 +627,7 @@ export default function OpportunitiesPage() {
                     onClick={confirmApply}
                     className="flex-1 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95"
                   >
-                    確認發送
+                    確認送出
                   </button>
                 </div>
               </div>
