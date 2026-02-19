@@ -1,10 +1,27 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link'; 
-import { useRouter } from 'next/navigation'; 
-import CreatorCard, { Creator } from '@/components/CreatorCard';
-import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase, Eye, Star } from 'lucide-react';
+// 移除導致錯誤的外部引用
+// import Link from 'next/link'; 
+// import { useRouter } from 'next/navigation'; 
+// import CreatorCard, { Creator } from '@/components/CreatorCard';
+import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase, Eye, Star, Lock, AlertCircle, LogIn } from 'lucide-react';
+
+// --- 自定義 Link 元件 (解決預覽環境問題) ---
+const Link = ({ href, children, className, ...props }: any) => {
+  return (
+    <a href={href} className={className} {...props}>
+      {children}
+    </a>
+  );
+};
+
+// --- 模擬 useRouter (解決預覽環境問題) ---
+const useRouter = () => {
+  return {
+    push: (path: string) => console.log(`Navigating to ${path}`)
+  };
+};
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
@@ -34,18 +51,95 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
+// --- 內嵌 CreatorCard 元件與介面 ---
+
+export interface Creator {
+  id: number | string;
+  name: string;
+  handle: string;
+  avatar: string;
+  tags: string[];
+  followers: number;
+  averageViews?: number;
+  completionScore?: number;
+  location: string;
+  bio: string;
+  coverImage?: string;
+}
+
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
   badges?: string[];
-  coverImage: string;      
   rates: { post: string; story: string; reels: string; };
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
   lineId?: string;
-  averageViews?: number;    // A. 平均觀看數
-  completionScore?: number; // B. 完案信用評分
 }
+
+const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
+      {/* 封面圖區域：維持 h-40 高度 */}
+      <div className="h-40 bg-slate-100 relative overflow-hidden">
+        {creator.coverImage && (
+          <img 
+            src={creator.coverImage} 
+            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500" 
+            alt="cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+      </div>
+      
+      <div className="px-6 pb-6 pt-0 flex-1 flex flex-col">
+        {/* ✨ 版面修正重點：分離頭像與數據 */}
+        <div className="flex justify-between items-start mb-2">
+           {/* 左側：頭像 (向上位移，跨越封面) */}
+           <div className="-mt-10 relative">
+             <img 
+               src={creator.avatar} 
+               alt={creator.name} 
+               className="w-20 h-20 rounded-full border-4 border-white shadow-md bg-white object-cover" 
+             />
+           </div>
+           
+           {/* 右側：粉絲數 (保持在內容區，不向上位移，避免與封面重疊) */}
+           <div className="flex flex-col items-end pt-3">
+             <span className="text-xs text-slate-400 font-bold mb-0.5">粉絲數</span>
+             <span className="font-black text-slate-900 text-lg">{(creator.followers / 1000).toFixed(1)}k</span>
+           </div>
+        </div>
+        
+        <h3 className="font-bold text-lg text-slate-900 mb-0.5 flex items-center gap-1">{creator.name}</h3>
+        <p className="text-sm text-slate-400 mb-3 font-medium">{creator.handle}</p>
+        
+        <div className="flex items-center gap-4 mb-4 text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
+           <div className="flex items-center gap-1.5">
+             <Eye size={14} className="text-sky-500"/>
+             <span>{creator.averageViews ? (creator.averageViews/1000).toFixed(1)+'k' : 'N/A'} 觀看</span>
+           </div>
+           <div className="w-px h-3 bg-slate-300"></div>
+           <div className="flex items-center gap-1.5">
+             <Star size={14} className="text-yellow-400 fill-yellow-400"/>
+             <span>{creator.completionScore || '5.0'} 信用</span>
+           </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {creator.tags.slice(0, 3).map(tag => (
+            <span key={tag} className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200">#{tag}</span>
+          ))}
+        </div>
+        
+        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span className="flex items-center gap-1"><MapPin size={12}/> {creator.location}</span>
+          <span className="text-indigo-600 font-bold group-hover:underline">查看履歷 &rarr;</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface ProjectMinimal {
   id: string;
@@ -53,40 +147,40 @@ interface ProjectMinimal {
   totalValue: string;
 }
 
-// 模擬豐富資料 (✨ 已全部更新為 5.0 評分)
+// 模擬豐富資料
 const ENRICH_DATA = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
     tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
     bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", 
-    completedJobs: 42, rating: 5.0, // ✨ 5.0
+    completedJobs: 42, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
     portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3" ],
-    averageViews: 12500, completionScore: 5.0 // ✨ 5.0
+    averageViews: 12500, completionScore: 5.0
   },
   {
     name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
     tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁",
     bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", 
-    completedJobs: 85, rating: 5.0, // ✨ 5.0
+    completedJobs: 85, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
-    averageViews: 45000, completionScore: 5.0 // ✨ 5.0
+    averageViews: 45000, completionScore: 5.0
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
     tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市",
     bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", 
-    completedJobs: 63, rating: 5.0, // ✨ 5.0
+    completedJobs: 63, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 3,500", story: "NT$ 1,000", reels: "NT$ 5,000" },
     audience: { gender: "女性 90%", age: "18-24歲", topCity: "台南/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ],
-    averageViews: 8500, completionScore: 5.0 // ✨ 5.0
+    averageViews: 8500, completionScore: 5.0
   }
 ];
 
@@ -100,8 +194,16 @@ export default function CreatorsPage() {
   const [creators, setCreators] = useState<CreatorDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 發送邀請相關狀態
+  // --- 業者會員狀態與權限控管 (Provider State) ---
+  const [providerPlan, setProviderPlan] = useState<'guest' | 'free' | 'pro'>('guest');
+  const [isProviderLoggedIn, setIsProviderLoggedIn] = useState(false); // 登入狀態
+  const [isVerifying, setIsVerifying] = useState(false); // 登入驗證中
+
+  // Modal 狀態
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false); // 登入提示
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示 (Pro Only)
+  
   const [inviteMessage, setInviteMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -150,7 +252,6 @@ export default function CreatorsPage() {
             rates: formatRates(u.rates),
             tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
             badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            // ✨ 優先讀取資料庫的數值，若無則使用預設值
             averageViews: u.averageViews || enrich.averageViews || 5000,
             completionScore: u.completionScore || enrich.completionScore || 5.0
           };
@@ -194,13 +295,58 @@ export default function CreatorsPage() {
   const founderMax = 50;
   const founderPercentage = Math.min((founderCount / founderMax) * 100, 100);
 
-  // 開啟發送邀請 Modal
-  const handleOpenInvite = () => {
-    const simulateIsLoggedIn = true; 
-    if (!simulateIsLoggedIn) {
-      router.push('/dashboard');
+  // --- 執行登入 (模擬後台驗證) ---
+  const handleLogin = () => {
+    setIsVerifying(true);
+    
+    // 模擬 API 延遲與後台判斷邏輯
+    setTimeout(() => {
+        setIsVerifying(false);
+        setIsProviderLoggedIn(true);
+        setShowAuthModal(false);
+
+        // --- 模擬後台回傳的會員狀態 ---
+        // 隨機模擬：50% 機率是付費版，50% 是免費版
+        const isPaidMember = Math.random() > 0.5; 
+        
+        if (isPaidMember) {
+            setProviderPlan('pro');
+        } else {
+            setProviderPlan('free');
+        }
+    }, 1200);
+  };
+
+  // --- 處理「LINE 聯繫」點擊 (權限檢查: 必須登入且為 Pro) ---
+  const handleLineContact = (e: React.MouseEvent) => {
+    e.preventDefault(); // 阻止預設連結跳轉
+
+    // 1. 檢查是否登入
+    if (!isProviderLoggedIn) {
+      setShowAuthModal(true);
       return;
     }
+
+    // 2. 檢查是否為 Pro 付費會員
+    if (providerPlan !== 'pro') {
+      setShowUpgradeModal(true); // 跳出升級提示
+      return;
+    }
+
+    // 3. 通過檢查，執行跳轉
+    if (selectedCreator) {
+      const lineUrl = `https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`;
+      window.open(lineUrl, '_blank');
+    }
+  };
+
+  // 開啟發送邀請 Modal (權限檢查: 必須登入)
+  const handleOpenInvite = () => {
+    if (!isProviderLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     setInviteMessage(`哈囉 ${selectedCreator?.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
     setSelectedProjectId('');
     setShowInviteModal(true);
@@ -289,6 +435,20 @@ export default function CreatorsPage() {
             </div>
           </div>
         </div>
+        
+        {/* Provider Status Display (僅在登入後顯示) */}
+        {isProviderLoggedIn && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex justify-end">
+                <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 shadow-sm flex items-center gap-3 animate-in fade-in slide-in-from-right-5">
+                    <div className="flex flex-col items-end">
+                        <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">會員身份</span>
+                        <span className={`font-bold text-sm flex items-center gap-1 ${providerPlan === 'pro' ? 'text-amber-400' : 'text-slate-200'}`}>
+                            {providerPlan === 'pro' ? <><Crown size={14} fill="currentColor"/> 專業版 Pro</> : '免費版 Starter'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        )}
       </div>
 
       {/* 🏆 Leaderboard Section */}
@@ -565,15 +725,19 @@ export default function CreatorsPage() {
 
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                <div className="flex gap-3 w-full sm:w-auto">
-                 {/* LINE 聯繫按鈕 */}
-                 <a 
-                   href={`https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`}
-                   target="_blank"
-                   rel="noopener noreferrer"
-                   className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                 {/* LINE 聯繫按鈕 (需登入且付費) */}
+                 <button 
+                   onClick={handleLineContact}
+                   className={`flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap`}
                  >
-                   <MessageCircle size={18} /> LINE 聯繫
-                 </a>
+                   {providerPlan === 'pro' ? (
+                      <MessageCircle size={18} /> 
+                   ) : (
+                      <Lock size={16} /> 
+                   )}
+                   LINE 聯繫
+                 </button>
+                 
                  {/* 導向發送邀請 Modal 按鈕 */}
                  <button 
                    onClick={handleOpenInvite}
@@ -685,6 +849,81 @@ export default function CreatorsPage() {
           </div>
         </div>
       )}
+
+      {/* --- Auth/Login Modal (身分驗證) --- */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 relative scale-100 animate-in zoom-in-95">
+              <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                 <X size={24} />
+              </button>
+              
+              <div className="text-center mb-8">
+                 <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <User size={32} className="text-indigo-600"/>
+                 </div>
+                 <h2 className="text-2xl font-bold text-slate-900 mb-2">請先登入業者帳號</h2>
+                 <p className="text-slate-500 text-sm">登入後系統將自動驗證您的會員身份與權限。</p>
+              </div>
+
+              <button 
+                onClick={handleLogin}
+                disabled={isVerifying}
+                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isVerifying ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> 驗證身份中...
+                    </>
+                ) : (
+                    <>
+                      <LogIn size={18} /> 立即登入
+                    </>
+                )}
+              </button>
+              
+              <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+                 <p className="text-xs text-slate-400">
+                    還沒有帳號？ <a href="#" className="text-indigo-600 font-bold hover:underline">免費註冊</a>
+                 </p>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* --- Upgrade Alert Modal (Pro Only Feature) --- */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <Lock size={32} className="text-amber-500" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">付費會員專屬功能</h2>
+              <p className="text-slate-500 text-sm mb-6">
+                 「LINE 直接聯繫」為專業版 (Pro) 專屬功能。<br/>升級後即可查看所有創作者的私人聯繫方式！
+              </p>
+              
+              <div className="space-y-3">
+                 <button 
+                   onClick={() => {
+                       setProviderPlan('pro'); // 模擬升級
+                       setShowUpgradeModal(false);
+                   }}
+                   className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                 >
+                   <Sparkles size={18} fill="currentColor"/> 立即升級解鎖
+                 </button>
+                 <button 
+                   onClick={() => setShowUpgradeModal(false)}
+                   className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 text-sm"
+                 >
+                   稍後再說
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
     </div>
   );
 }
