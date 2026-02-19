@@ -5,9 +5,8 @@ import { useState, useEffect } from 'react';
 // import Link from 'next/link';
 import { 
   TrendingUp, Users, CheckCircle, ArrowRight, Search, MessageCircle, Heart, Star, BarChart, Loader2,
-  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye, Building2, Briefcase, Flame
+  X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye, Building2, Briefcase, Flame, Globe
 } from 'lucide-react';
-import CreatorCard, { Creator } from '@/components/CreatorCard';
 
 // --- 自定義 Link 元件 (解決預覽環境無法解析 next/link 的問題) ---
 const Link = ({ href, children, className, ...props }: any) => {
@@ -46,6 +45,97 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
+// --- 整合 CreatorCard 元件 (來自您提供的原始檔) ---
+
+export interface Creator {
+  id: number | string;
+  name: string;
+  handle: string;
+  avatar: string;
+  tags: string[];
+  followers: number;
+  averageViews?: number;
+  completionScore?: number;
+  location: string;
+  bio: string;
+  coverImage?: string;
+}
+
+// 擴充創作者資料結構 (包含詳情頁所需欄位)
+interface CreatorDetail extends Creator {
+  completedJobs: number;
+  rating: number;
+  badges?: string[];
+  rates: { post: string; story: string; reels: string; };
+  audience: { gender: string; age: string; topCity: string; };
+  portfolio: string[];     
+  lineId?: string;
+}
+
+const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
+      {/* 封面圖區域：維持 h-40 高度 */}
+      <div className="h-40 bg-slate-100 relative overflow-hidden">
+        {creator.coverImage && (
+          <img 
+            src={creator.coverImage} 
+            className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500" 
+            alt="cover"
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+      </div>
+      
+      <div className="px-6 pb-6 pt-0 flex-1 flex flex-col">
+        {/* ✨ 版面修正重點：分離頭像與數據 */}
+        <div className="flex justify-between items-start mb-2">
+           {/* 左側：頭像 (向上位移，跨越封面) */}
+           <div className="-mt-10 relative">
+             <img 
+               src={creator.avatar} 
+               alt={creator.name} 
+               className="w-20 h-20 rounded-full border-4 border-white shadow-md bg-white object-cover" 
+             />
+           </div>
+           
+           {/* 右側：粉絲數 (保持在內容區，不向上位移，避免與封面重疊) */}
+           <div className="flex flex-col items-end pt-3">
+             <span className="text-xs text-slate-400 font-bold mb-0.5">粉絲數</span>
+             <span className="font-black text-slate-900 text-lg">{(creator.followers / 1000).toFixed(1)}k</span>
+           </div>
+        </div>
+        
+        <h3 className="font-bold text-lg text-slate-900 mb-0.5 flex items-center gap-1">{creator.name}</h3>
+        <p className="text-sm text-slate-400 mb-3 font-medium">{creator.handle}</p>
+        
+        <div className="flex items-center gap-4 mb-4 text-xs font-bold text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
+           <div className="flex items-center gap-1.5">
+             <Eye size={14} className="text-sky-500"/>
+             <span>{creator.averageViews ? (creator.averageViews/1000).toFixed(1)+'k' : 'N/A'} 觀看</span>
+           </div>
+           <div className="w-px h-3 bg-slate-300"></div>
+           <div className="flex items-center gap-1.5">
+             <Star size={14} className="text-yellow-400 fill-yellow-400"/>
+             <span>{creator.completionScore || '5.0'} 信用</span>
+           </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {creator.tags.slice(0, 3).map(tag => (
+            <span key={tag} className="text-[10px] px-2 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200">#{tag}</span>
+          ))}
+        </div>
+        
+        <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+          <span className="flex items-center gap-1"><MapPin size={12}/> {creator.location}</span>
+          <span className="text-indigo-600 font-bold group-hover:underline">查看履歷 &rarr;</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // 定義成功案例資料結構
 interface Testimonial {
   id: string;
@@ -57,20 +147,6 @@ interface Testimonial {
   metricIcon?: string;
   metricLabel?: string;
   rating?: number;
-}
-
-// 擴充創作者資料結構 (包含詳情頁所需欄位)
-interface CreatorDetail extends Creator {
-  completedJobs: number;
-  rating: number;
-  badges?: string[];
-  coverImage: string;      
-  rates: { post: string; story: string; reels: string; };
-  audience: { gender: string; age: string; topCity: string; };
-  portfolio: string[];     
-  lineId?: string;
-  averageViews?: number;    // 新增：平均觀看數
-  completionScore?: number; // 新增：完案信用評分
 }
 
 // 修改：廠商資料結構 (對應真實案源 Projects)
@@ -87,6 +163,7 @@ interface ProviderDetail {
   totalValue: string;   // 對應 project.totalValue
   rating: number;
   spotsLeft: number;    // 對應 project.spotsLeft
+  description?: string; // 新增：案源描述
 }
 
 // ✨ 定義豐富資料的介面，解決 TypeScript 報錯
@@ -158,7 +235,8 @@ const FALLBACK_PROJECTS: ProviderDetail[] = [
         budgetType: "互惠體驗", 
         totalValue: "NT$ 8,800",
         rating: 4.9, 
-        spotsLeft: 1
+        spotsLeft: 1,
+        description: "位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景，歡迎喜愛海邊生活的創作者。"
     },
     {
         id: "p2", 
@@ -172,7 +250,8 @@ const FALLBACK_PROJECTS: ProviderDetail[] = [
         budgetType: "有稿酬", 
         totalValue: "NT$ 3,000+",
         rating: 4.8, 
-        spotsLeft: 3
+        spotsLeft: 3,
+        description: "隱身在台北巷弄的預約制私廚，每一季都會更換菜單，尋找懂吃的你來品嚐。"
     },
     {
         id: "p3", 
@@ -186,7 +265,8 @@ const FALLBACK_PROJECTS: ProviderDetail[] = [
         budgetType: "體驗互惠", 
         totalValue: "NT$ 6,500",
         rating: 5.0, 
-        spotsLeft: 2
+        spotsLeft: 2,
+        description: "免裝備豪華露營體驗，適合親子家庭或情侶，享受大自然的寧靜與星空。"
     }
 ];
 
@@ -210,10 +290,11 @@ const FALLBACK_TESTIMONIALS: Testimonial[] = [
 
 export default function Home() {
   const [creators, setCreators] = useState<CreatorDetail[]>([]);
-  const [providers, setProviders] = useState<ProviderDetail[]>([]); // 新增：廠商 State
+  const [providers, setProviders] = useState<ProviderDetail[]>([]); 
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<ProviderDetail | null>(null); // 新增：選中的廠商案源
 
   // 監聽 Firebase 資料
   useEffect(() => {
@@ -268,7 +349,7 @@ export default function Home() {
       setIsLoading(false);
     });
 
-    // 2. 抓取真實廠商案源 (改為監聽 projects 集合)
+    // 2. 抓取真實廠商案源 (監聽 projects 集合)
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
         if (!snapshot.empty) {
@@ -285,8 +366,9 @@ export default function Home() {
                     lookingFor: raw.tags || ["熱門"],
                     budgetType: raw.type || "互惠體驗",
                     totalValue: raw.totalValue || "洽談中",
-                    rating: 5.0, // 案源無評分，給予預設好評
-                    spotsLeft: raw.spotsLeft !== undefined ? raw.spotsLeft : 3
+                    rating: 5.0, 
+                    spotsLeft: raw.spotsLeft !== undefined ? raw.spotsLeft : 3,
+                    description: raw.description || "歡迎優質創作者合作..."
                 } as ProviderDetail;
             });
             // 只顯示最新的 3 個案源
@@ -438,11 +520,7 @@ export default function Home() {
                   className="cursor-pointer transition-transform hover:-translate-y-1"
                   onClick={() => setSelectedCreator(creator)}
                 >
-                  <CreatorCard creator={{
-                      ...creator, 
-                      averageViews: creator.averageViews, 
-                      completionScore: creator.completionScore
-                  }} />
+                  <CreatorCard creator={creator} />
                 </div>
               ))}
             </div>
@@ -475,7 +553,11 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {providers.map((provider) => (
-              <div key={provider.id} className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative">
+              <div 
+                key={provider.id} 
+                onClick={() => setSelectedProvider(provider)}
+                className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative cursor-pointer"
+              >
                 
                 {/* Image Area */}
                 <div className="h-48 relative overflow-hidden">
@@ -614,7 +696,7 @@ export default function Home() {
         )}
       </div>
 
-      {/* --- Creator Details Modal (熱門創作者詳情 - 與 creators 頁面一致) --- */}
+      {/* --- Creator Details Modal --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -681,7 +763,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* ✨ 新指標展示卡片 */}
+                {/* 指標展示卡片 */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
@@ -790,6 +872,111 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* --- Provider Details Modal (優質廠商詳情視窗) --- */}
+      {selectedProvider && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
+            
+            <button 
+              onClick={() => setSelectedProvider(null)}
+              className="absolute top-4 right-4 z-20 p-2 bg-black/30 hover:bg-black/50 text-white rounded-full backdrop-blur-md transition-colors"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Header / Cover */}
+            <div className="relative h-56 sm:h-64 bg-slate-200 shrink-0">
+              <img src={selectedProvider.coverImage} className="w-full h-full object-cover" alt="Cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+              
+              <div className="absolute top-6 left-6">
+                 <span className="px-3 py-1 bg-white/90 backdrop-blur text-xs font-bold text-slate-800 rounded-full shadow-sm flex items-center gap-1">
+                    <Building2 size={12} className="text-sky-500"/>
+                    {selectedProvider.category}
+                 </span>
+              </div>
+
+              <div className="absolute -bottom-8 left-6 sm:left-10 flex items-end gap-5">
+                <div className="relative">
+                  <img 
+                    src={selectedProvider.logo} 
+                    className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl border-[4px] border-white bg-white shadow-xl object-cover" 
+                    alt={selectedProvider.name} 
+                  />
+                </div>
+                <div className="pb-10 text-white hidden sm:block">
+                   <h2 className="text-2xl font-black mb-1 flex items-center gap-2">
+                     {selectedProvider.name}
+                     {selectedProvider.rating >= 4.8 && <Award size={20} className="text-yellow-400 fill-yellow-400"/>}
+                   </h2>
+                   <p className="font-medium text-white/90 flex items-center gap-1">
+                      <MapPin size={14}/> {selectedProvider.location}
+                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Content Body */}
+            <div className="pt-14 px-6 sm:px-10 pb-8 flex-grow bg-slate-50/50">
+              
+              <div className="sm:hidden mb-6">
+                <h2 className="text-xl font-black text-slate-900 mb-1 flex items-center gap-2">
+                  {selectedProvider.name}
+                  {selectedProvider.rating >= 4.8 && <Award size={18} className="text-yellow-400 fill-yellow-400"/>}
+                </h2>
+                <p className="font-medium text-slate-500 flex items-center gap-1">
+                   <MapPin size={14}/> {selectedProvider.location}
+                </p>
+              </div>
+
+              <div className="mb-6">
+                 <h3 className="text-2xl font-bold text-slate-900 mb-2">{selectedProvider.title}</h3>
+                 <div className="flex flex-wrap gap-2 mb-4">
+                    {selectedProvider.lookingFor.map(tag => (
+                        <span key={tag} className="px-2.5 py-1 bg-sky-50 text-sky-700 text-xs font-medium rounded-md border border-sky-100">
+                            #{tag}
+                        </span>
+                    ))}
+                 </div>
+                 <p className="text-slate-600 leading-relaxed font-medium bg-white p-4 rounded-xl border border-slate-100">
+                    {selectedProvider.description || "歡迎對本品牌有興趣的創作者申請合作！我們期待與您共同創造美好的體驗內容。"}
+                 </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-8">
+                 <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider">合作價值</p>
+                    <p className="text-lg font-black text-slate-800">{selectedProvider.totalValue || selectedProvider.budgetType}</p>
+                 </div>
+                 <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+                    <p className="text-xs text-slate-500 mb-1 uppercase tracking-wider">剩餘名額</p>
+                    <p className="text-lg font-black text-green-600 flex items-center gap-1">
+                        <Flame size={18} className="fill-green-600"/> {selectedProvider.spotsLeft} 位
+                    </p>
+                 </div>
+              </div>
+
+            </div>
+
+            <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex gap-3 z-20">
+               <button 
+                 onClick={() => setSelectedProvider(null)}
+                 className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+               >
+                 關閉
+               </button>
+               <Link 
+                 href="/opportunities"
+                 className="flex-[2] py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-sky-600 shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95"
+               >
+                 前往應徵 <ArrowRight size={18}/>
+               </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
