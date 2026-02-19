@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, 
-  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2, Lock, Crown, AlertCircle
+  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2, Lock, Crown, AlertCircle, LogIn
 } from 'lucide-react';
 
 // --- 自定義 Link 元件 (解決預覽環境問題) ---
@@ -149,11 +149,13 @@ export default function TripsPage() {
 
   // --- 業者會員狀態 (Provider State) ---
   const [providerPlan, setProviderPlan] = useState<'guest' | 'free' | 'pro'>('guest');
+  const [isProviderLoggedIn, setIsProviderLoggedIn] = useState(false); // 登入狀態
   const [usageCount, setUsageCount] = useState(0); // 已使用次數
   const FREE_LIMIT = 3; // 免費版限制次數
 
-  const [showAuthModal, setShowAuthModal] = useState(false); // 登入/註冊視窗
+  const [showAuthModal, setShowAuthModal] = useState(false); // 登入視窗
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示視窗
+  const [isVerifying, setIsVerifying] = useState(false); // 登入驗證中
 
   // Firebase 資料狀態
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -226,7 +228,7 @@ export default function TripsPage() {
   // 處理「前往邀請」點擊 (權限檢查核心邏輯)
   const handleGoToInvite = () => {
     // 1. 檢查是否登入
-    if (providerPlan === 'guest') {
+    if (!isProviderLoggedIn) {
       setShowAuthModal(true);
       return;
     }
@@ -241,16 +243,34 @@ export default function TripsPage() {
     setInviteStep('form');
   };
 
-  // 模擬登入
-  const handleLogin = (plan: 'free' | 'pro') => {
-    setProviderPlan(plan);
-    setShowAuthModal(false);
-    // 登入後若原本是要去邀請，檢查額度後自動跳轉
-    if (plan === 'free' && usageCount >= FREE_LIMIT) {
-        setShowUpgradeModal(true);
-    } else {
-        setInviteStep('form');
-    }
+  // 執行登入 (模擬後台驗證)
+  const handleLogin = () => {
+    setIsVerifying(true);
+    
+    // 模擬 API 延遲與後台判斷邏輯
+    setTimeout(() => {
+        setIsVerifying(false);
+        setIsProviderLoggedIn(true);
+        setShowAuthModal(false);
+
+        // --- 這裡模擬後台回傳的會員狀態 ---
+        // 隨機模擬：50% 機率是付費版，50% 是免費版 (實際應由後端 user.role 或 user.subscription 決定)
+        const isPaidMember = Math.random() > 0.5; 
+        
+        if (isPaidMember) {
+            setProviderPlan('pro');
+            // 付費版直接通過，進入表單
+            setInviteStep('form');
+        } else {
+            setProviderPlan('free');
+            // 免費版需檢查額度
+            if (usageCount >= FREE_LIMIT) {
+                setShowUpgradeModal(true);
+            } else {
+                setInviteStep('form');
+            }
+        }
+    }, 1200);
   };
 
   // 確認發送
@@ -286,11 +306,11 @@ export default function TripsPage() {
           </p>
         </div>
         
-        {/* Provider Status Display (Demo Only) */}
-        {providerPlan !== 'guest' && (
-            <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center gap-3">
+        {/* Provider Status Display (僅在登入後顯示) */}
+        {isProviderLoggedIn && (
+            <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center gap-3 animate-in fade-in slide-in-from-right-5">
                 <div className="flex flex-col items-end">
-                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">目前方案</span>
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">會員身份</span>
                     <span className={`font-bold text-sm flex items-center gap-1 ${providerPlan === 'pro' ? 'text-amber-500' : 'text-slate-700'}`}>
                         {providerPlan === 'pro' ? <><Crown size={14} fill="currentColor"/> 專業版 Pro</> : '免費版 Starter'}
                     </span>
@@ -645,43 +665,39 @@ export default function TripsPage() {
       {/* --- Auth/Login Modal (身分驗證) --- */}
       {showAuthModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 relative scale-100 animate-in zoom-in-95">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 relative scale-100 animate-in zoom-in-95">
               <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                  <X size={24} />
               </button>
               
               <div className="text-center mb-8">
+                 <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <User size={32} className="text-indigo-600"/>
+                 </div>
                  <h2 className="text-2xl font-bold text-slate-900 mb-2">請先登入業者帳號</h2>
-                 <p className="text-slate-500">登入後即可向創作者發送合作邀請，媒合心儀的人選。</p>
+                 <p className="text-slate-500 text-sm">登入後系統將自動驗證您的會員身份與權限。</p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 {/* Free Plan Option */}
-                 <div 
-                   onClick={() => handleLogin('free')}
-                   className="border-2 border-slate-200 hover:border-slate-400 rounded-xl p-6 cursor-pointer transition-all hover:bg-slate-50 group"
-                 >
-                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-white group-hover:shadow-sm">
-                       <User size={24} className="text-slate-600"/>
-                    </div>
-                    <h3 className="font-bold text-slate-900 mb-1">免費版登入</h3>
-                    <p className="text-xs text-slate-500 mb-4">每月 {FREE_LIMIT} 次邀請額度</p>
-                    <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded">試用 Starter</span>
-                 </div>
-
-                 {/* Pro Plan Option */}
-                 <div 
-                   onClick={() => handleLogin('pro')}
-                   className="border-2 border-indigo-100 hover:border-indigo-500 rounded-xl p-6 cursor-pointer transition-all bg-indigo-50/50 hover:bg-indigo-50 group relative overflow-hidden"
-                 >
-                    <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">推薦</div>
-                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-white group-hover:shadow-sm">
-                       <Crown size={24} className="text-indigo-600"/>
-                    </div>
-                    <h3 className="font-bold text-indigo-900 mb-1">付費版登入</h3>
-                    <p className="text-xs text-indigo-600/80 mb-4">無限次發送邀請</p>
-                    <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-1 rounded">專業版 Pro</span>
-                 </div>
+              <button 
+                onClick={handleLogin}
+                disabled={isVerifying}
+                className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isVerifying ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> 驗證身份中...
+                    </>
+                ) : (
+                    <>
+                      <LogIn size={18} /> 立即登入
+                    </>
+                )}
+              </button>
+              
+              <div className="mt-6 pt-6 border-t border-slate-100 text-center">
+                 <p className="text-xs text-slate-400">
+                    還沒有帳號？ <a href="#" className="text-indigo-600 font-bold hover:underline">免費註冊</a>
+                 </p>
               </div>
            </div>
         </div>
