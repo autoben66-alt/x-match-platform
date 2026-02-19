@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// 移除 next/link 改用自定義 Link 元件以避免預覽環境錯誤
-// import Link from 'next/link';
 import { 
   Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, 
-  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2
+  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2, Lock, Crown, AlertCircle
 } from 'lucide-react';
 
-// --- 自定義 Link 元件 (解決預覽環境無法解析 next/link 的問題) ---
+// --- 自定義 Link 元件 (解決預覽環境問題) ---
 const Link = ({ href, children, className, ...props }: any) => {
   return (
     <a href={href} className={className} {...props}>
@@ -45,12 +43,12 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// 定義行程資料結構 (擴充創作者履歷欄位)
+// --- 資料結構 ---
 interface Trip {
   id: string;
   creatorName: string;
   creatorAvatar: string;
-  creatorHandle?: string; // e.g. @jason_shot
+  creatorHandle?: string;
   creatorBio?: string;
   creatorStats?: { followers: string; engagement: string; verified?: boolean };
   creatorPortfolio?: string[];
@@ -66,7 +64,7 @@ interface Trip {
   tags: string[];
 }
 
-// 備用模擬行程資料
+// 模擬行程資料
 const FALLBACK_TRIPS: Trip[] = [
   {
     id: '1',
@@ -136,29 +134,6 @@ const FALLBACK_TRIPS: Trip[] = [
     needs: "露營區營位 x2，需有插座與乾淨衛浴。",
     status: "Open",
     tags: ["露營", "戶外"]
-  },
-  {
-    id: '4',
-    creatorName: "林小美",
-    creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
-    creatorHandle: "@may_family",
-    creatorBio: "二寶媽咪，專注於親子旅遊與育兒好物分享。希望能幫助更多家庭輕鬆帶孩子出門看世界。",
-    creatorStats: { followers: "22k", engagement: "6.8%", verified: false },
-    creatorPortfolio: [
-      "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1596436889106-be35e843f974?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80"
-    ],
-    destination: "宜蘭礁溪",
-    dates: "2024/05/20 - 05/22",
-    daysLeft: 0,
-    category: "住宿",
-    partySize: "2大2小",
-    offers: 15,
-    purpose: "家庭週末小旅行，拍攝親子穿搭與飯店設施。",
-    needs: "親子友善飯店，希望能有溫泉設施與兒童遊戲室。",
-    status: "Matched",
-    tags: ["親子", "溫泉", "飯店"]
   }
 ];
 
@@ -166,18 +141,25 @@ export default function TripsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('全部');
   
-  // 視窗狀態控制
+  // 視窗狀態
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null); 
-  const [inviteStep, setInviteStep] = useState<'profile' | 'form'>('profile'); // 控制「履歷預覽」或「填寫表單」
-  
+  const [inviteStep, setInviteStep] = useState<'profile' | 'form'>('profile'); 
   const [isSuccess, setIsSuccess] = useState(false);
   const [message, setMessage] = useState('');
+
+  // --- 業者會員狀態 (Provider State) ---
+  const [providerPlan, setProviderPlan] = useState<'guest' | 'free' | 'pro'>('guest');
+  const [usageCount, setUsageCount] = useState(0); // 已使用次數
+  const FREE_LIMIT = 3; // 免費版限制次數
+
+  const [showAuthModal, setShowAuthModal] = useState(false); // 登入/註冊視窗
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示視窗
 
   // Firebase 資料狀態
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. 監聽 Firestore 資料
+  // 1. 監聽 Firestore
   useEffect(() => {
     if (!db) {
       setTrips(FALLBACK_TRIPS);
@@ -190,8 +172,6 @@ export default function TripsPage() {
       if (!snapshot.empty) {
         const data = snapshot.docs.map(doc => {
           const rawData = doc.data() as Trip;
-          
-          // 確保所有欄位都有值 (Fallback)
           const fallbackSource = FALLBACK_TRIPS.find(t => t.creatorName === rawData.creatorName) || FALLBACK_TRIPS[0];
           
           return {
@@ -201,7 +181,6 @@ export default function TripsPage() {
             tags: rawData.tags || ["熱門許願", "求合作"],
             category: rawData.category || "住宿",
             status: rawData.status || "Open",
-            // 補充履歷欄位 (若 DB 沒資料則使用 Fallback)
             creatorHandle: rawData.creatorHandle || fallbackSource.creatorHandle,
             creatorBio: rawData.creatorBio || fallbackSource.creatorBio,
             creatorStats: rawData.creatorStats || fallbackSource.creatorStats,
@@ -230,24 +209,57 @@ export default function TripsPage() {
     { id: '體驗', label: '求體驗', icon: Ticket },
   ];
 
-  // 篩選邏輯
   const filteredTrips = trips.filter(trip => {
     const matchesSearch = trip.destination.includes(searchTerm) || trip.tags.some(tag => tag.includes(searchTerm));
     const matchesCategory = categoryFilter === '全部' || trip.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
-  // 開啟視窗 (預設先顯示履歷 profile)
+  // 開啟視窗 (查看履歷)
   const handleOpenInvite = (trip: Trip) => {
     setSelectedTrip(trip);
-    setInviteStep('profile'); // Step 1: 先看履歷
-    // 預先填寫訊息 (但不送出)
+    setInviteStep('profile'); 
     setMessage(`哈囉 ${trip.creatorName}！\n\n我們是[您的店家名稱]，看到您預計前往${trip.destination}，誠摯邀請您來體驗我們的服務！\n\n我們可以提供：\n1. 免費體驗...\n2. 特別招待...\n\n期待您的回覆！`);
     setIsSuccess(false);
   };
 
+  // 處理「前往邀請」點擊 (權限檢查核心邏輯)
+  const handleGoToInvite = () => {
+    // 1. 檢查是否登入
+    if (providerPlan === 'guest') {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // 2. 檢查額度 (僅針對免費版)
+    if (providerPlan === 'free' && usageCount >= FREE_LIMIT) {
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    // 3. 通過檢查，進入填寫表單
+    setInviteStep('form');
+  };
+
+  // 模擬登入
+  const handleLogin = (plan: 'free' | 'pro') => {
+    setProviderPlan(plan);
+    setShowAuthModal(false);
+    // 登入後若原本是要去邀請，檢查額度後自動跳轉
+    if (plan === 'free' && usageCount >= FREE_LIMIT) {
+        setShowUpgradeModal(true);
+    } else {
+        setInviteStep('form');
+    }
+  };
+
   // 確認發送
   const confirmInvite = () => {
+    // 若為免費版，扣除額度
+    if (providerPlan === 'free') {
+        setUsageCount(prev => prev + 1);
+    }
+
     setTimeout(() => {
       setIsSuccess(true);
       setTimeout(() => {
@@ -274,13 +286,24 @@ export default function TripsPage() {
           </p>
         </div>
         
-        <Link 
-          href="/dashboard"
-          className="bg-indigo-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-indigo-700 shadow-md flex items-center gap-2 transition-transform active:scale-95"
-        >
-          <Calendar size={18} />
-          發布新行程
-        </Link>
+        {/* Provider Status Display (Demo Only) */}
+        {providerPlan !== 'guest' && (
+            <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm flex items-center gap-3">
+                <div className="flex flex-col items-end">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">目前方案</span>
+                    <span className={`font-bold text-sm flex items-center gap-1 ${providerPlan === 'pro' ? 'text-amber-500' : 'text-slate-700'}`}>
+                        {providerPlan === 'pro' ? <><Crown size={14} fill="currentColor"/> 專業版 Pro</> : '免費版 Starter'}
+                    </span>
+                </div>
+                <div className="w-px h-8 bg-slate-100"></div>
+                <div className="flex flex-col">
+                    <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">剩餘額度</span>
+                    <span className="font-bold text-sm text-slate-900">
+                        {providerPlan === 'pro' ? '無限' : `${Math.max(0, FREE_LIMIT - usageCount)} / ${FREE_LIMIT}`}
+                    </span>
+                </div>
+            </div>
+        )}
       </div>
 
       {/* Filter & Search Toolbar */}
@@ -590,7 +613,7 @@ export default function TripsPage() {
                       再看看
                     </button>
                     <button 
-                      onClick={() => setInviteStep('form')}
+                      onClick={handleGoToInvite}
                       className="flex-[2] py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95"
                     >
                       前往邀請 <ArrowRight size={18} />
@@ -618,6 +641,86 @@ export default function TripsPage() {
           </div>
         </div>
       )}
+
+      {/* --- Auth/Login Modal (身分驗證) --- */}
+      {showAuthModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 relative scale-100 animate-in zoom-in-95">
+              <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                 <X size={24} />
+              </button>
+              
+              <div className="text-center mb-8">
+                 <h2 className="text-2xl font-bold text-slate-900 mb-2">請先登入業者帳號</h2>
+                 <p className="text-slate-500">登入後即可向創作者發送合作邀請，媒合心儀的人選。</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                 {/* Free Plan Option */}
+                 <div 
+                   onClick={() => handleLogin('free')}
+                   className="border-2 border-slate-200 hover:border-slate-400 rounded-xl p-6 cursor-pointer transition-all hover:bg-slate-50 group"
+                 >
+                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-white group-hover:shadow-sm">
+                       <User size={24} className="text-slate-600"/>
+                    </div>
+                    <h3 className="font-bold text-slate-900 mb-1">免費版登入</h3>
+                    <p className="text-xs text-slate-500 mb-4">每月 {FREE_LIMIT} 次邀請額度</p>
+                    <span className="text-xs font-bold text-slate-600 bg-slate-200 px-2 py-1 rounded">試用 Starter</span>
+                 </div>
+
+                 {/* Pro Plan Option */}
+                 <div 
+                   onClick={() => handleLogin('pro')}
+                   className="border-2 border-indigo-100 hover:border-indigo-500 rounded-xl p-6 cursor-pointer transition-all bg-indigo-50/50 hover:bg-indigo-50 group relative overflow-hidden"
+                 >
+                    <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg">推薦</div>
+                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center mb-4 group-hover:bg-white group-hover:shadow-sm">
+                       <Crown size={24} className="text-indigo-600"/>
+                    </div>
+                    <h3 className="font-bold text-indigo-900 mb-1">付費版登入</h3>
+                    <p className="text-xs text-indigo-600/80 mb-4">無限次發送邀請</p>
+                    <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-1 rounded">專業版 Pro</span>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* --- Upgrade Alert Modal (額度不足提示) --- */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <AlertCircle size={32} className="text-red-500" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">免費額度已用完</h2>
+              <p className="text-slate-500 text-sm mb-6">
+                 您本月的 {FREE_LIMIT} 次邀請額度已達上限。<br/>升級至專業版即可解鎖無限邀請！
+              </p>
+              
+              <div className="space-y-3">
+                 <button 
+                   onClick={() => {
+                       setProviderPlan('pro'); // 模擬升級
+                       setShowUpgradeModal(false);
+                       setInviteStep('form');
+                   }}
+                   className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                 >
+                   <Zap size={18} fill="currentColor"/> 立即升級 Pro
+                 </button>
+                 <button 
+                   onClick={() => setShowUpgradeModal(false)}
+                   className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 text-sm"
+                 >
+                   稍後再說
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
     </div>
   );
 }
