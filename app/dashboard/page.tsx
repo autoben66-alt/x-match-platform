@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// 移除 next/link 引用，改用下方自定義的 Link 元件
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
@@ -56,6 +55,7 @@ interface ProjectData {
   id: string; title: string; category: string; type: string; location: string; 
   numericValue: number; totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
   status: string; applicants: number; date: string; image?: string; gallery?: string[]; requiredTier?: string;
+  validDays?: string; // ✨ 新增平假日選項
 }
 
 interface TripData {
@@ -90,19 +90,19 @@ export default function DashboardPage() {
   const [role, setRole] = useState<'business' | 'creator'>('business');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
-  const [localUid, setLocalUid] = useState('mock_user_123'); // ✨ 備用身分機制
+  const [localUid, setLocalUid] = useState<string>(''); // ✨ 加入 localUid 狀態宣告
 
   // 業者權限
   const [providerPlan, setProviderPlan] = useState<'free' | 'pro'>('free');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
-  const [editProjectId, setEditProjectId] = useState<string | null>(null); // ✨ 新增：紀錄目前正在編輯的案源 ID
+  const [editProjectId, setEditProjectId] = useState<string | null>(null); 
   const [newProject, setNewProject] = useState({
     title: '', category: '住宿', type: '互惠體驗', location: '',
-    numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[]
+    numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[],
+    validDays: '不限 (平假日皆可)' // ✨ 新增預設平假日選項
   });
   const [isUploading, setIsUploading] = useState(false);
   
@@ -114,7 +114,7 @@ export default function DashboardPage() {
 
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
-  const [newTrip, setNewTrip] = useState({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
+  const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', partySize: '1人', purpose: '', needs: '' }); // ✨ 修改日期為起迄選擇器
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
@@ -326,7 +326,8 @@ export default function DashboardPage() {
     setNewProject({
       title: project.title, category: project.category, type: project.type, location: project.location,
       numericValue: project.numericValue || 0, valueBreakdown: project.valueBreakdown, 
-      requirements: project.requirements, spots: project.spots, gallery: project.gallery || (project.image ? [project.image] : [])
+      requirements: project.requirements, spots: project.spots, gallery: project.gallery || (project.image ? [project.image] : []),
+      validDays: project.validDays || '不限 (平假日皆可)' // ✨ 加入平假日
     });
     setEditProjectId(project.id);
     setShowCreateModal(true);
@@ -336,16 +337,11 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!newProject.title || !newProject.location || newProject.numericValue <= 0) { alert("請填寫完整資訊與總價值"); return; }
     
-    const targetId = editProjectId || Date.now().toString(); // ✨ 判斷是更新還是新增
+    const targetId = editProjectId || Date.now().toString(); 
     const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制'; 
 
-    if (!db || !fbUser) {
-      setShowCreateModal(false);
-      setEditProjectId(null);
-      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
-      return;
-    }
-    
+    const currentUid = fbUser?.uid || localUid;
+
     try {
       await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', targetId), {
         id: targetId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
@@ -353,35 +349,39 @@ export default function DashboardPage() {
         valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
         spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
         requiredTier: requiredTier,
+        validDays: newProject.validDays, // ✨ 寫入平假日設定
         image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
         gallery: newProject.gallery
-      }, { merge: true }); // 使用 merge 確保保留原本其他的屬性
+      }, { merge: true }); 
       setShowCreateModal(false);
-      setEditProjectId(null); // 清空編輯狀態
-      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
+      setEditProjectId(null); 
+      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [], validDays: '不限 (平假日皆可)' });
     } catch (err) { console.error(err); }
   };
 
+  // ✨ 修復：保留這一個唯一的 handleCreateTrip 函數
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTrip.destination) { alert("請填寫目的地"); return; }
+    if (!newTrip.destination || !newTrip.startDate || !newTrip.endDate) { alert("請填寫完整目的地與日期"); return; }
     
-    if (!db) {
-       setShowCreateTripModal(false);
-       setNewTrip({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
-       return;
-    }
-    
+    const currentUid = fbUser?.uid || localUid;
     const newId = `t${Date.now()}`;
+    
+    // ✨ 格式化日期顯示 (例如 2024/07/15 - 2024/07/17)
+    const formattedDates = `${newTrip.startDate.replace(/-/g, '/')} - ${newTrip.endDate.replace(/-/g, '/')}`;
+
     try {
-      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'trips', newId), {
-        id: newId, creatorName: creatorProfile.name || '創作者', destination: newTrip.destination, dates: newTrip.dates,
-        partySize: newTrip.partySize, purpose: newTrip.purpose, needs: newTrip.needs, status: '招募中', offers: 0
-      });
+      if (db) {
+          await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'trips', newId), {
+            id: newId, creatorName: creatorProfile.name || '創作者', destination: newTrip.destination, dates: formattedDates,
+            partySize: newTrip.partySize, purpose: newTrip.purpose, needs: newTrip.needs, status: '招募中', offers: 0
+          });
+      }
       setShowCreateTripModal(false);
-      setNewTrip({ destination: '', dates: '', partySize: '1人', purpose: '', needs: '' });
+      setNewTrip({ destination: '', startDate: '', endDate: '', partySize: '1人', purpose: '', needs: '' });
     } catch (err) { console.error(err); }
   };
+
 
   // ✨ 最關鍵的履歷寫入功能 (防跳島保護)
   const handleSaveCreatorProfile = async () => {
@@ -544,7 +544,7 @@ export default function DashboardPage() {
             amount: purchaseItem.price, status: '成功', date: new Date().toLocaleString('zh-TW', { hour12: false })
           });
           
-          if (purchaseItem.id === 'pro' && role === 'business') {
+          if ((purchaseItem.id === 'pro' || purchaseItem.id === 'pro-year') && role === 'business') {
             await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', currentUid), {
               plan: 'Pro'
             });
@@ -1005,7 +1005,7 @@ export default function DashboardPage() {
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
                       <ListPlus size={20} className="text-sky-500"/> {editProjectId ? '編輯案源' : '發布新案源'} (Cloud Sync)
                     </h3>
-                    <button onClick={() => { setShowCreateModal(false); setEditProjectId(null); setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] }); }} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                    <button onClick={() => { setShowCreateModal(false); setEditProjectId(null); setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [], validDays: '不限 (平假日皆可)' }); }} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                   </div>
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-6" onSubmit={handleCreateProject}>
@@ -1023,6 +1023,14 @@ export default function DashboardPage() {
                                 <option>住宿</option><option>餐飲</option><option>體驗</option>
                               </select>
                             </div>
+                            <div>
+                              <label className="block text-xs font-bold text-slate-500 mb-1">適用時間 (平/假日) <span className="text-red-500">*</span></label>
+                              <select className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none text-sm" value={newProject.validDays} onChange={(e) => setNewProject({...newProject, validDays: e.target.value})}>
+                                <option>不限 (平假日皆可)</option><option>限平日</option><option>限假日</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-500 mb-1">地點 <span className="text-red-500">*</span></label>
                               <div className="flex items-center relative">
@@ -1367,13 +1375,17 @@ export default function DashboardPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1">預計日期</label>
-                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2024/07/15 - 07/17" value={newTrip.dates} onChange={(e) => setNewTrip({...newTrip, dates: e.target.value})} />
+                          <label className="block text-xs font-bold text-slate-500 mb-1">出發日期 <span className="text-red-500">*</span></label>
+                          <input type="date" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" value={newTrip.startDate} onChange={(e) => setNewTrip({...newTrip, startDate: e.target.value})} required />
                         </div>
                         <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1">隨行人數</label>
-                          <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2大1小、單人" value={newTrip.partySize} onChange={(e) => setNewTrip({...newTrip, partySize: e.target.value})} />
+                          <label className="block text-xs font-bold text-slate-500 mb-1">結束日期 <span className="text-red-500">*</span></label>
+                          <input type="date" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" value={newTrip.endDate} onChange={(e) => setNewTrip({...newTrip, endDate: e.target.value})} required />
                         </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-500 mb-1">隨行人數</label>
+                        <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none text-sm" placeholder="例如：2大1小、單人" value={newTrip.partySize} onChange={(e) => setNewTrip({...newTrip, partySize: e.target.value})} />
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 mb-1">行程目的 (將產出什麼內容？)</label>
@@ -1427,7 +1439,7 @@ export default function DashboardPage() {
           <div className="space-y-8">
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
                 <div className="relative z-10 flex-grow">
                   <span className="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded mb-4 inline-block">目前方案</span>
@@ -1451,18 +1463,16 @@ export default function DashboardPage() {
               </div>
 
               <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white flex flex-col">
-                <div className="absolute top-0 right-0 bg-yellow-400 text-indigo-900 text-xs font-bold px-3 py-1 rounded-bl-lg">RECOMMENDED</div>
                 <div className="relative z-10 flex-grow">
-                  <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">專業成長版 Pro <Crown size={20} className="text-yellow-400 fill-yellow-400"/></h3>
+                  <h3 className="text-2xl font-bold mb-2 flex items-center gap-2">專業版 Pro <span className="text-sm font-normal text-indigo-200">(月繳)</span></h3>
                   <div className="flex items-baseline mb-4">
-                    <span className="text-4xl font-extrabold">$999</span><span className="text-indigo-200 ml-2">/ 月</span>
+                    <span className="text-4xl font-extrabold">$1,200</span><span className="text-indigo-200 ml-2">/ 月</span>
                   </div>
                   <ul className="space-y-3 mb-6 text-indigo-100">
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送合作邀請</li>
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 解鎖直接查看網紅 LINE ID</li>
                     <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 網紅深度數據解鎖 (受眾分析)</li>
                     <li className="flex items-center text-sm"><Shield className="w-4 h-4 text-white mr-2"/> 無限使用智能合約與數位簽署</li>
-                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 優先客服支援</li>
                   </ul>
                 </div>
                 <div className="mt-auto">
@@ -1471,10 +1481,32 @@ export default function DashboardPage() {
                       您已升級此方案
                     </button>
                   ) : (
-                    <button onClick={() => { setPurchaseItem({ id: 'pro', name: '專業成長版 Pro (月費)', price: 999, type: 'subscription' }); setPaymentStep('form'); }} className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg active:scale-95">
-                      立即升級 Pro
+                    <button onClick={() => { setPurchaseItem({ id: 'pro', name: '專業版 Pro (月訂閱)', price: 1200, type: 'subscription' }); setPaymentStep('form'); }} className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg active:scale-95">
+                      訂閱月方案
                     </button>
                   )}
+                </div>
+              </div>
+              
+              <div className="bg-gradient-to-b from-slate-900 to-indigo-950 p-6 rounded-2xl shadow-xl relative overflow-hidden text-white flex flex-col border border-indigo-500/30">
+                <div className="absolute top-0 right-0 bg-yellow-400 text-indigo-900 text-xs font-bold px-3 py-1 rounded-bl-lg">BEST VALUE</div>
+                <div className="relative z-10 flex-grow">
+                  <h3 className="text-2xl font-bold mb-2 flex items-center gap-2 text-yellow-400">尊榮年約 Pro <Crown size={20} className="fill-yellow-400"/></h3>
+                  <div className="flex items-baseline mb-4">
+                    <span className="text-4xl font-extrabold text-white">$10,000</span><span className="text-indigo-200 ml-2">/ 年</span>
+                  </div>
+                  <p className="text-xs text-indigo-300 mb-4">(現省 $4,400，平均每月僅 $833)</p>
+                  <ul className="space-y-3 mb-6 text-indigo-100">
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 包含月訂閱所有 Pro 權限</li>
+                    <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 每月免費贈送 1 次置頂推廣 ($300)</li>
+                    <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 案源優先曝光與尊榮標章</li>
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 專屬 1 對 1 優先客服</li>
+                  </ul>
+                </div>
+                <div className="mt-auto">
+                  <button onClick={() => { setPurchaseItem({ id: 'pro-year', name: '尊榮年約 Pro (年訂閱)', price: 10000, type: 'subscription' }); setPaymentStep('form'); }} className="w-full py-3 bg-gradient-to-r from-yellow-400 to-amber-500 text-indigo-900 font-black rounded-xl hover:scale-[1.02] transition-transform shadow-lg active:scale-95">
+                    立即解鎖年約
+                  </button>
                 </div>
               </div>
             </div>
@@ -1860,6 +1892,10 @@ export default function DashboardPage() {
                       <h2 className="text-2xl font-bold text-slate-900 mb-2">{viewProject.title}</h2>
                       <div className="flex gap-2">
                         <span className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">{viewProject.category}</span>
+                        {/* ✨ 顯示平假日 */}
+                        {viewProject.validDays && (
+                           <span className="text-xs bg-sky-50 text-sky-700 px-2 py-1 rounded border border-sky-100 flex items-center gap-1"><Calendar size={12}/> {viewProject.validDays}</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-left sm:text-right w-full sm:w-auto bg-white sm:bg-transparent p-4 sm:p-0 rounded-xl border sm:border-0 border-slate-100">
