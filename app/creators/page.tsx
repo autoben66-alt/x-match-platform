@@ -1,11 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// 移除導致錯誤的外部引用
-// import Link from 'next/link'; 
-// import { useRouter } from 'next/navigation'; 
-// import CreatorCard, { Creator } from '@/components/CreatorCard';
-import { Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase, Eye, Star, Lock, AlertCircle, LogIn } from 'lucide-react';
+import { 
+  Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase, Eye, Star, Lock, AlertCircle, LogIn, Link as LinkIcon 
+} from 'lucide-react';
 
 // --- 自定義 Link 元件 (解決預覽環境問題) ---
 const Link = ({ href, children, className, ...props }: any) => {
@@ -65,6 +63,7 @@ export interface Creator {
   location: string;
   bio: string;
   coverImage?: string;
+  tier?: string; // ✨ 新增分級
 }
 
 interface CreatorDetail extends Creator {
@@ -75,12 +74,31 @@ interface CreatorDetail extends Creator {
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
   lineId?: string;
+  socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; }; // ✨ 新增社群連結
 }
+
+// ✨ 網紅評級顯示標籤組件
+const TierBadge = ({ tier }: { tier?: string }) => {
+  if (!tier || tier === '未評級') {
+    return <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">未評級</span>;
+  }
+  const colors: Record<string, string> = {
+    'S': 'bg-gradient-to-r from-yellow-300 to-amber-500 text-slate-900 border-amber-300 shadow-sm',
+    'A': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'B': 'bg-sky-100 text-sky-700 border-sky-200',
+    'C': 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-black border flex items-center gap-1 w-fit ${colors[tier] || colors['C']}`}>
+      {tier === 'S' && <Crown size={12} />} {tier} 級
+    </span>
+  );
+};
 
 const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
-      {/* 封面圖區域：維持 h-40 高度 */}
+      {/* 封面圖區域 */}
       <div className="h-40 bg-slate-100 relative overflow-hidden">
         {creator.coverImage && (
           <img 
@@ -90,12 +108,14 @@ const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
+        {/* ✨ 右上角顯示評級 */}
+        <div className="absolute top-3 right-3">
+          <TierBadge tier={creator.tier} />
+        </div>
       </div>
       
       <div className="px-6 pb-6 pt-0 flex-1 flex flex-col">
-        {/* ✨ 版面修正重點：分離頭像與數據 */}
         <div className="flex justify-between items-start mb-2">
-           {/* 左側：頭像 (向上位移，跨越封面) */}
            <div className="-mt-10 relative">
              <img 
                src={creator.avatar} 
@@ -103,8 +123,6 @@ const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
                className="w-20 h-20 rounded-full border-4 border-white shadow-md bg-white object-cover" 
              />
            </div>
-           
-           {/* 右側：粉絲數 (保持在內容區，不向上位移，避免與封面重疊) */}
            <div className="flex flex-col items-end pt-3">
              <span className="text-xs text-slate-400 font-bold mb-0.5">粉絲數</span>
              <span className="font-black text-slate-900 text-lg">{(creator.followers / 1000).toFixed(1)}k</span>
@@ -145,49 +163,53 @@ interface ProjectMinimal {
   id: string;
   title: string;
   totalValue: string;
+  requiredTier?: string; // ✨ 新增案源綁定的限制等級
 }
 
-// 模擬豐富資料
+// 模擬豐富資料 (含評級與社群連結)
 const ENRICH_DATA = [
   {
     name: "林小美", handle: "@may_travel", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix", lineId: "may_travel",
-    tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市",
+    tags: ["旅遊", "美食", "親子"], followers: 45000, engagement: 3.2, location: "台北市", tier: "A",
     bio: "專注於親子友善飯店與在地美食推廣，擁有高黏著度的社群。", 
     completedJobs: 42, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 5,000", story: "NT$ 1,500", reels: "NT$ 8,000" },
     audience: { gender: "女性 85%", age: "25-34歲", topCity: "台北/新北" },
     portfolio: [ "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3" ],
-    averageViews: 12500, completionScore: 5.0
+    averageViews: 12500, completionScore: 5.0,
+    socialLinks: { ig: 'https://instagram.com', yt: '', tiktok: '', other: '' }
   },
   {
     name: "Jason 攝影", handle: "@jason_shot", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason", lineId: "jason_shot",
-    tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁",
+    tags: ["攝影", "戶外", "衝浪"], followers: 120000, engagement: 4.5, location: "墾丁", tier: "S",
     bio: "專業戶外攝影師，擅長用影像說故事，曾與多個國際戶外品牌合作。", 
     completedJobs: 85, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 12,000", story: "NT$ 3,000", reels: "NT$ 25,000" },
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
-    averageViews: 45000, completionScore: 5.0
+    averageViews: 45000, completionScore: 5.0,
+    socialLinks: { ig: 'https://instagram.com', yt: 'https://youtube.com', tiktok: '', other: 'https://behance.net' }
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
-    tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市",
+    tags: ["咖啡廳", "生活風格"], followers: 28000, engagement: 5.1, location: "台南市", tier: "B",
     bio: "喜歡挖掘巷弄裡的小店，照片風格清新明亮，粉絲以年輕女性為主。", 
     completedJobs: 63, rating: 5.0,
     coverImage: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
     rates: { post: "NT$ 3,500", story: "NT$ 1,000", reels: "NT$ 5,000" },
     audience: { gender: "女性 90%", age: "18-24歲", topCity: "台南/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1497935586351-b67a49e012bf?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1509042239860-f550ce710b93?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3" ],
-    averageViews: 8500, completionScore: 5.0
+    averageViews: 8500, completionScore: 5.0,
+    socialLinks: { ig: 'https://instagram.com', yt: '', tiktok: 'https://tiktok.com', other: '' }
   }
 ];
 
 export default function CreatorsPage() {
   const router = useRouter(); 
   const [categoryFilter, setCategoryFilter] = useState('全部');
-  const [locationFilter, setLocationFilter] = useState('全部'); // ✨ 新增：地區篩選
+  const [locationFilter, setLocationFilter] = useState('全部');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'relevance' | 'followers' | 'views' | 'score'>('relevance');
   
@@ -231,6 +253,8 @@ export default function CreatorsPage() {
       portfolio: enrich.portfolio,
       audience: enrich.audience,
       rates: enrich.rates,
+      tier: enrich.tier, // ✨ 寫入假資料的評級
+      socialLinks: enrich.socialLinks, // ✨ 寫入社群連結
       tags: ['👑 創始會員', ...enrich.tags],
       badges: ['創始會員', '官方認證'],
       averageViews: enrich.averageViews,
@@ -276,6 +300,8 @@ export default function CreatorsPage() {
                 portfolio: u.portfolio?.length > 0 ? u.portfolio : enrich.portfolio,
                 audience: u.audience || enrich.audience,
                 rates: formatRates(u.rates),
+                tier: u.tier || enrich.tier || '未評級', // ✨ 抓取資料庫評級
+                socialLinks: u.socialLinks || enrich.socialLinks, // ✨ 抓取社群連結
                 tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
                 badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
                 averageViews: u.averageViews || enrich.averageViews || 5000,
@@ -284,17 +310,14 @@ export default function CreatorsPage() {
             });
             setCreators(mappedCreators);
         } else {
-            // 如果表裡沒有創作者角色，顯示預設資料
             setCreators(fallbackCreators);
         }
       } else {
-        // 如果資料庫空空如也，顯示預設資料
         setCreators(fallbackCreators);
       }
-      setIsLoading(false); // 取消轉圈
+      setIsLoading(false); 
     }, (error) => {
       console.error("Firebase 讀取錯誤:", error);
-      // ✨ 攔截錯誤並解除 Loading，顯示預設資料以防頁面卡死
       setCreators(fallbackCreators);
       setIsLoading(false);
     });
@@ -303,7 +326,15 @@ export default function CreatorsPage() {
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubscribeProjects = onSnapshot(projectsCol, (snapshot) => {
       if (!snapshot.empty) {
-        setProjects(snapshot.docs.map(doc => doc.data() as ProjectMinimal));
+        setProjects(snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: data.id,
+            title: data.title,
+            totalValue: data.totalValue,
+            requiredTier: data.requiredTier || '無限制' // ✨ 抓取該案源是否為 S 級
+          } as ProjectMinimal;
+        }));
       }
     }, (error) => {
       console.error("Firebase 專案讀取錯誤:", error);
@@ -317,19 +348,19 @@ export default function CreatorsPage() {
   const filteredCreators = creators.filter(creator => {
     const matchesSearch = creator.name.toLowerCase().includes(searchTerm.toLowerCase()) || creator.handle.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === '全部' || creator.tags.some(tag => tag.includes(categoryFilter));
-    const matchesLocation = locationFilter === '全部' || creator.location.includes(locationFilter); // ✨ 加入地區判斷
+    const matchesLocation = locationFilter === '全部' || creator.location.includes(locationFilter);
     return matchesSearch && matchesCategory && matchesLocation;
   }).sort((a, b) => {
     switch (sortBy) {
       case 'followers': return b.followers - a.followers;
-      case 'views': return (b.averageViews || 0) - (a.averageViews || 0); // 依平均觀看
-      case 'score': return (b.completionScore || 0) - (a.completionScore || 0); // 依信用評分
+      case 'views': return (b.averageViews || 0) - (a.averageViews || 0);
+      case 'score': return (b.completionScore || 0) - (a.completionScore || 0);
       default: return 0;
     }
   });
 
   const categories = [ { id: '全部', label: '全部' }, { id: '旅遊', label: '旅遊 Travel' }, { id: '美食', label: '美食 Foodie' }, { id: '親子', label: '親子 Family' }, { id: '攝影', label: '攝影 Photography' } ];
-  const availableLocations = ['全部', '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市', '墾丁', '宜蘭縣', '花蓮縣']; // ✨ 地區清單
+  const availableLocations = ['全部', '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市', '墾丁', '宜蘭縣', '花蓮縣']; 
   
   const founderCount = creators.length;
   const founderMax = 50;
@@ -339,48 +370,36 @@ export default function CreatorsPage() {
   const handleLogin = () => {
     setIsVerifying(true);
     
-    // 模擬 API 延遲與後台判斷邏輯
     setTimeout(() => {
         setIsVerifying(false);
         setIsProviderLoggedIn(true);
         setShowAuthModal(false);
-
-        // --- 模擬後台回傳的會員狀態 ---
         // 隨機模擬：50% 機率是付費版，50% 是免費版
         const isPaidMember = Math.random() > 0.5; 
-        
-        if (isPaidMember) {
-            setProviderPlan('pro');
-        } else {
-            setProviderPlan('free');
-        }
+        setProviderPlan(isPaidMember ? 'pro' : 'free');
     }, 1200);
   };
 
   // --- 處理「LINE 聯繫」點擊 (權限檢查: 必須登入且為 Pro) ---
   const handleLineContact = (e: React.MouseEvent) => {
-    e.preventDefault(); // 阻止預設連結跳轉
+    e.preventDefault(); 
 
-    // 1. 檢查是否登入
     if (!isProviderLoggedIn) {
       setShowAuthModal(true);
       return;
     }
 
-    // 2. 檢查是否為 Pro 付費會員
     if (providerPlan !== 'pro') {
       setShowUpgradeModal(true); // 跳出升級提示
       return;
     }
 
-    // 3. 通過檢查，執行跳轉
     if (selectedCreator) {
       const lineUrl = `https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`;
       window.open(lineUrl, '_blank');
     }
   };
 
-  // 開啟發送邀請 Modal (權限檢查: 必須登入)
   const handleOpenInvite = () => {
     if (!isProviderLoggedIn) {
       setShowAuthModal(true);
@@ -393,7 +412,6 @@ export default function CreatorsPage() {
     setSendSuccess(false);
   };
 
-  // 確認發送
   const confirmSendInvite = async () => {
     if (!db) { alert("尚未連線至資料庫，請稍候再試。"); return; }
     setIsSending(true);
@@ -405,7 +423,7 @@ export default function CreatorsPage() {
       
       await setDoc(invRef, {
         id: newId,
-        fromName: '海角七號民宿', // 模擬業者名稱
+        fromName: '海角七號民宿', 
         toName: selectedCreator?.name || '創作者',
         toHandle: selectedCreator?.handle || '',
         toAvatar: selectedCreator?.avatar || '',
@@ -415,15 +433,16 @@ export default function CreatorsPage() {
         projectId: proj?.id || '',
         projectTitle: proj?.title || '',
         projectValue: proj?.totalValue || '',
-        type: 'invite', // 標記為業者邀請
-        creatorInfo: { // 附帶創作者資料
+        type: 'invite',
+        creatorInfo: { 
           name: selectedCreator?.name,
           avatar: selectedCreator?.avatar,
           followers: selectedCreator?.followers,
           averageViews: selectedCreator?.averageViews,
           completionScore: selectedCreator?.completionScore,
           tags: selectedCreator?.tags,
-          lineId: selectedCreator?.lineId
+          lineId: selectedCreator?.lineId,
+          tier: selectedCreator?.tier // 夾帶評級資訊
         }
       });
 
@@ -515,10 +534,13 @@ export default function CreatorsPage() {
                       {index === 0 && <div className="absolute -bottom-1 -right-1 bg-amber-100 text-amber-700 p-1 rounded-full"><Trophy size={12} fill="currentColor"/></div>}
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900">{creator.name}</h3>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <h3 className="font-bold text-slate-900">{creator.name}</h3>
+                        {/* ✨ 排行榜顯示評級 */}
+                        <TierBadge tier={creator.tier} />
+                      </div>
                       <p className="text-xs text-slate-500 mb-1">已完成 {creator.completedJobs} 筆合作</p>
                       <div className="flex items-center gap-1 text-xs font-medium text-green-600 bg-green-50 px-2 py-0.5 rounded-full w-fit">
-                         {/* ✨ 排行榜改為顯示「完案評分」 */}
                         <Star size={10} className="fill-current text-green-600" /> {creator.completionScore} 信用評分
                       </div>
                     </div>
@@ -547,7 +569,7 @@ export default function CreatorsPage() {
                 <input type="text" placeholder="搜尋網紅名稱或關鍵字..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all hover:bg-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
               
-              {/* ✨ 地區篩選下拉 */}
+              {/* 地區篩選下拉 */}
               <div className="relative min-w-[140px]">
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                 <select 
@@ -613,7 +635,6 @@ export default function CreatorsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-500">
             {filteredCreators.map(creator => (
               <div key={creator.id} onClick={() => setSelectedCreator(creator)}>
-                {/* 傳遞新指標到 Card 元件 */}
                 <CreatorCard creator={{
                   ...creator, 
                   averageViews: creator.averageViews, 
@@ -625,7 +646,7 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* --- Creator Details Modal (創作者詳情視窗 - 更新顯示新指標) --- */}
+      {/* --- Creator Details Modal (創作者詳情視窗) --- */}
       {selectedCreator && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-4xl sm:rounded-3xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -659,7 +680,7 @@ export default function CreatorsPage() {
                 <div className="pb-12 text-white hidden sm:block">
                    <h2 className="text-3xl font-black mb-1 flex items-center gap-2">
                      {selectedCreator.name}
-                     <CheckCircle2 size={24} className="text-sky-400 fill-sky-50" />
+                     <TierBadge tier={selectedCreator.tier} />
                    </h2>
                    <p className="font-medium text-white/80">{selectedCreator.handle}</p>
                 </div>
@@ -672,7 +693,7 @@ export default function CreatorsPage() {
               <div className="sm:hidden mb-6">
                 <h2 className="text-2xl font-black text-slate-900 mb-1 flex items-center gap-2">
                   {selectedCreator.name}
-                  <CheckCircle2 size={20} className="text-sky-500 fill-sky-50" />
+                  <TierBadge tier={selectedCreator.tier} />
                 </h2>
                 <p className="font-medium text-slate-500">{selectedCreator.handle}</p>
               </div>
@@ -688,24 +709,26 @@ export default function CreatorsPage() {
                     ))}
                   </div>
                   
-                  <div className="flex gap-3">
-                    <button className="p-2.5 bg-white border border-slate-200 shadow-sm rounded-full text-pink-600 hover:bg-pink-50 transition-colors"><Instagram size={20}/></button>
-                    <button className="p-2.5 bg-white border border-slate-200 shadow-sm rounded-full text-red-600 hover:bg-red-50 transition-colors"><Youtube size={20}/></button>
-                  </div>
+                  {/* ✨ 社群連結展示 */}
+                  {selectedCreator.socialLinks && (
+                    <div className="flex items-center gap-3 mt-3">
+                      {selectedCreator.socialLinks.ig && <a href={selectedCreator.socialLinks.ig} target="_blank" rel="noreferrer" className="text-pink-600 hover:text-pink-700 bg-pink-50 p-1.5 rounded-lg transition-colors"><Instagram size={18}/></a>}
+                      {selectedCreator.socialLinks.yt && <a href={selectedCreator.socialLinks.yt} target="_blank" rel="noreferrer" className="text-red-600 hover:text-red-700 bg-red-50 p-1.5 rounded-lg transition-colors"><Youtube size={18}/></a>}
+                      {selectedCreator.socialLinks.other && <a href={selectedCreator.socialLinks.other} target="_blank" rel="noreferrer" className="text-slate-600 hover:text-slate-900 bg-slate-100 p-1.5 rounded-lg transition-colors"><LinkIcon size={18}/></a>}
+                    </div>
+                  )}
                 </div>
 
-                {/* ✨ 新指標展示卡片 */}
-                <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar">
+                {/* 指標展示卡片 */}
+                <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar mt-4 sm:mt-0">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
                     <p className="text-2xl font-black text-slate-900">{(selectedCreator.followers/1000).toFixed(1)}k</p>
                   </div>
-                  {/* 平均觀看數 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">平均觀看</p>
                     <p className="text-2xl font-black text-green-500">{(selectedCreator.averageViews ? (selectedCreator.averageViews/1000).toFixed(1) + 'k' : 'N/A')}</p>
                   </div>
-                  {/* 完案信用 */}
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">完案信用</p>
                     <p className="text-2xl font-black text-indigo-600 flex items-center justify-center gap-1">
@@ -762,18 +785,20 @@ export default function CreatorsPage() {
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
-                    <DollarSign size={18} className="text-green-500"/> 參考報價
+                    <DollarSign size={18} className="text-green-500"/> 合作參考報價
                   </h4>
                   <div className="space-y-4 relative z-10">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Camera size={14} className="text-slate-400"/> 圖文貼文</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.post}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">NT$ {selectedCreator.rates?.post?.toLocaleString() || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-slate-400"></div> 限時動態</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.story}</span>
+                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-slate-400"></div> 限時動態</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">NT$ {selectedCreator.rates?.story?.toLocaleString() || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Reels 短影音</span><span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.reels}</span>
+                      <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Reels 短影音</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">NT$ {selectedCreator.rates?.reels?.toLocaleString() || 0}</span>
                     </div>
                   </div>
                 </div>
@@ -783,7 +808,7 @@ export default function CreatorsPage() {
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
                 <div className="grid grid-cols-3 gap-3 sm:gap-4">
-                  {selectedCreator.portfolio.map((img, i) => (
+                  {selectedCreator.portfolio?.map((img, i) => (
                     <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer">
                       <img src={img} className="w-full h-full object-cover" alt="Portfolio" />
                     </div>
@@ -795,20 +820,23 @@ export default function CreatorsPage() {
 
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                <div className="flex gap-3 w-full sm:w-auto">
-                 {/* LINE 聯繫按鈕 (需登入且付費) */}
-                 <button 
-                   onClick={handleLineContact}
-                   className={`flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap`}
-                 >
-                   {providerPlan === 'pro' ? (
-                      <MessageCircle size={18} /> 
-                   ) : (
-                      <Lock size={16} /> 
-                   )}
-                   LINE 聯繫
-                 </button>
+                 {/* ✨ LINE 聯繫按鈕 (防跳島付費牆) */}
+                 {providerPlan === 'pro' ? (
+                    <button 
+                      onClick={handleLineContact}
+                      className="flex-1 sm:flex-none px-6 py-3.5 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg shadow-green-200/50 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                    >
+                      <MessageCircle size={18} /> LINE 聯繫
+                    </button>
+                 ) : (
+                    <button 
+                      onClick={() => setShowUpgradeModal(true)}
+                      className="flex-1 sm:flex-none px-6 py-3.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                    >
+                      <Lock size={16} /> 升級 Pro 解鎖聯繫方式
+                    </button>
+                 )}
                  
-                 {/* 導向發送邀請 Modal 按鈕 */}
                  <button 
                    onClick={handleOpenInvite}
                    className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
@@ -853,7 +881,10 @@ export default function CreatorsPage() {
                   <div className="flex items-center gap-3 mb-6 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
                     <img src={selectedCreator.avatar} className="w-12 h-12 rounded-full border border-white shadow-sm" alt="avatar" />
                     <div className="flex-1">
-                       <p className="font-bold text-indigo-900">{selectedCreator.name}</p>
+                       <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-indigo-900">{selectedCreator.name}</p>
+                          <TierBadge tier={selectedCreator.tier} />
+                       </div>
                        <p className="text-xs text-indigo-600 font-medium">{selectedCreator.handle}</p>
                     </div>
                   </div>
@@ -881,6 +912,15 @@ export default function CreatorsPage() {
                           <option key={p.id} value={p.id}>{p.title} ({p.totalValue})</option>
                         ))}
                       </select>
+                      
+                      {/* ✨ 越級邀請提示 */}
+                      {selectedProjectId && projects.find(p => p.id === selectedProjectId)?.requiredTier === 'S' && selectedCreator.tier !== 'S' && (
+                        <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs mt-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+                          <p className="font-bold mb-1 flex items-center gap-1"><AlertCircle size={14} className="text-orange-500"/> 越級邀請提示</p>
+                          您選擇的案源為 <b>S 級優先</b>，而該創作者目前為 <b>{selectedCreator.tier || '未評級'}</b>。<br/>
+                          系統將提示創作者必須附上「加碼提案」才能接受此合作。
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -970,7 +1010,7 @@ export default function CreatorsPage() {
               </div>
               <h2 className="text-xl font-bold text-slate-900 mb-2">付費會員專屬功能</h2>
               <p className="text-slate-500 text-sm mb-6">
-                 「LINE 直接聯繫」為專業版 (Pro) 專屬功能。<br/>升級後即可查看所有創作者的私人聯繫方式！
+                 「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬功能。<br/>升級後即可與所有頂尖創作者零距離洽談！
               </p>
               
               <div className="space-y-3">
