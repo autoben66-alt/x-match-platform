@@ -187,6 +187,7 @@ const ENRICH_DATA = [
 export default function CreatorsPage() {
   const router = useRouter(); 
   const [categoryFilter, setCategoryFilter] = useState('全部');
+  const [locationFilter, setLocationFilter] = useState('全部'); // ✨ 新增：地區篩選
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'relevance' | 'followers' | 'views' | 'score'>('relevance');
   
@@ -213,7 +214,31 @@ export default function CreatorsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   useEffect(() => {
+    // ✨ 建立預設展示資料 (Fallback Data)
+    const fallbackCreators: CreatorDetail[] = ENRICH_DATA.map((enrich, index) => ({
+      id: 'fallback-' + index,
+      name: enrich.name,
+      handle: enrich.handle,
+      lineId: enrich.lineId,
+      avatar: enrich.avatar,
+      location: enrich.location,
+      bio: enrich.bio,
+      followers: enrich.followers,
+      engagement: enrich.engagement,
+      completedJobs: enrich.completedJobs,
+      rating: enrich.rating,
+      coverImage: enrich.coverImage,
+      portfolio: enrich.portfolio,
+      audience: enrich.audience,
+      rates: enrich.rates,
+      tags: ['👑 創始會員', ...enrich.tags],
+      badges: ['創始會員', '官方認證'],
+      averageViews: enrich.averageViews,
+      completionScore: enrich.completionScore
+    }));
+
     if (!db) { 
+      setCreators(fallbackCreators); // 填入展示資料
       setIsLoading(false); 
       return; 
     }
@@ -224,43 +249,53 @@ export default function CreatorsPage() {
       if (!snapshot.empty) {
         const creatorUsers = snapshot.docs.map(doc => doc.data()).filter(u => u.role === '創作者');
         
-        const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
-          const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
-          const isFounder = index < 50; 
-          
-          const formatRates = (rates: any) => ({
-            post: rates?.post ? `NT$ ${rates.post.toLocaleString()}` : enrich.rates.post,
-            story: rates?.story ? `NT$ ${rates.story.toLocaleString()}` : enrich.rates.story,
-            reels: rates?.reels ? `NT$ ${rates.reels.toLocaleString()}` : enrich.rates.reels,
-          });
+        if (creatorUsers.length > 0) {
+            const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
+              const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
+              const isFounder = index < 50; 
+              
+              const formatRates = (rates: any) => ({
+                post: rates?.post ? `NT$ ${rates.post.toLocaleString()}` : enrich.rates.post,
+                story: rates?.story ? `NT$ ${rates.story.toLocaleString()}` : enrich.rates.story,
+                reels: rates?.reels ? `NT$ ${rates.reels.toLocaleString()}` : enrich.rates.reels,
+              });
 
-          return {
-            id: Number(u.id) || Date.now() + index,
-            name: u.name || enrich.name,
-            handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
-            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
-            avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
-            location: u.location || enrich.location,
-            bio: u.bio || enrich.bio,
-            followers: u.followers || enrich.followers,
-            engagement: u.engagement || enrich.engagement, // Keeping for type compatibility
-            completedJobs: u.completedJobs || enrich.completedJobs,
-            rating: u.rating || enrich.rating,
-            coverImage: u.coverImage || enrich.coverImage,
-            portfolio: u.portfolio?.length > 0 ? u.portfolio : enrich.portfolio,
-            audience: u.audience || enrich.audience,
-            rates: formatRates(u.rates),
-            tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
-            badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            averageViews: u.averageViews || enrich.averageViews || 5000,
-            completionScore: u.completionScore || enrich.completionScore || 5.0
-          };
-        });
-        
-        setCreators(mappedCreators);
+              return {
+                id: Number(u.id) || Date.now() + index,
+                name: u.name || enrich.name,
+                handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
+                lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
+                avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
+                location: u.location || enrich.location,
+                bio: u.bio || enrich.bio,
+                followers: u.followers || enrich.followers,
+                engagement: u.engagement || enrich.engagement,
+                completedJobs: u.completedJobs || enrich.completedJobs,
+                rating: u.rating || enrich.rating,
+                coverImage: u.coverImage || enrich.coverImage,
+                portfolio: u.portfolio?.length > 0 ? u.portfolio : enrich.portfolio,
+                audience: u.audience || enrich.audience,
+                rates: formatRates(u.rates),
+                tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
+                badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
+                averageViews: u.averageViews || enrich.averageViews || 5000,
+                completionScore: u.completionScore || enrich.completionScore || 5.0
+              };
+            });
+            setCreators(mappedCreators);
+        } else {
+            // 如果表裡沒有創作者角色，顯示預設資料
+            setCreators(fallbackCreators);
+        }
       } else {
-        setCreators([]);
+        // 如果資料庫空空如也，顯示預設資料
+        setCreators(fallbackCreators);
       }
+      setIsLoading(false); // 取消轉圈
+    }, (error) => {
+      console.error("Firebase 讀取錯誤:", error);
+      // ✨ 攔截錯誤並解除 Loading，顯示預設資料以防頁面卡死
+      setCreators(fallbackCreators);
       setIsLoading(false);
     });
 
@@ -270,6 +305,8 @@ export default function CreatorsPage() {
       if (!snapshot.empty) {
         setProjects(snapshot.docs.map(doc => doc.data() as ProjectMinimal));
       }
+    }, (error) => {
+      console.error("Firebase 專案讀取錯誤:", error);
     });
 
     return () => { unsubscribeUsers(); unsubscribeProjects(); };
@@ -280,7 +317,8 @@ export default function CreatorsPage() {
   const filteredCreators = creators.filter(creator => {
     const matchesSearch = creator.name.toLowerCase().includes(searchTerm.toLowerCase()) || creator.handle.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === '全部' || creator.tags.some(tag => tag.includes(categoryFilter));
-    return matchesSearch && matchesCategory;
+    const matchesLocation = locationFilter === '全部' || creator.location.includes(locationFilter); // ✨ 加入地區判斷
+    return matchesSearch && matchesCategory && matchesLocation;
   }).sort((a, b) => {
     switch (sortBy) {
       case 'followers': return b.followers - a.followers;
@@ -291,6 +329,8 @@ export default function CreatorsPage() {
   });
 
   const categories = [ { id: '全部', label: '全部' }, { id: '旅遊', label: '旅遊 Travel' }, { id: '美食', label: '美食 Foodie' }, { id: '親子', label: '親子 Family' }, { id: '攝影', label: '攝影 Photography' } ];
+  const availableLocations = ['全部', '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市', '墾丁', '宜蘭縣', '花蓮縣']; // ✨ 地區清單
+  
   const founderCount = creators.length;
   const founderMax = 50;
   const founderPercentage = Math.min((founderCount / founderMax) * 100, 100);
@@ -498,29 +538,49 @@ export default function CreatorsPage() {
 
         {/* Toolbar */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-8 sticky top-20 z-40">
-          <div className="flex flex-col md:flex-row gap-4 justify-between">
+          <div className="flex flex-col lg:flex-row gap-4 justify-between">
             <div className="flex flex-col md:flex-row gap-4 flex-1">
+              
+              {/* 關鍵字搜尋 */}
               <div className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input type="text" placeholder="搜尋網紅名稱..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                <input type="text" placeholder="搜尋網紅名稱或關鍵字..." className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all hover:bg-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar">
+              
+              {/* ✨ 地區篩選下拉 */}
+              <div className="relative min-w-[140px]">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                <select 
+                  className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 py-2.5 pl-9 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer hover:bg-white transition-colors" 
+                  value={locationFilter} 
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                >
+                  {availableLocations.map(loc => (
+                    <option key={loc} value={loc}>{loc === '全部' ? '所有地區' : loc}</option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+              </div>
+
+              {/* 分類按鈕 */}
+              <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0 no-scrollbar items-center">
                 {categories.map(cat => (
                   <button key={cat.id} onClick={() => setCategoryFilter(cat.id)} className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${categoryFilter === cat.id ? 'bg-sky-500 text-white shadow-md shadow-sky-200' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{cat.label}</button>
                 ))}
               </div>
             </div>
-            <div className="flex items-center gap-2 border-l border-slate-200 pl-4">
-              <span className="text-sm text-slate-500 hidden md:inline">排序：</span>
-              <div className="relative">
+            
+            {/* 排序 */}
+            <div className="flex items-center gap-2 lg:border-l border-slate-200 lg:pl-4 pt-4 lg:pt-0 border-t lg:border-t-0">
+              <span className="text-sm text-slate-500 whitespace-nowrap">排序：</span>
+              <div className="relative w-full lg:w-auto">
                 <select 
-                  className="appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer hover:bg-slate-50" 
+                  className="w-full appearance-none bg-white border border-slate-200 text-slate-700 py-2.5 pl-4 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer hover:bg-slate-50" 
                   value={sortBy} 
                   onChange={(e) => setSortBy(e.target.value as any)}
                 >
                   <option value="relevance">綜合推薦</option>
                   <option value="followers">粉絲數 (高到低)</option>
-                  {/* ✨ 新增排序選項 */}
                   <option value="views">平均觀看數 (高到低)</option>
                   <option value="score">完案信用評分 (高到低)</option>
                 </select>
@@ -534,10 +594,20 @@ export default function CreatorsPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-32 text-slate-400"><Loader2 className="w-10 h-10 animate-spin mb-4 text-sky-500" /><p className="font-medium tracking-widest uppercase text-xs">正在同步創作者資料...</p></div>
         ) : filteredCreators.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
-            <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Filter className="text-slate-400" /></div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">沒有找到符合條件的創作者</h3>
-            <button onClick={() => {setSearchTerm(''); setCategoryFilter('全部');}} className="mt-4 text-sky-600 font-bold hover:underline">清除所有篩選</button>
+          <div className="text-center py-24 bg-white rounded-2xl border border-dashed border-slate-300">
+            <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><Filter className="text-slate-400 w-8 h-8" /></div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">沒有找到符合條件的創作者</h3>
+            <p className="text-slate-500 text-sm mb-6">嘗試更換關鍵字、放寬地區或是選擇其他分類。</p>
+            <button 
+              onClick={() => {
+                setSearchTerm(''); 
+                setCategoryFilter('全部');
+                setLocationFilter('全部'); // 重置地區
+              }} 
+              className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-md active:scale-95"
+            >
+              清除所有篩選
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in zoom-in duration-500">
@@ -545,9 +615,9 @@ export default function CreatorsPage() {
               <div key={creator.id} onClick={() => setSelectedCreator(creator)}>
                 {/* 傳遞新指標到 Card 元件 */}
                 <CreatorCard creator={{
-                    ...creator, 
-                    averageViews: creator.averageViews, 
-                    completionScore: creator.completionScore
+                  ...creator, 
+                  averageViews: creator.averageViews, 
+                  completionScore: creator.completionScore
                 }} />
               </div>
             ))}
@@ -804,7 +874,7 @@ export default function CreatorsPage() {
                             setInviteMessage(`哈囉 ${selectedCreator.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源「${proj.title}」，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
                           }
                         }}
-                        className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors outline-none"
+                        className="w-full p-3 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors outline-none cursor-pointer"
                       >
                         <option value="">不附帶案源，直接發送訊息</option>
                         {projects.map(p => (
