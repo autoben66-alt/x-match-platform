@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Calendar, MapPin, Camera, Heart, Search, Filter, Users, Flame, Zap, Bed, Utensils, Ticket, Clock, 
-  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2, Lock, Crown, AlertCircle, LogIn
+  ArrowRight, X, CheckCircle, Send, Loader2, Instagram, Youtube, Globe, FileText, ChevronLeft, BarChart3, User, CheckCircle2, Lock, Crown, AlertCircle, LogIn, Link as LinkIcon, Star, MessageCircle
 } from 'lucide-react';
 
 // --- 自定義 Link 元件 (解決預覽環境問題) ---
@@ -17,7 +17,7 @@ const Link = ({ href, children, className, ...props }: any) => {
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, onSnapshot } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 
 // --- Firebase 初始化 ---
 const firebaseConfig = {
@@ -62,7 +62,30 @@ interface Trip {
   needs: string;
   status: 'Open' | 'Matched' | 'Completed' | string;
   tags: string[];
+  tier?: string; // ✨ 新增評級
+  averageViews?: number; // ✨ 新增觀看
+  completionScore?: number; // ✨ 新增評分
+  lineId?: string;
+  socialLinks?: any;
 }
+
+// ✨ 網紅評級顯示標籤組件
+const TierBadge = ({ tier }: { tier?: string }) => {
+  if (!tier || tier === '未評級') {
+    return <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">未評級</span>;
+  }
+  const colors: Record<string, string> = {
+    'S': 'bg-gradient-to-r from-yellow-300 to-amber-500 text-slate-900 border-amber-300 shadow-sm',
+    'A': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    'B': 'bg-sky-100 text-sky-700 border-sky-200',
+    'C': 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  };
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-black border flex items-center gap-1 w-fit ${colors[tier] || colors['C']}`}>
+      {tier === 'S' && <Crown size={12} />} {tier} 級
+    </span>
+  );
+};
 
 // 模擬行程資料
 const FALLBACK_TRIPS: Trip[] = [
@@ -72,7 +95,7 @@ const FALLBACK_TRIPS: Trip[] = [
     creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jason",
     creatorHandle: "@jason_visuals",
     creatorBio: "專業戶外攝影師，擅長捕捉自然光影與人像情感。曾與國家地理雜誌合作，Instagram 風格偏向冷色調電影感。",
-    creatorStats: { followers: "125k", engagement: "4.8%", verified: true },
+    creatorStats: { followers: "120k", engagement: "4.5%", verified: true },
     creatorPortfolio: [
       "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
       "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
@@ -87,7 +110,8 @@ const FALLBACK_TRIPS: Trip[] = [
     purpose: "拍攝星空銀河與飛魚季紀錄片，預計產出 YouTube 4K 影片。",
     needs: "尋找特色民宿，需有頂樓或陽台可拍星空，希望含機車租借。",
     status: "Open",
-    tags: ["攝影", "自然", "離島"]
+    tags: ["攝影", "自然", "離島"],
+    tier: "S", averageViews: 45000, completionScore: 5.0, lineId: "jason_shot"
   },
   {
     id: '2',
@@ -95,7 +119,7 @@ const FALLBACK_TRIPS: Trip[] = [
     creatorAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly",
     creatorHandle: "@elly_foodie",
     creatorBio: "台南在地美食部落客，喜歡挖掘巷弄裡的老宅咖啡與隱藏版甜點。照片風格明亮清新，粉絲多為年輕女性。",
-    creatorStats: { followers: "45k", engagement: "5.2%", verified: false },
+    creatorStats: { followers: "28k", engagement: "5.1%", verified: false },
     creatorPortfolio: [
       "https://images.unsplash.com/photo-1554118811-1e0d58224f24?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
       "https://images.unsplash.com/photo-1563379926898-05f4575a45d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80",
@@ -110,7 +134,8 @@ const FALLBACK_TRIPS: Trip[] = [
     purpose: "巷弄老宅咖啡廳與甜點店巡禮，發布 IG Reels。",
     needs: "尋找復古風格的咖啡廳或冰店，需有自然光座位。",
     status: "Open",
-    tags: ["美食", "老宅", "文青"]
+    tags: ["美食", "老宅", "文青"],
+    tier: "B", averageViews: 8500, completionScore: 5.0, lineId: "elly_eats"
   },
   {
     id: '3',
@@ -133,7 +158,8 @@ const FALLBACK_TRIPS: Trip[] = [
     purpose: "夏季露營裝備評測影片，推廣戶外生活風格。",
     needs: "露營區營位 x2，需有插座與乾淨衛浴。",
     status: "Open",
-    tags: ["露營", "戶外"]
+    tags: ["露營", "戶外"],
+    tier: "A", averageViews: 15000, completionScore: 4.8
   }
 ];
 
@@ -156,6 +182,7 @@ export default function TripsPage() {
   const [showAuthModal, setShowAuthModal] = useState(false); // 登入視窗
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示視窗
   const [isVerifying, setIsVerifying] = useState(false); // 登入驗證中
+  const [isSending, setIsSending] = useState(false);
 
   // Firebase 資料狀態
   const [trips, setTrips] = useState<Trip[]>([]);
@@ -186,12 +213,17 @@ export default function TripsPage() {
             creatorHandle: rawData.creatorHandle || fallbackSource.creatorHandle,
             creatorBio: rawData.creatorBio || fallbackSource.creatorBio,
             creatorStats: rawData.creatorStats || fallbackSource.creatorStats,
-            creatorPortfolio: rawData.creatorPortfolio || fallbackSource.creatorPortfolio
+            creatorPortfolio: rawData.creatorPortfolio || fallbackSource.creatorPortfolio,
+            tier: rawData.tier || fallbackSource.tier,
+            averageViews: rawData.averageViews || fallbackSource.averageViews,
+            completionScore: rawData.completionScore || fallbackSource.completionScore,
+            lineId: rawData.lineId || fallbackSource.lineId,
+            socialLinks: rawData.socialLinks || fallbackSource.socialLinks
           };
         });
         setTrips(data.sort((a, b) => b.id.localeCompare(a.id)));
       } else {
-        setTrips([]);
+        setTrips(FALLBACK_TRIPS);
       }
       setIsLoading(false);
     }, (err) => {
@@ -243,6 +275,25 @@ export default function TripsPage() {
     setInviteStep('form');
   };
 
+  // 處理「LINE 聯繫」點擊 (權限檢查: 必須登入且為 Pro)
+  const handleLineContact = (e: React.MouseEvent) => {
+    e.preventDefault(); 
+    if (!isProviderLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
+    if (providerPlan !== 'pro') {
+      setShowUpgradeModal(true); 
+      return;
+    }
+    if (selectedTrip && selectedTrip.lineId) {
+      const lineUrl = `https://line.me/ti/p/~${selectedTrip.lineId}`;
+      window.open(lineUrl, '_blank');
+    } else {
+      alert("此創作者尚未提供 LINE 聯繫方式。");
+    }
+  };
+
   // 執行登入 (模擬後台驗證)
   const handleLogin = () => {
     setIsVerifying(true);
@@ -259,38 +310,56 @@ export default function TripsPage() {
         
         if (isPaidMember) {
             setProviderPlan('pro');
-            // 付費版直接通過，進入表單
-            setInviteStep('form');
         } else {
             setProviderPlan('free');
-            // 免費版需檢查額度
-            if (usageCount >= FREE_LIMIT) {
-                setShowUpgradeModal(true);
-            } else {
-                setInviteStep('form');
-            }
         }
     }, 1200);
   };
 
   // 確認發送
-  const confirmInvite = () => {
-    // 若為免費版，扣除額度
-    if (providerPlan === 'free') {
-        setUsageCount(prev => prev + 1);
+  const confirmInvite = async () => {
+    if (!db) {
+       // 模擬成功
+       if (providerPlan === 'free') setUsageCount(prev => prev + 1);
+       setIsSending(true);
+       setTimeout(() => {
+         setIsSending(false);
+         setIsSuccess(true);
+         setTimeout(() => { setSelectedTrip(null); setIsSuccess(false); }, 2000);
+       }, 800);
+       return;
     }
 
-    setTimeout(() => {
+    setIsSending(true);
+    try {
+      const newId = `inv-${Date.now()}`;
+      const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', newId);
+      
+      await setDoc(invRef, {
+        id: newId,
+        fromName: '合作廠商', 
+        toName: selectedTrip?.creatorName || '創作者',
+        toHandle: selectedTrip?.creatorHandle || '',
+        toAvatar: selectedTrip?.creatorAvatar || '',
+        message: message,
+        status: '待回覆',
+        date: new Date().toLocaleString('zh-TW', { hour12: false }),
+        type: 'invite'
+      });
+
+      if (providerPlan === 'free') setUsageCount(prev => prev + 1);
+      setIsSending(false);
       setIsSuccess(true);
-      setTimeout(() => {
-        setSelectedTrip(null);
-        setIsSuccess(false);
-      }, 2000);
-    }, 800);
+      setTimeout(() => { setSelectedTrip(null); setIsSuccess(false); }, 2000);
+    } catch (error) {
+      console.error("發送邀請失敗:", error);
+      alert("發送失敗，請稍後再試。");
+      setIsSending(false);
+    }
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 font-sans pb-32">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
         <div>
@@ -389,7 +458,10 @@ export default function TripsPage() {
                      )}
                   </div>
                 </div>
-                <p className="text-sm font-bold text-slate-900 mb-1">{trip.creatorName}</p>
+                <div className="flex items-center gap-1.5 mb-1 mt-1">
+                   <p className="text-sm font-bold text-slate-900">{trip.creatorName}</p>
+                   <TierBadge tier={trip.tier} />
+                </div>
                 <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 px-2 py-1 rounded-full mt-1 border border-slate-100">
                   <Users size={12} />
                   {trip.partySize}
@@ -495,15 +567,18 @@ export default function TripsPage() {
 
       {/* --- Unified Modal: Profile Preview & Invitation --- */}
       {selectedTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white sm:rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200 flex flex-col h-full sm:max-h-[90vh]">
             
             {/* Header: Always show Creator basic info */}
             <div className="bg-slate-50 border-b border-slate-100 p-4 flex justify-between items-center shrink-0">
                <div className="flex items-center gap-3">
                  <img src={selectedTrip.creatorAvatar} className="w-10 h-10 rounded-full border border-white shadow-sm" alt="Avatar"/>
                  <div>
-                    <h3 className="font-bold text-slate-900">{selectedTrip.creatorName}</h3>
+                    <h3 className="font-bold text-slate-900 flex items-center gap-1.5">
+                       {selectedTrip.creatorName}
+                       <TierBadge tier={selectedTrip.tier} />
+                    </h3>
                     <p className="text-xs text-slate-500">{selectedTrip.creatorHandle}</p>
                  </div>
                </div>
@@ -537,14 +612,14 @@ export default function TripsPage() {
                          <p className="font-bold text-slate-900 text-lg">{selectedTrip.creatorStats?.followers}</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                         <p className="text-xs text-slate-400 mb-1">互動率</p>
-                         <p className="font-bold text-green-600 text-lg">{selectedTrip.creatorStats?.engagement}</p>
+                         <p className="text-xs text-slate-400 mb-1">平均觀看</p>
+                         <p className="font-bold text-green-600 text-lg">{selectedTrip.averageViews ? (selectedTrip.averageViews/1000).toFixed(1)+'k' : 'N/A'}</p>
                       </div>
                       <div className="text-center p-3 bg-slate-50 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
-                         <p className="text-xs text-slate-400 mb-1">官方認證</p>
-                         {selectedTrip.creatorStats?.verified ? (
-                           <CheckCircle2 size={24} className="text-blue-500 fill-blue-50" />
-                         ) : <span className="text-slate-300">-</span>}
+                         <p className="text-xs text-slate-400 mb-1">完案信用</p>
+                         <p className="font-bold text-indigo-600 text-lg flex items-center justify-center gap-1">
+                            {selectedTrip.completionScore || '5.0'} <Star size={14} className="fill-yellow-400 text-yellow-400"/>
+                         </p>
                       </div>
                    </div>
 
@@ -556,12 +631,14 @@ export default function TripsPage() {
                       <p className="text-sm text-slate-600 leading-relaxed bg-white border border-slate-100 p-3 rounded-lg">
                         {selectedTrip.creatorBio || "這位創作者很害羞，暫時沒有自我介紹。"}
                       </p>
-                      {/* Social Links */}
-                      <div className="flex gap-3 mt-3">
-                        <button className="p-2 bg-slate-50 rounded-full text-slate-500 hover:text-pink-600 hover:bg-pink-50 transition-colors"><Instagram size={18}/></button>
-                        <button className="p-2 bg-slate-50 rounded-full text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors"><Youtube size={18}/></button>
-                        <button className="p-2 bg-slate-50 rounded-full text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Globe size={18}/></button>
-                      </div>
+                      {/* ✨ 社群連結 */}
+                      {selectedTrip.socialLinks && (
+                         <div className="flex gap-3 mt-3">
+                           {selectedTrip.socialLinks.ig && <a href={selectedTrip.socialLinks.ig} target="_blank" rel="noreferrer" className="p-2 bg-pink-50 rounded-full text-pink-600 hover:bg-pink-100 transition-colors"><Instagram size={18}/></a>}
+                           {selectedTrip.socialLinks.yt && <a href={selectedTrip.socialLinks.yt} target="_blank" rel="noreferrer" className="p-2 bg-red-50 rounded-full text-red-600 hover:bg-red-100 transition-colors"><Youtube size={18}/></a>}
+                           {selectedTrip.socialLinks.other && <a href={selectedTrip.socialLinks.other} target="_blank" rel="noreferrer" className="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 transition-colors"><LinkIcon size={18}/></a>}
+                         </div>
+                      )}
                    </div>
 
                    {/* Portfolio */}
@@ -623,15 +700,19 @@ export default function TripsPage() {
 
             {/* Footer Actions */}
             {!isSuccess && (
-              <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3 shrink-0">
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-white sm:bg-slate-50 flex gap-3 shrink-0">
                 {inviteStep === 'profile' ? (
                   <>
-                    <button 
-                      onClick={() => setSelectedTrip(null)}
-                      className="flex-1 py-3 border border-slate-300 rounded-xl font-bold text-slate-600 hover:bg-white transition-colors"
-                    >
-                      再看看
-                    </button>
+                    {/* ✨ LINE 聯繫按鈕 (防跳島) */}
+                    {providerPlan === 'pro' ? (
+                       <button onClick={handleLineContact} className="flex-1 sm:flex-none py-3 px-4 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-md flex items-center justify-center gap-1 active:scale-95 transition-all">
+                         <MessageCircle size={18}/> LINE
+                       </button>
+                    ) : (
+                       <button onClick={() => setShowUpgradeModal(true)} className="flex-1 sm:flex-none py-3 px-4 bg-slate-800 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-1 active:scale-95 transition-all text-sm">
+                         <Lock size={16}/> LINE
+                       </button>
+                    )}
                     <button 
                       onClick={handleGoToInvite}
                       className="flex-[2] py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95"
@@ -649,10 +730,11 @@ export default function TripsPage() {
                     </button>
                     <button 
                       onClick={confirmInvite}
-                      className="flex-[2] py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95"
+                      disabled={isSending}
+                      className="flex-[2] py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                      <Send size={18} />
-                      確認發送
+                      {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                      {isSending ? '發送中...' : '確認發送'}
                     </button>
                   </>
                 )}
@@ -703,16 +785,24 @@ export default function TripsPage() {
         </div>
       )}
 
-      {/* --- Upgrade Alert Modal (額度不足提示) --- */}
+      {/* --- Upgrade Alert Modal (額度不足 / 權限提示) --- */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <AlertCircle size={32} className="text-red-500" />
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                 {providerPlan === 'free' && usageCount >= FREE_LIMIT ? (
+                    <AlertCircle size={32} className="text-red-500" />
+                 ) : (
+                    <Lock size={32} className="text-amber-500" />
+                 )}
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">免費額度已用完</h2>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">
+                 {providerPlan === 'free' && usageCount >= FREE_LIMIT ? '免費額度已用完' : '付費會員專屬功能'}
+              </h2>
               <p className="text-slate-500 text-sm mb-6">
-                 您本月的 {FREE_LIMIT} 次邀請額度已達上限。<br/>升級至專業版即可解鎖無限邀請！
+                 {providerPlan === 'free' && usageCount >= FREE_LIMIT 
+                   ? `您本月的 ${FREE_LIMIT} 次邀請額度已達上限。\n升級至專業版即可解鎖無限邀請！`
+                   : `「LINE 直接聯繫」為專業版 (Pro) 專屬功能。\n升級後即可查看所有創作者的私人聯繫方式！`}
               </p>
               
               <div className="space-y-3">
@@ -720,7 +810,7 @@ export default function TripsPage() {
                    onClick={() => {
                        setProviderPlan('pro'); // 模擬升級
                        setShowUpgradeModal(false);
-                       setInviteStep('form');
+                       if(inviteStep === 'form') setInviteStep('form');
                    }}
                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                  >
