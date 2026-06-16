@@ -1,12 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-// 移除 next/link 引用，改用下方自定義的 Link 元件
 import { 
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye, Lock, Link as LinkIcon, Instagram, Youtube, Sparkles
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -54,8 +53,8 @@ type Tab = 'overview' | 'projects' | 'trips' | 'contracts' | 'wallet' | 'setting
 
 interface ProjectData {
   id: string; title: string; category: string; type: string; location: string; 
-  totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
-  status: string; applicants: number; date: string; image?: string; gallery?: string[];
+  numericValue: number; totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
+  status: string; applicants: number; date: string; image?: string; gallery?: string[]; requiredTier?: string;
 }
 
 interface TripData {
@@ -78,6 +77,7 @@ interface InvitationData {
   fromLineId?: string;
   businessReview?: ReviewData;
   creatorReview?: ReviewData;
+  extraConditions?: string; // ✨ 新增加碼提案條件
 }
 
 interface PaymentItem {
@@ -91,11 +91,14 @@ export default function DashboardPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
+  // 業者權限
+  const [providerPlan, setProviderPlan] = useState<'free' | 'pro'>('free');
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [newProject, setNewProject] = useState({
     title: '', category: '住宿', type: '互惠體驗', location: '',
-    totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[]
+    numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[]
   });
   const [isUploading, setIsUploading] = useState(false);
   
@@ -123,7 +126,9 @@ export default function DashboardPage() {
   const [creatorProfile, setCreatorProfile] = useState({
     name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
     bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
+    tier: '未評級', // ✨ 新增網紅評級
     coverImage: '', avatar: '', portfolio: [] as string[],
+    socialLinks: { ig: '', yt: '', tiktok: '', other: '' }, // ✨ 新增社群連結
     rates: { post: 5000, story: 1500, reels: 8000 },
     audience: { gender: '女性 85%', age: '25-34歲', topCity: '台北/新北' },
     averageViews: 5000,
@@ -186,19 +191,23 @@ export default function DashboardPage() {
 
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists() && role === 'creator') {
+      if (docSnap.exists()) {
         const d = docSnap.data();
-        if (d.role === '創作者') {
+        if (role === 'creator' && d.role === '創作者') {
           setCreatorProfile(prev => ({
             ...prev,
             name: d.name || prev.name, handle: d.handle || prev.handle, lineId: d.lineId || prev.lineId,
             location: d.location || prev.location, tags: d.tags ? d.tags.join(', ') : prev.tags,
+            tier: d.tier || '未評級',
+            socialLinks: d.socialLinks || prev.socialLinks,
             bio: d.bio || prev.bio, coverImage: d.coverImage || '',
             avatar: d.avatar || '', portfolio: d.portfolio || [],
             rates: d.rates || prev.rates, audience: d.audience || prev.audience,
             averageViews: d.averageViews || prev.averageViews,
             completionScore: d.completionScore || prev.completionScore
           }));
+        } else if (role === 'business') {
+          setProviderPlan(d.plan === 'Pro' ? 'pro' : 'free');
         }
       }
     });
@@ -258,19 +267,23 @@ export default function DashboardPage() {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProject.title || !newProject.location) { alert("請填寫必填欄位"); return; }
+    if (!newProject.title || !newProject.location || newProject.numericValue <= 0) { alert("請填寫完整資訊與總價值"); return; }
     if (!db || !fbUser) return;
     const newId = Date.now().toString();
+    const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制'; // ✨ S級判斷邏輯
+
     try {
       await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId), {
         id: newId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
-        totalValue: newProject.totalValue || 'NT$ 未定', valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
+        numericValue: newProject.numericValue, totalValue: `NT$ ${newProject.numericValue.toLocaleString()}`, 
+        valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
         spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
+        requiredTier: requiredTier,
         image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
         gallery: newProject.gallery
       });
       setShowCreateModal(false);
-      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', totalValue: '', valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
+      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
     } catch (err) { console.error(err); }
   };
 
@@ -298,6 +311,7 @@ export default function DashboardPage() {
         joinDate: new Date().toLocaleDateString('zh-TW'), handle: creatorProfile.handle, lineId: creatorProfile.lineId, location: creatorProfile.location,
         tags: creatorProfile.tags.split(',').map(t => t.trim()).filter(Boolean), bio: creatorProfile.bio, coverImage: creatorProfile.coverImage,
         avatar: creatorProfile.avatar, portfolio: creatorProfile.portfolio, rates: creatorProfile.rates, audience: creatorProfile.audience,
+        socialLinks: creatorProfile.socialLinks, tier: creatorProfile.tier,
         followers: 12000, engagement: 4.5, completedJobs: 0,
         averageViews: creatorProfile.averageViews, completionScore: creatorProfile.completionScore
       }, { merge: true });
@@ -363,7 +377,37 @@ export default function DashboardPage() {
 
   const handleManageApplicants = (project: ProjectData) => {
     const apps = invitations.filter(inv => inv.projectId === project.id && inv.type === 'application');
-    setCurrentProjectApplicants(apps);
+    
+    // ✨ 模擬資料：展示如果有低等級網紅越級應徵，會帶有加碼條件
+    const simulatedApps = apps.length > 0 ? apps : [
+      {
+        id: `mock-app-${Date.now()}`,
+        fromName: "潛力新星",
+        toName: "海角七號民宿",
+        toHandle: "@new_star",
+        toAvatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=newstar",
+        message: "您好，我非常喜歡這間海景房！雖然我的等級尚未達到 S 級，但我願意提供額外的曝光資源來爭取這次合作機會。",
+        status: "待審核",
+        date: new Date().toLocaleDateString('zh-TW'),
+        projectId: project.id,
+        projectTitle: project.title,
+        type: 'application' as const,
+        extraConditions: "✅ 加碼一支 YouTube 10 分鐘開箱長影片\n✅ 同步發布 3 篇 IG 限動並標記帳號",
+        creatorInfo: {
+          name: "潛力新星",
+          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=newstar",
+          followers: 8500,
+          averageViews: 2000,
+          completionScore: 4.8,
+          tier: 'A',
+          lineId: "new_star_line",
+          tags: ["旅遊", "新秀"],
+          socialLinks: { ig: "https://instagram.com", yt: "https://youtube.com" }
+        }
+      }
+    ];
+
+    setCurrentProjectApplicants(simulatedApps);
     setCurrentProjectTitle(project.title);
     setShowApplicantsModal(true);
   };
@@ -378,20 +422,31 @@ export default function DashboardPage() {
             id: newTxId, user: role === 'business' ? '海角七號民宿' : creatorProfile.name, item: purchaseItem.name,
             amount: purchaseItem.price, status: '成功', date: new Date().toLocaleString('zh-TW', { hour12: false })
           });
+          
+          if (purchaseItem.id === 'pro' && role === 'business') {
+            await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid), {
+              plan: 'Pro'
+            });
+            setProviderPlan('pro');
+          }
         } catch (err) { console.error(err); }
       }
       setPaymentStep('success');
     }, 2000);
   };
 
-  const handleAuth = (e: React.FormEvent) => { 
+  const handleAuth = async (e: React.FormEvent) => { 
     e.preventDefault(); 
-    setTimeout(() => {
-      setIsLoggedIn(true);
-      localStorage.setItem('xmatch_logged_in', 'true');
-      // 注意：role 在登入前就已經在 Modal 中透過 handleRoleSwitch 設定好了
-      // 這裡只需要確認登入狀態
-    }, 800); 
+    if (!auth) return;
+    try {
+      await signInAnonymously(auth);
+      setTimeout(() => {
+        setIsLoggedIn(true);
+        localStorage.setItem('xmatch_logged_in', 'true');
+      }, 800); 
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const handleLogout = () => {
@@ -408,6 +463,24 @@ export default function DashboardPage() {
 
   const themeText = role === 'business' ? 'text-indigo-600' : 'text-purple-600';
   const themeBg = role === 'business' ? 'bg-indigo-600' : 'bg-purple-600';
+
+  // ✨ 網紅評級顯示標籤組件
+  const TierBadge = ({ tier }: { tier?: string }) => {
+    if (!tier || tier === '未評級') {
+      return <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">未評級</span>;
+    }
+    const colors: Record<string, string> = {
+      'S': 'bg-gradient-to-r from-yellow-300 to-amber-500 text-slate-900 border-amber-300 shadow-sm',
+      'A': 'bg-indigo-100 text-indigo-700 border-indigo-200',
+      'B': 'bg-sky-100 text-sky-700 border-sky-200',
+      'C': 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    };
+    return (
+      <span className={`px-2 py-0.5 rounded text-[10px] font-black border flex items-center gap-1 w-fit ${colors[tier] || colors['C']}`}>
+        {tier === 'S' && <Crown size={12} />} {tier} 級
+      </span>
+    );
+  };
 
   if (!isLoggedIn) {
     return (
@@ -494,9 +567,17 @@ export default function DashboardPage() {
         const myReceivedInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-bold text-slate-900">
-              {role === 'business' ? '早安，海角七號民宿 👋' : `早安，${creatorProfile.name} 👋`}
-            </h2>
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-bold text-slate-900">
+                {role === 'business' ? '早安，海角七號民宿 👋' : `早安，${creatorProfile.name} 👋`}
+              </h2>
+              {role === 'business' && (
+                <div className="flex items-center gap-2 bg-slate-900 text-white px-3 py-1.5 rounded-lg shadow-sm text-xs font-bold">
+                  {providerPlan === 'pro' ? <><Crown size={14} className="text-yellow-400"/> Pro 專業版</> : 'Free 免費版'}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {role === 'business' ? (
                 <>
@@ -518,12 +599,12 @@ export default function DashboardPage() {
                 </>
               ) : (
                 <>
-                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-sm text-slate-500 mb-1">Media Kit 瀏覽數</p>
-                    <div className="flex items-baseline gap-2">
-                      <h3 className="text-3xl font-bold text-slate-900">856</h3>
-                      <span className="text-xs font-bold text-green-600 flex items-center"><TrendingUp size={12}/> +24%</span>
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <p className="text-sm text-slate-500 mb-1">目前評級</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1 mb-2"><TierBadge tier={creatorProfile.tier} /></h3>
                     </div>
+                    <p className="text-xs text-slate-400">努力接案提升信用分數可升級！</p>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm cursor-pointer hover:border-indigo-300" onClick={() => setActiveTab('invitations')}>
                     <p className="text-sm text-slate-500 mb-1">收到的邀請</p>
@@ -592,10 +673,10 @@ export default function DashboardPage() {
                   <thead className="bg-slate-50 text-slate-500 border-b border-slate-200">
                     <tr>
                       <th className="px-6 py-4 font-bold">標題</th>
+                      <th className="px-6 py-4 font-bold">等級限制</th>
                       <th className="px-6 py-4 font-bold">分類</th>
                       <th className="px-6 py-4 font-bold">狀態</th>
                       <th className="px-6 py-4 font-bold">應徵人數</th>
-                      <th className="px-6 py-4 font-bold">發布日期</th>
                       <th className="px-6 py-4 font-bold text-right">操作</th>
                     </tr>
                   </thead>
@@ -606,13 +687,15 @@ export default function DashboardPage() {
                         <tr key={project.id} className="hover:bg-slate-50 transition-colors">
                           <td className="px-6 py-4 font-bold text-slate-900">{project.title}</td>
                           <td className="px-6 py-4">
+                             {project.requiredTier === 'S' ? <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-1 rounded font-bold border border-amber-200">S 級優先</span> : <span className="text-slate-400 text-xs">無限制</span>}
+                          </td>
+                          <td className="px-6 py-4">
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 text-xs font-bold">{project.category}</span>
                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${project.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{project.status}</span>
                           </td>
                           <td className="px-6 py-4"><div className="flex items-center gap-1.5 font-bold text-slate-700"><Users size={14} className="text-slate-400"/> {applicantCount} 人</div></td>
-                          <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
                           <td className="px-6 py-4 text-right"><button onClick={() => handleManageApplicants(project)} className={`font-bold hover:underline ${themeText}`}>管理名單</button></td>
                         </tr>
                       );
@@ -625,7 +708,7 @@ export default function DashboardPage() {
             {/* --- 管理應徵者名單 Modal (Upgrade) --- */}
             {showApplicantsModal && (
               <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <div><h3 className="font-bold text-lg text-slate-900">應徵者名單</h3><p className="text-xs text-slate-500 mt-1">案源：{currentProjectTitle}</p></div>
                     <button onClick={() => setShowApplicantsModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
@@ -642,52 +725,50 @@ export default function DashboardPage() {
                                <div className="flex flex-col sm:flex-row items-start gap-5 mb-5 border-b border-slate-100 pb-5">
                                  <div className="relative shrink-0">
                                    <img src={info.avatar || app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-16 h-16 rounded-full border-4 border-slate-50 shadow-sm" alt="Avatar"/>
-                                   {info.followers > 10000 && <div className="absolute -bottom-1 -right-1 bg-yellow-400 text-white p-1 rounded-full border-2 border-white"><Crown size={12} fill="currentColor"/></div>}
                                  </div>
                                  
                                  <div className="flex-1 w-full">
                                    <div className="flex justify-between items-start">
                                       <div>
-                                         <div className="flex items-center gap-2">
+                                         <div className="flex items-center gap-2 mb-1">
                                             <h4 className="font-bold text-slate-900 text-lg">{info.name || app.fromName}</h4>
-                                            {info.lineId && <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded font-bold">LINE OK</span>}
+                                            <TierBadge tier={info.tier} />
                                          </div>
                                          <div className="flex gap-3 text-xs text-slate-500 mt-1.5 font-medium">
                                             <span className="flex items-center gap-1"><Users size={12}/> {info.followers ? (info.followers/1000).toFixed(1) + 'k' : 'N/A'} 粉絲</span>
                                             <span className="text-slate-300">|</span>
                                             <span className="flex items-center gap-1"><Eye size={12}/> {info.averageViews ? (info.averageViews/1000).toFixed(1)+'k' : 'N/A'} 觀看</span>
-                                            <span className="text-slate-300">|</span>
-                                            <span className="flex items-center gap-1"><Star size={12} className="fill-yellow-400 text-yellow-400"/> {info.completionScore || '5.0'} 信用</span>
-                                         </div>
-                                         <div className="mt-3 flex flex-wrap gap-1.5">
-                                            {info.tags?.map((t:string, i:number) => <span key={i} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-1 rounded font-medium">#{t}</span>)}
                                          </div>
                                       </div>
                                       <div className="flex flex-col items-end gap-2">
                                         <span className={`px-3 py-1 rounded-full text-xs font-bold shadow-sm ${app.status === '待審核' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
                                             {app.status}
                                         </span>
-                                        {/* 當已接受時顯示的按鈕 */}
                                         {app.status === '已接受' && (
-                                            <div className="flex gap-2 justify-end flex-wrap">
-                                                {/* LINE 聯繫 */}
-                                                {info.lineId ? (
-                                                  <a 
-                                                      href={`https://line.me/ti/p/~${info.lineId}`}
-                                                      target="_blank" 
-                                                      rel="noreferrer"
-                                                      className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
-                                                  >
-                                                      <MessageCircle size={12}/> LINE
-                                                  </a>
+                                            <div className="flex gap-2 justify-end flex-wrap mt-2">
+                                                {/* ✨ 付費牆：LINE 聯繫 */}
+                                                {providerPlan === 'pro' ? (
+                                                  info.lineId ? (
+                                                    <a 
+                                                        href={`https://line.me/ti/p/~${info.lineId}`}
+                                                        target="_blank" 
+                                                        rel="noreferrer"
+                                                        className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
+                                                    >
+                                                        <MessageCircle size={12}/> LINE
+                                                    </a>
+                                                  ) : (
+                                                      <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
+                                                  )
                                                 ) : (
-                                                    <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
+                                                  <button onClick={() => { setShowApplicantsModal(false); setActiveTab('wallet'); }} className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-[10px] font-bold hover:bg-slate-700 flex items-center gap-1 shadow-sm transition-colors">
+                                                      <Lock size={10}/> 升級解鎖 LINE
+                                                  </button>
                                                 )}
-                                                {/* 智能合約 */}
+
                                                 <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
                                                     <FileSignature size={12}/> 合約
                                                 </Link>
-                                                {/* 結案評價 */}
                                                 {myReview ? (
                                                   <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
                                                     <Star size={12} className="fill-yellow-500 text-yellow-500"/> {myReview.rating} 已評價
@@ -714,13 +795,21 @@ export default function DashboardPage() {
                                  <FileText size={16}/> 查看完整履歷 (Media Kit)
                                </button>
                                
-                               <div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl mb-5 italic border border-slate-100 relative">
+                               <div className="text-sm text-slate-600 bg-slate-50 p-4 rounded-xl mb-4 italic border border-slate-100 relative">
                                  <div className="absolute top-3 left-3 text-slate-300"><MessageCircle size={16}/></div>
-                                 <span className="pl-6 block">"{app.message}"</span>
+                                 <span className="pl-6 block leading-relaxed">{app.message}</span>
                                </div>
+
+                               {/* ✨ 加碼提案顯示區塊 */}
+                               {app.extraConditions && (
+                                 <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-5">
+                                   <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1"><Sparkles size={14}/> 創作者加碼條件 (爭取 S 級案源)</p>
+                                   <p className="text-sm text-orange-900 font-medium whitespace-pre-line">{app.extraConditions}</p>
+                                 </div>
+                               )}
                                
                                {app.status === '待審核' ? (
-                                 <div className="flex gap-3">
+                                 <div className="flex gap-3 mt-4">
                                    <button onClick={() => handleUpdateInviteStatus(app.id, '已婉拒')} className="flex-1 py-3 border border-red-200 text-red-600 rounded-xl text-sm font-bold hover:bg-red-50 transition-colors">婉拒申請</button>
                                    <button onClick={() => handleUpdateInviteStatus(app.id, '已接受')} className="flex-1 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors shadow-md">接受並開始合作</button>
                                  </div>
@@ -742,10 +831,9 @@ export default function DashboardPage() {
               </div>
             )}
             
+            {/* 發布新案源 Modal */}
             {showCreateModal && (
                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                 {/* ... (Create Project Modal) ... */}
-                 {/* ... code ... */}
                  <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
@@ -778,7 +866,7 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相簿 (Gallery)</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-2">上傳環境相片 (建議上傳真實美照以吸引網紅)</label>
                             <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar items-center">
                               <label className="shrink-0 w-20 h-20 bg-slate-50 rounded-lg flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors relative overflow-hidden">
                                 {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-indigo-500" /> : <><Plus size={24} /><span className="text-[10px] mt-1 font-bold">選擇照片</span></>}
@@ -791,7 +879,6 @@ export default function DashboardPage() {
                                 </div>
                               ))}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">支援多圖上傳，第一張將預設為前台封面主圖。(需在 Firebase 後台開啟 Storage 服務)</p>
                           </div>
                         </div>
                       </div>
@@ -810,25 +897,44 @@ export default function DashboardPage() {
                               <input type="number" min="1" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" value={newProject.spots} onChange={(e) => setNewProject({...newProject, spots: Number(e.target.value)})} />
                             </div>
                           </div>
+                          
+                          {/* ✨ 新增：輸入數值以判定網紅等級限制 */}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值</label>
-                              <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600" placeholder="例如：NT$ 8,800" value={newProject.totalValue} onChange={(e) => setNewProject({...newProject, totalValue: e.target.value})} />
+                              <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值 (填寫數字 NT$)</label>
+                              <input 
+                                type="number" 
+                                min="0"
+                                className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-bold text-indigo-600" 
+                                placeholder="例如：8800" 
+                                value={newProject.numericValue} 
+                                onChange={(e) => setNewProject({...newProject, numericValue: Number(e.target.value)})} 
+                              />
                             </div>
                             <div>
-                              <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解</label>
+                              <label className="block text-xs font-bold text-slate-700 mb-1">價值拆解說明</label>
                               <input type="text" className="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm" placeholder="例如：住宿($6800) + 早餐($800)" value={newProject.valueBreakdown} onChange={(e) => setNewProject({...newProject, valueBreakdown: e.target.value})} />
                             </div>
                           </div>
+
+                          {/* 自動判定 S 級提示 */}
+                          {newProject.numericValue >= 30000 && (
+                            <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-xs mt-2 shadow-sm animate-in fade-in slide-in-from-top-2">
+                              <p className="font-bold mb-1 flex items-center gap-1"><Crown size={14} className="text-amber-500"/> 高價值案源設定</p>
+                              系統判定此案源總價值超過 30,000 元，將自動標示為 <b>S 級網紅優先</b>。<br/>
+                              (A、B、C 級網紅仍可應徵，但系統將強制要求他們提出「加碼條件」，例如：多一篇貼文或短影音，方可送出申請。)
+                            </div>
+                          )}
+
                           <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">交付內容需求</label>
+                            <label className="block text-xs font-bold text-slate-700 mb-1">基本交付內容需求</label>
                             <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：IG 貼文 1 則 + 限動 3 則..." value={newProject.requirements} onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}></textarea>
                           </div>
                         </div>
                       </div>
                       <div className="pt-4 border-t border-slate-200">
                         <button type="submit" className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                          <CheckCircle2 size={18} /> 立即同步發布
+                          <CheckCircle2 size={18} /> 確認發布
                         </button>
                       </div>
                     </form>
@@ -839,7 +945,6 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in duration-300">
-            {/* ... creator projects ... */}
             <h2 className="text-2xl font-bold text-slate-900">我的應徵紀錄</h2>
             <div className="grid gap-4">
               <div className="bg-white p-6 rounded-xl border border-slate-200 flex items-center justify-between hover:shadow-md transition-shadow">
@@ -863,7 +968,6 @@ export default function DashboardPage() {
 
       case 'invitations':
         if (role === 'business') {
-          // ... business invitations ...
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h2 className="text-2xl font-bold text-slate-900">已發送的邀請</h2>
@@ -872,7 +976,7 @@ export default function DashboardPage() {
                   {invitations.map((inv) => (
                     <div key={inv.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-md transition-shadow">
                       <div className="flex items-center gap-4 md:w-1/3 shrink-0">
-                        <img src={inv.toAvatar} className="w-12 h-12 rounded-full border border-slate-200" alt="avatar" />
+                        <img src={inv.toAvatar} className="w-12 h-12 rounded-full border border-slate-200 object-cover" alt="avatar" />
                         <div>
                           <p className="font-bold text-slate-900">{inv.toName}</p>
                           <p className="text-xs text-slate-500">{inv.toHandle}</p>
@@ -897,13 +1001,20 @@ export default function DashboardPage() {
                              }`}>{inv.status}</span>
                              {inv.status === '已接受' && (
                                <div className="flex gap-2">
-                                  {inv.creatorInfo?.lineId ? (
-                                    <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
+                                  {/* ✨ 付費牆：只有 Pro 才能點擊網紅 LINE */}
+                                  {providerPlan === 'pro' ? (
+                                    inv.creatorInfo?.lineId ? (
+                                      <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
+                                    ) : (
+                                      <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
+                                    )
                                   ) : (
-                                    <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
+                                    <button onClick={() => setActiveTab('wallet')} className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-[10px] font-bold hover:bg-slate-700 flex items-center gap-1 shadow-sm transition-colors">
+                                      <Lock size={10}/> 升級解鎖 LINE
+                                    </button>
                                   )}
+                                  
                                   <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
-                                  {/* 評價按鈕 or 已評價顯示 */}
                                   {inv.businessReview ? (
                                     <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
                                       <Star size={12} className="fill-yellow-500 text-yellow-500"/> {inv.businessReview.rating} 已評價
@@ -1013,7 +1124,6 @@ export default function DashboardPage() {
         }
 
       case 'trips':
-        // ... trips ...
         return role === 'creator' ? (
           <div className="space-y-6 animate-in fade-in duration-300">
             <div className="flex justify-between items-center">
@@ -1121,7 +1231,6 @@ export default function DashboardPage() {
         ) : null;
 
       case 'contracts':
-        // ... contracts ...
         return (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -1148,7 +1257,6 @@ export default function DashboardPage() {
         );
 
       case 'wallet':
-        // ... wallet ...
         return role === 'business' ? (
           <div className="space-y-8">
             <h2 className="text-2xl font-bold text-slate-900">訂閱與點數</h2>
@@ -1166,10 +1274,13 @@ export default function DashboardPage() {
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 查看所有公開行程許願池</li>
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約 (每月 1 份)</li>
                     <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅深度數據</li>
+                    <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅 LINE 聯繫方式</li>
                   </ul>
                 </div>
                 <div className="mt-auto">
-                  <button className="w-full py-2 bg-slate-100 text-slate-400 font-bold rounded-xl cursor-not-allowed">使用中</button>
+                  <button className={`w-full py-2 font-bold rounded-xl ${providerPlan === 'free' ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                    {providerPlan === 'free' ? '使用中' : '降級回免費版'}
+                  </button>
                 </div>
               </div>
 
@@ -1182,17 +1293,22 @@ export default function DashboardPage() {
                   </div>
                   <ul className="space-y-3 mb-6 text-indigo-100">
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送合作邀請</li>
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 解鎖直接查看網紅 LINE ID</li>
                     <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 網紅深度數據解鎖 (受眾分析)</li>
                     <li className="flex items-center text-sm"><Shield className="w-4 h-4 text-white mr-2"/> 無限使用智能合約與數位簽署</li>
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 優先客服支援</li>
-                    <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 贈送每月置頂推廣 ($300) 每月一次</li>
-                    <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 贈送每月精準推播 每月一次</li>
                   </ul>
                 </div>
                 <div className="mt-auto">
-                  <button onClick={() => { setPurchaseItem({ id: 'pro', name: '專業成長版 Pro (月費)', price: 999, type: 'subscription' }); setPaymentStep('form'); }} className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg active:scale-95">
-                    立即升級 Pro
-                  </button>
+                  {providerPlan === 'pro' ? (
+                    <button className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl cursor-not-allowed opacity-90">
+                      您已升級此方案
+                    </button>
+                  ) : (
+                    <button onClick={() => { setPurchaseItem({ id: 'pro', name: '專業成長版 Pro (月費)', price: 999, type: 'subscription' }); setPaymentStep('form'); }} className="w-full py-3 bg-white text-indigo-600 font-bold rounded-xl hover:bg-indigo-50 transition-colors shadow-lg active:scale-95">
+                      立即升級 Pro
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1230,7 +1346,6 @@ export default function DashboardPage() {
       case 'settings':
         return role === 'business' ? (
            <div className="space-y-6">
-             {/* ... business settings ... */}
              <div className="flex justify-between items-center">
                <h2 className="text-2xl font-bold text-slate-900">基本資料設定</h2>
                <button onClick={() => alert("儲存成功！")} className="hidden sm:flex bg-slate-900 text-white px-4 py-2 rounded-lg text-sm font-bold items-center gap-2 hover:bg-slate-800 transition-colors shadow-sm">
@@ -1307,7 +1422,6 @@ export default function DashboardPage() {
                  
                  {/* 形象照片區塊 */}
                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                   {/* ... photo upload ... */}
                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><ImageIcon size={18} className="text-sky-500"/> 形象照片 (Cloud Sync)</h3>
                    
                    {/* Cover Image Upload */}
@@ -1365,7 +1479,7 @@ export default function DashboardPage() {
                               value={creatorProfile.handle} onChange={(e) => setCreatorProfile(p => ({...p, handle: e.target.value}))} />
                      </div>
                      <div>
-                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">LINE ID (聯絡用)</label>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">LINE ID (廠商付費後可見)</label>
                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
                               placeholder="例如：may_travel"
                               value={creatorProfile.lineId} onChange={(e) => setCreatorProfile(p => ({...p, lineId: e.target.value}))} />
@@ -1385,6 +1499,29 @@ export default function DashboardPage() {
                      <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">個人簡介 (Bio)</label>
                      <textarea className="w-full p-4 border border-slate-200 rounded-xl h-28 resize-none text-sm leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-all" 
                                value={creatorProfile.bio} onChange={(e) => setCreatorProfile(p => ({...p, bio: e.target.value}))} />
+                   </div>
+
+                   {/* ✨ 頻道連結 */}
+                   <div className="pt-4 border-t border-slate-100">
+                     <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><LinkIcon size={16} className="text-slate-400"/> 社群頻道連結 (將展示於履歷)</h4>
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5"><Instagram size={14} className="inline mr-1 text-pink-600"/>Instagram 連結</label>
+                         <input type="url" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-pink-500 outline-none bg-slate-50" placeholder="https://instagram.com/..." value={creatorProfile.socialLinks?.ig || ''} onChange={(e) => setCreatorProfile(p => ({...p, socialLinks: {...p.socialLinks, ig: e.target.value}}))} />
+                       </div>
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5"><Youtube size={14} className="inline mr-1 text-red-600"/>YouTube 連結</label>
+                         <input type="url" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-red-500 outline-none bg-slate-50" placeholder="https://youtube.com/..." value={creatorProfile.socialLinks?.yt || ''} onChange={(e) => setCreatorProfile(p => ({...p, socialLinks: {...p.socialLinks, yt: e.target.value}}))} />
+                       </div>
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5">TikTok 連結</label>
+                         <input type="url" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-black outline-none bg-slate-50" placeholder="https://tiktok.com/..." value={creatorProfile.socialLinks?.tiktok || ''} onChange={(e) => setCreatorProfile(p => ({...p, socialLinks: {...p.socialLinks, tiktok: e.target.value}}))} />
+                       </div>
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5">其他作品集網站</label>
+                         <input type="url" className="w-full p-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-slate-50" placeholder="https://..." value={creatorProfile.socialLinks?.other || ''} onChange={(e) => setCreatorProfile(p => ({...p, socialLinks: {...p.socialLinks, other: e.target.value}}))} />
+                       </div>
+                     </div>
                    </div>
                  </div>
 
@@ -1454,7 +1591,6 @@ export default function DashboardPage() {
                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
                               value={creatorProfile.audience.topCity} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, topCity: e.target.value}}))} />
                      </div>
-                     {/* ✨ 新增：平均觀看數輸入欄位 */}
                      <div>
                        <label className="block text-xs font-bold text-slate-500 mb-1.5">平均觀看數 (Average Views)</label>
                        <div className="flex items-center relative">
@@ -1480,14 +1616,13 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between h-16 items-center">
           <Link href="/" className="font-extrabold text-2xl text-sky-500 tracking-tight">X-Match</Link>
           <div className="flex items-center gap-4">
-             {/* 登入後的身分顯示 (不可切換) */}
-             <span className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 ${role === 'business' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'}`}>
-                {role === 'business' ? <Briefcase size={14}/> : <User size={14}/>}
-                {role === 'business' ? '業者後台' : '創作者中心'}
-             </span>
-             <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 flex items-center gap-1 text-sm font-bold transition-colors">
-               <LogOut size={18}/> 登出
-             </button>
+              <span className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-2 ${role === 'business' ? 'bg-indigo-50 text-indigo-700' : 'bg-purple-50 text-purple-700'}`}>
+                 {role === 'business' ? <Briefcase size={14}/> : <User size={14}/>}
+                 {role === 'business' ? '業者後台' : '創作者中心'}
+              </span>
+              <button onClick={handleLogout} className="text-slate-400 hover:text-red-500 flex items-center gap-1 text-sm font-bold transition-colors">
+                <LogOut size={18}/> 登出
+              </button>
           </div>
         </div>
       </div>
@@ -1552,7 +1687,8 @@ export default function DashboardPage() {
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${viewProject.type === '付費推廣' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700'}`}>{viewProject.type}</span>
+                        {viewProject.requiredTier === 'S' && <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-bold border border-amber-200">S級優先</span>}
+                        <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${viewProject.type === '付費推廣' ? 'bg-indigo-100 text-indigo-800' : 'bg-sky-50 text-sky-700'}`}>{viewProject.type}</span>
                         <span className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} /> {viewProject.location}</span>
                       </div>
                       <h2 className="text-2xl font-bold text-slate-900 mb-2">{viewProject.title}</h2>
@@ -1610,7 +1746,7 @@ export default function DashboardPage() {
                     <img 
                       src={viewApplicant.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
                       alt="Avatar" 
-                      className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-md bg-white" 
+                      className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-md bg-white object-cover" 
                     />
                   </div>
                 </div>
@@ -1618,34 +1754,45 @@ export default function DashboardPage() {
                 <div className="p-6 sm:p-8 pt-12 sm:pt-14 flex-grow overflow-y-auto bg-slate-50/50">
                   <div className="flex flex-col sm:flex-row justify-between items-start mb-6">
                     <div>
-                      <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2">
+                      <h2 className="text-2xl font-black text-slate-900 flex items-center gap-2 mb-1">
                         {viewApplicant.name} 
-                        {viewApplicant.handle && <span className="text-sm font-medium text-slate-500">{viewApplicant.handle}</span>}
+                        <TierBadge tier={viewApplicant.tier} />
                       </h2>
+                      {viewApplicant.handle && <p className="text-sm font-medium text-slate-500 mb-2">{viewApplicant.handle}</p>}
+                      
                       <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
                         <span className="flex items-center gap-1"><MapPin size={14}/> {viewApplicant.location || '台灣'}</span>
-                        {viewApplicant.lineId && <span className="flex items-center gap-1 text-green-600 font-bold"><MessageCircle size={14}/> LINE ID: {viewApplicant.lineId}</span>}
                       </div>
+
+                      {/* ✨ 社群連結展示 */}
+                      {viewApplicant.socialLinks && (
+                        <div className="flex items-center gap-3 mt-3">
+                          {viewApplicant.socialLinks.ig && <a href={viewApplicant.socialLinks.ig} target="_blank" rel="noreferrer" className="text-pink-600 hover:text-pink-700 bg-pink-50 p-1.5 rounded-lg transition-colors"><Instagram size={18}/></a>}
+                          {viewApplicant.socialLinks.yt && <a href={viewApplicant.socialLinks.yt} target="_blank" rel="noreferrer" className="text-red-600 hover:text-red-700 bg-red-50 p-1.5 rounded-lg transition-colors"><Youtube size={18}/></a>}
+                          {viewApplicant.socialLinks.other && <a href={viewApplicant.socialLinks.other} target="_blank" rel="noreferrer" className="text-slate-600 hover:text-slate-900 bg-slate-100 p-1.5 rounded-lg transition-colors"><LinkIcon size={18}/></a>}
+                        </div>
+                      )}
+
                       <div className="flex flex-wrap gap-2 mt-3">
-                        {viewApplicant.tags?.split(',').map((tag: string, i: number) => (
+                        {viewApplicant.tags?.map ? viewApplicant.tags.map((tag: string, i: number) => (
                           <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-md">#{tag.trim()}</span>
-                        ))}
+                        )) : null}
                       </div>
                     </div>
                     {/* 數據概覽 */}
-                    <div className="flex gap-4 mt-4 sm:mt-0">
+                    <div className="flex gap-4 mt-4 sm:mt-0 bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
                       <div className="text-center">
                         <p className="text-xs text-slate-400 font-bold mb-1">粉絲數</p>
-                        <p className="text-xl font-black text-slate-900">{(viewApplicant.followers / 1000).toFixed(1)}k</p>
+                        <p className="text-xl font-black text-slate-900">{viewApplicant.followers ? (viewApplicant.followers / 1000).toFixed(1) : '0'}k</p>
                       </div>
-                      <div className="text-center border-l border-slate-200 pl-4">
+                      <div className="text-center border-l border-slate-100 pl-4">
                         <p className="text-xs text-slate-400 font-bold mb-1">平均觀看</p>
-                        <p className="text-xl font-black text-slate-900">{(viewApplicant.averageViews / 1000).toFixed(1)}k</p>
+                        <p className="text-xl font-black text-slate-900">{viewApplicant.averageViews ? (viewApplicant.averageViews / 1000).toFixed(1) : '0'}k</p>
                       </div>
-                      <div className="text-center border-l border-slate-200 pl-4">
+                      <div className="text-center border-l border-slate-100 pl-4">
                         <p className="text-xs text-slate-400 font-bold mb-1">信用評分</p>
                         <p className="text-xl font-black text-yellow-500 flex items-center justify-center gap-1">
-                          {viewApplicant.completionScore} <Star size={14} fill="currentColor"/>
+                          {viewApplicant.completionScore || '5.0'} <Star size={14} fill="currentColor"/>
                         </p>
                       </div>
                     </div>
@@ -1682,15 +1829,15 @@ export default function DashboardPage() {
                         <div className="space-y-3">
                           <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
                             <span className="text-xs font-bold text-slate-500">圖文貼文</span>
-                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.post?.toLocaleString()}</span>
+                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.post?.toLocaleString() || 0}</span>
                           </div>
                           <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
                             <span className="text-xs font-bold text-slate-500">限時動態</span>
-                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.story?.toLocaleString()}</span>
+                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.story?.toLocaleString() || 0}</span>
                           </div>
                           <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
                             <span className="text-xs font-bold text-slate-500">短影音 Reels</span>
-                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.reels?.toLocaleString()}</span>
+                            <span className="font-black text-slate-900">NT$ {viewApplicant.rates?.reels?.toLocaleString() || 0}</span>
                           </div>
                         </div>
                       </div>
@@ -1702,7 +1849,7 @@ export default function DashboardPage() {
                       {viewApplicant.portfolio && viewApplicant.portfolio.length > 0 ? (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           {viewApplicant.portfolio.map((img: string, i: number) => (
-                            <div key={i} className="aspect-square rounded-lg overflow-hidden bg-slate-100 relative group cursor-pointer">
+                            <div key={i} className="aspect-square rounded-lg overflow-hidden bg-slate-100 relative group cursor-pointer border border-slate-200">
                               <img src={img} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" alt={`Portfolio ${i}`} />
                             </div>
                           ))}
@@ -1714,8 +1861,20 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 
-                <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end z-20">
-                   <button onClick={() => setViewApplicant(null)} className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all">關閉履歷</button>
+                <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end gap-3 z-20">
+                   <button onClick={() => setViewApplicant(null)} className="px-6 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 transition-all">關閉</button>
+                   {/* ✨ 履歷內的聯繫按鈕 (防跳島) */}
+                   {providerPlan === 'pro' ? (
+                      viewApplicant.lineId ? (
+                        <a href={`https://line.me/ti/p/~${viewApplicant.lineId}`} target="_blank" rel="noreferrer" className="px-6 py-3 bg-[#06C755] text-white font-bold rounded-xl hover:bg-[#05b34c] shadow-lg active:scale-95 transition-all flex items-center gap-2">
+                          <MessageCircle size={18}/> LINE 聯繫
+                        </a>
+                      ) : null
+                   ) : (
+                      <button onClick={() => { setViewApplicant(null); setShowApplicantsModal(false); setActiveTab('wallet'); }} className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex items-center gap-2">
+                        <Lock size={16}/> 升級 Pro 解鎖聯繫方式
+                      </button>
+                   )}
                 </div>
               </div>
             </div>
