@@ -445,31 +445,34 @@ export default function Home() {
         <div className="absolute inset-0">
           <img 
             /* 💡 請在這裡替換您的圖片路徑 */
-            src="/hero.png" 
+            src="/images/ChatGPT Image 2026年6月16日 下午02_44_02.png" 
             alt="X-Match 媒合新標準" 
             /* 修改處 2: 新增 object-left 讓手機版強制對齊左側文字，md 版以上才置中 */
             className="w-full h-full object-cover object-left md:object-center"
           />
-          {/* 底部保留一點微弱漸層，讓下方的按鈕能清楚顯示，不會被背景吃掉 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-80"></div>
+          {/* 移除底部的深色漸層，因為我們要改用毛玻璃按鈕，讓圖片原色透出來 */}
         </div>
         
-        {/* 按鈕區域：已移除所有多餘文字，只保留按鈕並放置於左下方 */}
-        {/* 修改處 3: 調整底部間距 pb-8，避免縮小後按鈕擋到重要畫面 */}
-        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-8 md:pb-16">
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto lg:mx-0 lg:ml-8">
+        {/* 按鈕區域：調整高度與間距，導入毛玻璃特效 */}
+        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-12 md:pb-20">
+          <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full max-w-md mx-auto lg:mx-0 lg:ml-12">
+            
+            {/* 按鈕 1: 白色毛玻璃風格 */}
             <Link 
               href="/creators"
-              className="flex-1 bg-white text-slate-900 py-3 px-6 rounded-xl font-bold text-base md:text-lg hover:bg-slate-50 transition-all hover:scale-105 shadow-xl flex items-center justify-center gap-2"
+              className="flex-1 bg-white/80 backdrop-blur-md text-slate-900 border border-white/50 py-3 md:py-3.5 px-6 rounded-2xl font-bold text-base md:text-lg hover:bg-white hover:scale-105 transition-all duration-300 shadow-xl flex items-center justify-center gap-2 group"
             >
-              我是業者，找網紅 <ArrowRight size={20} />
+              我是業者，找網紅 <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
             </Link>
+
+            {/* 按鈕 2: 品牌藍色毛玻璃風格 */}
             <Link 
               href="/dashboard"
-              className="flex-1 bg-sky-500 text-white py-3 px-6 rounded-xl font-bold text-base md:text-lg hover:bg-sky-600 transition-all hover:scale-105 shadow-[0_0_20px_rgba(14,165,233,0.4)] border border-sky-400 text-center flex items-center justify-center"
+              className="flex-1 bg-sky-500/80 backdrop-blur-md text-white border border-sky-400/50 py-3 md:py-3.5 px-6 rounded-2xl font-bold text-base md:text-lg hover:bg-sky-500 hover:scale-105 transition-all duration-300 shadow-[0_8px_30px_rgba(14,165,233,0.3)] text-center flex items-center justify-center gap-2 group"
             >
-              我是網紅，免費駐站
+              我是網紅，免費駐站 <Sparkles size={18} className="opacity-70 group-hover:opacity-100 group-hover:rotate-12 transition-all" />
             </Link>
+
           </div>
         </div>
       </div>
