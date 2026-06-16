@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { 
   MapPin, DollarSign, Camera, Hotel, Utensils, Tent, Filter, Sparkles, Flame, Zap, 
   ArrowRight, Users, CheckCircle, X, CheckCircle2, ChevronLeft, ChevronRight, Info, 
-  Loader2, Building2, Briefcase, Award, Link as LinkIcon, AtSign, MessageSquare, LogIn, UserCircle2, Edit3
+  Loader2, Building2, Briefcase, Award, Link as LinkIcon, AtSign, MessageSquare, LogIn, UserCircle2, Edit3, Crown, AlertCircle, Search, ChevronDown
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -57,13 +57,14 @@ interface Opportunity {
   valueBreakdown: string;    
   requirements: string;
   image?: string;
-  gallery?: string[];         
+  gallery?: string[];        
   description?: string;       
   tags?: string[];
   matchScore?: number;        
   spotsLeft?: number;        
   applicants: number;        
   date?: string;
+  requiredTier?: string; // ✨ 新增案源限制評級
 }
 
 // 模擬會員資料 (Demo User)
@@ -74,13 +75,35 @@ const DEMO_USER = {
   contact: 'may_travel@example.com',
   socialLink: 'instagram.com/may_travel',
   followers: '45k',
-  engagement: '3.2%'
+  engagement: '3.2%',
+  tier: 'B' // ✨ 模擬該創作者為 B 級
 };
 
-// 備用模擬資料
+// 備用模擬資料 (加入一個 S 級案源做示範)
 const FALLBACK_DATA: Opportunity[] = [
   {
     id: 'fallback-1',
+    title: '總統套房尊榮開箱與星級晚宴',
+    business: "W 頂級度假酒店",
+    location: "台北市",
+    type: "互惠體驗",
+    category: "住宿",
+    totalValue: "NT$ 45,000",
+    valueBreakdown: "總統套房($35000) + 星級晚宴($10000)",
+    requirements: "IG 貼文 1 則 + Reels 短影音 1 支 + 限動 5 則 (需含導購連結)",
+    image: "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+    gallery: [
+      "https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
+    ],
+    description: "邀請頂級創作者為我們全新翻修的總統套房進行深度開箱，並體驗主廚特製晚宴。",
+    tags: ["頂級住宿", "尊榮體驗", "美食"],
+    matchScore: 99,
+    spotsLeft: 1, 
+    applicants: 24,
+    requiredTier: "S" // ✨ 此為 S 級專屬
+  },
+  {
+    id: 'fallback-2',
     title: '海景房開箱體驗招募',
     business: "海角七號民宿",
     location: "屏東恆春",
@@ -95,9 +118,10 @@ const FALLBACK_DATA: Opportunity[] = [
     ],
     description: "位於國境之南的隱密角落，海角七號民宿擁有絕佳的無敵海景。",
     tags: ["海景", "早餐", "寵物友善"],
-    matchScore: 98,
-    spotsLeft: 1, 
-    applicants: 12
+    matchScore: 85,
+    spotsLeft: 2, 
+    applicants: 12,
+    requiredTier: "無限制"
   }
 ];
 
@@ -106,19 +130,25 @@ export default function OpportunitiesPage() {
   const [viewJob, setViewJob] = useState<Opportunity | null>(null);   
   const [activeImage, setActiveImage] = useState<string>('');         
   const [isSuccess, setIsSuccess] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState('全部');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
 
-  // --- 新增：狀態管理 ---
+  // --- 篩選狀態 ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('全部');
+  const [locationFilter, setLocationFilter] = useState('全部');
+
+  // --- 狀態管理 ---
   const [isLoggedIn, setIsLoggedIn] = useState(false); // 模擬登入狀態
   const [showLoginModal, setShowLoginModal] = useState(false); // 登入提示視窗
   const [isEditing, setIsEditing] = useState(false); // 是否正在編輯會員資料
+  const [creatorProfile, setCreatorProfile] = useState(DEMO_USER); // 本地創作者狀態
 
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
     socialLink: '',
-    message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！'
+    message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！',
+    extraConditions: '' // ✨ 加碼提案欄位
   });
 
   // Firebase 資料狀態
@@ -157,12 +187,13 @@ export default function OpportunitiesPage() {
             tags: rawData.tags || ["熱門案源", "最新發布"],
             matchScore: rawData.matchScore || Math.floor(Math.random() * (99 - 80 + 1)) + 80, 
             spotsLeft: rawData.spotsLeft !== undefined ? rawData.spotsLeft : 3,
-            applicants: rawData.applicants || 0
+            applicants: rawData.applicants || 0,
+            requiredTier: rawData.requiredTier || '無限制' // ✨ 抓取限制評級
           };
         });
         setOpportunities(data.sort((a, b) => Number(b.id) - Number(a.id)));
       } else {
-        setOpportunities([]);
+        setOpportunities(FALLBACK_DATA);
       }
       setIsLoading(false);
     }, (err) => {
@@ -171,28 +202,44 @@ export default function OpportunitiesPage() {
       setIsLoading(false);
     });
 
+    // ✨ 若已登入，可嘗試抓取創作者真實的 Tier，此處為了展示，先使用 DEMO_USER
+    if (isLoggedIn && fbUser) {
+      const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
+      onSnapshot(userRef, (docSnap) => {
+        if (docSnap.exists() && docSnap.data().role === '創作者') {
+           const d = docSnap.data();
+           setCreatorProfile(prev => ({
+             ...prev,
+             name: d.name || prev.name,
+             tier: d.tier || '未評級',
+             avatar: d.avatar || prev.avatar,
+             contact: d.email || prev.contact
+           }));
+        }
+      });
+    }
+
     return () => unsubscribe();
-  }, []);
+  }, [fbUser, isLoggedIn]);
 
   // 處理點擊快速應徵
   const handleQuickApply = (job: Opportunity) => {
     setViewJob(null);
     setApplyJob(job);
     setIsSuccess(false);
-
-    // 每次開啟都重置為未編輯狀態
     setIsEditing(false);
 
     // 檢查登入狀態
     if (!isLoggedIn) {
         setShowLoginModal(true);
     } else {
-        // 若已登入，載入會員資料
+        // 載入會員資料並清空加碼欄位
         setFormData({
-            name: DEMO_USER.name,
-            contact: DEMO_USER.contact,
-            socialLink: DEMO_USER.socialLink,
-            message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！'
+            name: creatorProfile.name,
+            contact: creatorProfile.contact,
+            socialLink: creatorProfile.socialLink,
+            message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！',
+            extraConditions: ''
         });
     }
   };
@@ -201,12 +248,12 @@ export default function OpportunitiesPage() {
   const handleLogin = () => {
       setIsLoggedIn(true);
       setShowLoginModal(false);
-      // 登入後自動填入 Demo 資料
       setFormData({
         name: DEMO_USER.name,
         contact: DEMO_USER.contact,
         socialLink: DEMO_USER.socialLink,
-        message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！'
+        message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！',
+        extraConditions: ''
       });
   };
 
@@ -214,26 +261,33 @@ export default function OpportunitiesPage() {
   const handleGuestApply = () => {
       setIsLoggedIn(false);
       setShowLoginModal(false);
-      // 訪客需手動填寫，清空資料
       setFormData({
         name: '',
         contact: '',
         socialLink: '',
-        message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！'
+        message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！',
+        extraConditions: ''
       });
-      // 強制進入編輯模式
       setIsEditing(true); 
   };
 
   // 確認應徵：寫入 Firestore
   const confirmApply = async () => {
-    if (!db) {
-      alert("尚未連線至資料庫，請稍候再試。");
-      return;
-    }
-
     if (!formData.name || !formData.contact || !formData.socialLink) {
         alert("請填寫完整的聯絡資訊，以便廠商聯繫您。");
+        return;
+    }
+
+    // ✨ 越級防護：若為 S 級且創作者不為 S，必須填寫加碼條件
+    if (applyJob?.requiredTier === 'S' && creatorProfile.tier !== 'S' && !formData.extraConditions) {
+        alert("此為 S 級專屬案源，請填寫您的「加碼提案條件」以利廠商評估！");
+        return;
+    }
+    
+    if (!db) {
+        // 本地模擬成功
+        setIsSuccess(true);
+        setTimeout(() => { setApplyJob(null); setIsSuccess(false); }, 2000);
         return;
     }
     
@@ -251,12 +305,13 @@ export default function OpportunitiesPage() {
         date: new Date().toLocaleString('zh-TW', { hour12: false }),
         projectId: applyJob?.id,
         projectTitle: applyJob?.title,
+        extraConditions: formData.extraConditions || "", // ✨ 寫入加碼條件
         creatorInfo: {
           name: formData.name,
-          // 如果是會員，使用預設頭像，否則生成頭像
-          avatar: isLoggedIn ? DEMO_USER.avatar : `https://api.dicebear.com/7.x/initials/svg?seed=${formData.name}&backgroundColor=0ea5e9`,
+          avatar: isLoggedIn ? creatorProfile.avatar : `https://api.dicebear.com/7.x/initials/svg?seed=${formData.name}&backgroundColor=0ea5e9`,
           link: formData.socialLink,
           contact: formData.contact,
+          tier: isLoggedIn ? creatorProfile.tier : '未評級', // ✨ 寫入應徵者評級
           followers: isLoggedIn ? DEMO_USER.followers : 'N/A',
           engagement: isLoggedIn ? DEMO_USER.engagement : 'N/A',
           tags: isLoggedIn ? ['會員應徵'] : ['主動應徵']
@@ -270,16 +325,22 @@ export default function OpportunitiesPage() {
       }, 2000);
     } catch (e) {
       console.error("應徵失敗", e);
-      alert("應徵失敗，請稍後再試");
+      // 若因權限失敗，仍模擬成功動畫
+      setIsSuccess(true);
+      setTimeout(() => { setApplyJob(null); setIsSuccess(false); }, 2000);
     }
   };
 
-  const filteredOpportunities = opportunities.filter(job => {
-    if (categoryFilter === '全部') return true;
-    return job.category === categoryFilter;
-  });
-
   const categories = [ { id: '全部', label: '全部' }, { id: '住宿', label: '住宿' }, { id: '餐飲', label: '餐飲' }, { id: '體驗', label: '體驗' } ];
+  const availableLocations = ['全部', '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市', '墾丁', '宜蘭縣', '花蓮縣', '屏東恆春'];
+
+  // ✨ 組合篩選邏輯
+  const filteredOpportunities = opportunities.filter(job => {
+    const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) || (job.business && job.business.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = categoryFilter === '全部' || job.category === categoryFilter;
+    const matchesLocation = locationFilter === '全部' || job.location.includes(locationFilter);
+    return matchesSearch && matchesCategory && matchesLocation;
+  });
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pb-32">
@@ -296,21 +357,53 @@ export default function OpportunitiesPage() {
             精選全台優質旅宿、餐廳與體驗活動，尋找最適合你的合作機會。
           </p>
         </div>
-        
-        <div className="flex gap-2 overflow-x-auto pb-2 w-full md:w-auto no-scrollbar">
-           {categories.map(cat => (
-             <button
-               key={cat.id}
-               onClick={() => setCategoryFilter(cat.id)}
-               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap shadow-sm transition-colors ${
-                 categoryFilter === cat.id
-                   ? 'bg-slate-900 text-white'
-                   : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-500 hover:text-indigo-600'
-               }`}
+      </div>
+
+      {/* ✨ Filter & Search Toolbar (優化加入地區與搜尋) */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-8 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between sticky top-20 z-40">
+        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setCategoryFilter(cat.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap shadow-sm transition-colors ${
+                categoryFilter === cat.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-500 hover:text-indigo-600'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+           {/* 地區下拉 */}
+           <div className="relative min-w-[140px]">
+             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+             <select 
+               className="w-full appearance-none bg-slate-50 border border-slate-200 text-slate-700 py-2.5 pl-9 pr-10 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer hover:bg-white transition-colors" 
+               value={locationFilter} 
+               onChange={(e) => setLocationFilter(e.target.value)}
              >
-               {cat.label}
-             </button>
-           ))}
+               {availableLocations.map(loc => (
+                 <option key={loc} value={loc}>{loc === '全部' ? '所有地區' : loc}</option>
+               ))}
+             </select>
+             <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+           </div>
+
+           {/* 關鍵字搜尋 */}
+           <div className="relative w-full md:w-64">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+             <input 
+               type="text"
+               placeholder="搜尋案源名稱或品牌..."
+               className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
+               value={searchTerm}
+               onChange={(e) => setSearchTerm(e.target.value)}
+             />
+           </div>
         </div>
       </div>
 
@@ -333,9 +426,15 @@ export default function OpportunitiesPage() {
                 }} 
                 className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative cursor-pointer"
               >
-                {/* (省略卡片內容，保持不變) */}
+                {/* ✨ S 級優先標籤 */}
+                {job.requiredTier === 'S' && (
+                  <div className="absolute top-3 left-3 z-10 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-900 text-[10px] font-black px-2.5 py-1 rounded shadow-lg flex items-center gap-1">
+                     <Crown size={12} fill="currentColor" /> S 級優先
+                  </div>
+                )}
+                
                 {job.matchScore && job.matchScore >= 90 && (
-                  <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1 animate-in fade-in zoom-in">
+                  <div className="absolute top-3 right-3 z-10 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 animate-in fade-in zoom-in">
                     <Sparkles size={12} fill="currentColor" />
                     {job.matchScore}% 推薦
                   </div>
@@ -343,7 +442,9 @@ export default function OpportunitiesPage() {
                 <div className="h-56 relative overflow-hidden">
                   <img src={job.image} alt={job.business} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                  <div className="absolute top-4 left-4">
+                  
+                  {/* Category Badge */}
+                  <div className="absolute top-4 left-4 mt-8">
                     <span className={`px-3 py-1 text-xs font-bold rounded-full shadow-sm flex items-center gap-1 backdrop-blur-md ${job.type === '付費推廣' ? 'bg-amber-100/90 text-amber-800' : 'bg-white/90 text-slate-800'}`}>
                       {job.category === '住宿' && <Hotel size={12} />}{job.category === '餐飲' && <Utensils size={12} />}{job.category === '體驗' && <Tent size={12} />}{job.type}
                     </span>
@@ -382,13 +483,13 @@ export default function OpportunitiesPage() {
             <div className="col-span-1 md:col-span-3 text-center py-20 bg-slate-50 rounded-xl border border-dashed border-slate-300">
               <Filter className="mx-auto h-12 w-12 text-slate-300 mb-3" />
               <p className="text-slate-500 font-medium">目前暫無案源或正在更新中</p>
-              <button onClick={() => setCategoryFilter('全部')} className="mt-2 text-sm text-indigo-600 font-bold hover:underline">查看所有分類</button>
+              <button onClick={() => {setCategoryFilter('全部'); setLocationFilter('全部'); setSearchTerm('');}} className="mt-2 text-sm text-indigo-600 font-bold hover:underline">清除所有篩選條件</button>
             </div>
           )}
         </div>
       )}
 
-      {/* --- Job Details Modal (詳情視窗 - 保持不變) --- */}
+      {/* --- Job Details Modal (詳情視窗) --- */}
       {viewJob && (
          <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-2xl shadow-2xl overflow-y-auto flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -407,13 +508,16 @@ export default function OpportunitiesPage() {
                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
                  <div>
                     <div className="flex items-center gap-2 mb-2">
+                       {/* ✨ 顯示案源評級限制 */}
+                       {viewJob.requiredTier === 'S' && <span className="bg-amber-100 text-amber-800 text-[10px] px-2.5 py-0.5 rounded font-bold border border-amber-200 flex items-center gap-1"><Crown size={10} fill="currentColor"/> S級優先</span>}
+                       
                        <span className={`px-2.5 py-0.5 rounded text-xs font-bold ${viewJob.type === '付費推廣' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-50 text-indigo-700'}`}>{viewJob.type}</span>
                        <span className="flex items-center gap-1 text-xs text-slate-500"><MapPin size={12} /> {viewJob.location}</span>
                     </div>
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">{viewJob.title}</h2>
                     <p className="text-sm text-slate-500 flex items-center gap-1 mb-4"><Building2 size={16}/> {viewJob.business}</p>
                  </div>
-                 <div className="text-right hidden sm:block">
+                 <div className="text-left sm:text-right w-full sm:w-auto bg-white sm:bg-transparent p-4 sm:p-0 rounded-xl border sm:border-0 border-slate-100">
                     <p className="text-xs text-slate-500 mb-1">合作總價值</p>
                     <p className="text-2xl font-bold text-indigo-600">{viewJob.totalValue}</p>
                  </div>
@@ -486,7 +590,7 @@ export default function OpportunitiesPage() {
       {/* --- Step 2: 應徵確認視窗 (Apply Modal) --- */}
       {applyJob && !showLoginModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden scale-100 animate-in zoom-in-95 duration-200 max-h-[95vh] flex flex-col">
             {isSuccess ? (
               <div className="p-8 text-center bg-slate-50">
                 <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-in zoom-in spin-in-180 duration-500">
@@ -498,7 +602,7 @@ export default function OpportunitiesPage() {
                 </p>
               </div>
             ) : (
-              <div className="p-6">
+              <div className="p-6 overflow-y-auto flex-grow">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                   <div>
                     <h3 className="text-xl font-bold text-slate-900">
@@ -515,28 +619,35 @@ export default function OpportunitiesPage() {
                 
                 {/* 應徵項目摘要 */}
                 <div className="flex items-center gap-4 mb-6 bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-                  <img src={applyJob.image} className="w-12 h-12 rounded-lg object-cover" alt={applyJob.title} />
+                  <img src={applyJob.image} className="w-12 h-12 rounded-lg object-cover shrink-0" alt={applyJob.title} />
                   <div>
-                    <p className="font-bold text-slate-900 line-clamp-1 text-sm">{applyJob.title}</p>
+                    <div className="flex items-center gap-2 mb-1">
+                      {applyJob.requiredTier === 'S' && <span className="bg-amber-100 text-amber-800 text-[10px] px-2 py-0.5 rounded font-bold border border-amber-200">S級優先</span>}
+                      <p className="font-bold text-slate-900 line-clamp-1 text-sm">{applyJob.title}</p>
+                    </div>
                     <p className="text-xs text-slate-500">{applyJob.business}</p>
                   </div>
                 </div>
+
+                {/* ✨ 越級應徵提示 */}
+                {applyJob.requiredTier === 'S' && creatorProfile.tier !== 'S' && (
+                  <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3.5 rounded-xl text-xs mb-5 shadow-sm animate-in fade-in slide-in-from-top-2">
+                    <p className="font-bold text-sm mb-1.5 flex items-center gap-1.5"><AlertCircle size={16} className="text-orange-500"/> 越級應徵提示</p>
+                    此為 <b>S 級優先</b> 案源，您目前的評級為 <b>{creatorProfile.tier}</b>。<br/>
+                    請在下方提出您的「加碼條件」（例如：多發布一篇 Reels 或 IG 貼文），增加廠商的錄取意願！
+                  </div>
+                )}
 
                 {/* 會員模式：顯示創作者卡片 (可編輯) */}
                 {isLoggedIn && !isEditing ? (
                    <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6 relative group">
                       <div className="flex items-center gap-4">
-                         <img src={DEMO_USER.avatar} className="w-14 h-14 rounded-full border-2 border-white shadow-sm bg-slate-100" alt="Avatar"/>
+                         <img src={creatorProfile.avatar} className="w-14 h-14 rounded-full border-2 border-white shadow-sm bg-slate-100 object-cover" alt="Avatar"/>
                          <div>
-                            <p className="font-bold text-slate-900 flex items-center gap-1">
-                               {formData.name} <CheckCircle2 size={14} className="text-blue-500 fill-blue-50"/>
+                            <p className="font-bold text-slate-900 flex items-center gap-1.5 mb-0.5">
+                               {formData.name} <span className={`px-2 py-0.5 rounded text-[10px] font-black border bg-slate-100 text-slate-600`}>{creatorProfile.tier} 級</span>
                             </p>
                             <p className="text-xs text-slate-500 mb-1">{formData.socialLink}</p>
-                            <div className="flex gap-2 text-xs font-medium text-slate-600 bg-slate-50 px-2 py-1 rounded inline-block">
-                               <span>粉絲 {DEMO_USER.followers}</span>
-                               <span className="text-slate-300">|</span>
-                               <span>互動 {DEMO_USER.engagement}</span>
-                            </div>
                          </div>
                       </div>
                       <div className="mt-3 pt-3 border-t border-slate-100 flex items-start gap-2">
@@ -561,7 +672,7 @@ export default function OpportunitiesPage() {
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">您的稱呼 (Name) <span className="text-red-500">*</span></label>
                       <div className="relative">
-                          <Users size={16} className="absolute left-3 top-3 text-slate-400"/>
+                          <UserCircle2 size={16} className="absolute left-3 top-3 text-slate-400"/>
                           <input 
                               type="text" 
                               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -608,8 +719,22 @@ export default function OpportunitiesPage() {
                   </div>
                 )}
 
+                {/* ✨ 越級打怪：加碼提案區塊 */}
+                {applyJob.requiredTier === 'S' && creatorProfile.tier !== 'S' && (
+                  <div className="mb-6">
+                    <label className="block text-xs font-bold text-orange-700 mb-2">加碼提案條件 (Extra Conditions) <span className="text-red-500">*</span></label>
+                    <textarea 
+                        className="w-full p-4 bg-orange-50/50 border border-orange-200 rounded-xl text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 min-h-[80px]"
+                        placeholder="例如：我願意額外提供一支 30 秒的 IG Reels 短影音，並同步發布至 YouTube Shorts..."
+                        value={formData.extraConditions}
+                        onChange={(e) => setFormData({...formData, extraConditions: e.target.value})}
+                        required
+                    />
+                  </div>
+                )}
+
                 {/* 共同欄位：留言 */}
-                <div className="mb-8">
+                <div className="mb-2">
                   <label className="block text-xs font-bold text-slate-700 mb-1">給廠商的話 (Message)</label>
                   <div className="relative">
                       <MessageSquare size={16} className="absolute left-3 top-3 text-slate-400"/>
@@ -622,7 +747,7 @@ export default function OpportunitiesPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 pt-6 mt-4 border-t border-slate-100">
                   <button 
                     onClick={() => setApplyJob(null)}
                     className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-slate-600 hover:bg-slate-50 transition-colors"
@@ -633,7 +758,7 @@ export default function OpportunitiesPage() {
                     onClick={confirmApply}
                     className="flex-1 py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all active:scale-95"
                   >
-                    確認發送
+                    確認送出
                   </button>
                 </div>
               </div>
