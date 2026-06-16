@@ -440,27 +440,20 @@ export default function Home() {
   return (
     <div className="bg-white min-h-screen">
       {/* Hero Section */}
-      <div className="relative bg-slate-900 overflow-hidden">
-        <div className="absolute inset-0 opacity-40">
-          {/* 更換為更適合「現代創意合作與商務」的高畫質示意圖 */}
+      <div className="relative bg-slate-900 overflow-hidden w-full h-[60vh] md:h-[80vh] lg:h-[90vh]">
+        <div className="absolute inset-0">
           <img 
-            src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
-            alt="Business Collaboration and Partnership" 
-            className="w-full h-full object-cover"
+            src="/images/ChatGPT Image 2026年6月16日 下午02_44_02.png" 
+            alt="X-Match 餐旅業 x 創作者 媒合新標準" 
+            className="w-full h-full object-cover md:object-center"
           />
+          {/* 選擇性：添加一個非常輕微的漸層，確保如果底下有按鈕，能提高清晰度，如果不需要可以移除 */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
         </div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32 flex flex-col items-center text-center">
-          <span className="inline-block py-1 px-3 rounded-full bg-sky-500/30 text-sky-200 text-sm font-semibold mb-6 backdrop-blur-sm border border-sky-400/30 shadow-lg">
-            餐旅業 x 創作者 媒合新標準
-          </span>
-          <h1 className="text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6 leading-tight drop-shadow-lg">
-            體驗，即是價值。<br/>開啟業者與創作者的互惠新局
-          </h1>
-          <p className="max-w-xl text-lg text-slate-200 mb-10 drop-shadow-md font-medium">
-            首創「行程逆向媒合」。網紅以影響力換宿，業者以空房換曝光。
-            智能合約保障，讓每一次合作簡單、透明。
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+        
+        {/* 按鈕區域：移除了原本的標題文字，只保留按鈕，並將位置調整到底部，避免遮擋您的設計圖 */}
+        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-16 md:pb-24">
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto lg:mx-0 lg:ml-12">
             <Link 
               href="/creators"
               className="flex-1 bg-white text-slate-900 py-3.5 px-6 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all hover:scale-105 shadow-xl flex items-center justify-center gap-2"
