@@ -152,12 +152,12 @@ interface Testimonial {
 // 修改：廠商資料結構 (對應真實案源 Projects)
 interface ProviderDetail {
   id: string;
-  name: string;         // 對應 project.business (廠商名稱)
-  title: string;        // 對應 project.title (案源標題)
+  name: string;        // 對應 project.business (廠商名稱)
+  title: string;       // 對應 project.title (案源標題)
   location: string;
   coverImage: string;
   logo: string;
-  category: string;     
+  category: string;    
   lookingFor: string[]; // 對應 tags
   budgetType: string;   // 對應 project.type
   totalValue: string;   // 對應 project.totalValue
@@ -400,13 +400,14 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="space-y-20 pb-20">
+    <div className="bg-white min-h-screen">
       {/* Hero Section */}
       <div className="relative bg-slate-900 overflow-hidden">
         <div className="absolute inset-0 opacity-40">
+          {/* 更換為更適合「媒合/合作」的高畫質咖啡廳商業合作示意圖 */}
           <img 
-            src="https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
-            alt="Luxury Resort" 
+            src="https://images.unsplash.com/photo-1556761175-4b46a572b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
+            alt="Business Collaboration and Matching" 
             className="w-full h-full object-cover"
           />
         </div>
@@ -439,7 +440,7 @@ export default function Home() {
       </div>
 
       {/* Stats Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 -mt-10 mb-10">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
             { icon: TrendingUp, label: "平均媒合效率", value: "3 天", sub: "傳統模式需 2 週" },
@@ -460,93 +461,20 @@ export default function Home() {
         </div>
       </div>
 
-      {/* How it Works Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold text-slate-900 mb-4">簡單三步驟，開啟互惠旅程</h2>
-          <p className="text-slate-600 max-w-2xl mx-auto">
-            我們簡化了繁瑣的溝通流程，讓您專注於創作與體驗。
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-          <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
-          {[
-            { step: "01", title: "探索與許願", desc: "網紅發布旅遊行程（許願池），或業者發布體驗招募。", icon: Search },
-            { step: "02", title: "智能媒合", desc: "系統根據地區、風格與互惠標準，推薦最適合的合作對象。", icon: MessageCircle },
-            { step: "03", title: "體驗與分享", desc: "完成體驗行程，系統自動生成數據結案報告，累積信用評價。", icon: Heart }
-          ].map((item, idx) => (
-            <div key={idx} className="flex flex-col items-center text-center bg-white p-6 rounded-xl">
-              <div className="w-24 h-24 bg-white border-4 border-sky-100 rounded-full flex items-center justify-center mb-6 shadow-sm relative z-10">
-                <item.icon className="w-10 h-10 text-sky-500" />
-                <span className="absolute -top-2 -right-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-sm border-2 border-white">{item.step}</span>
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-3">{item.title}</h3>
-              <p className="text-slate-600 leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Featured Creators Section */}
-      <div className="bg-slate-50 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h2 className="text-3xl font-bold text-slate-900">本週駐站熱門創作者</h2>
-                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-green-100 border border-green-200 rounded-full text-[10px] font-bold text-green-700 uppercase tracking-widest shadow-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                  Live Sync
-                </span>
-              </div>
-              <p className="text-slate-600">最新加入且經系統認證的高互動潛力新星</p>
-            </div>
-            <Link href="/creators" className="text-sky-600 font-semibold hover:underline flex items-center gap-1 bg-sky-50 px-4 py-2 rounded-full transition-colors">
-              查看全部創作者 <ArrowRight size={16} />
-            </Link>
-          </div>
-          
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-              <Loader2 className="w-8 h-8 animate-spin mb-3 text-sky-500" />
-              <p className="font-bold text-sm tracking-widest uppercase">資料庫同步中...</p>
-            </div>
-          ) : creators.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {creators.map(creator => (
-                <div 
-                  key={creator.id} 
-                  className="cursor-pointer transition-transform hover:-translate-y-1"
-                  onClick={() => setSelectedCreator(creator)}
-                >
-                  <CreatorCard creator={creator} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
-               <p className="text-slate-500 font-medium">尚未有創作者加入平台，搶先成為第一位！</p>
-               <Link href="/dashboard" className="mt-4 inline-block text-sky-600 font-bold hover:underline">立即註冊入駐</Link>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* --- Featured Providers (本週優質廠商體驗 - 更新為真實案源) --- */}
-      <div className="bg-white py-20 border-t border-slate-100">
+      {/* --- Featured Providers (本週優質廠商體驗 - 移至上方) --- */}
+      <div className="bg-slate-50 py-20 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h2 className="text-3xl font-bold text-slate-900">本週優質廠商體驗</h2>
                 <span className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 border border-amber-200 rounded-full text-[10px] font-bold text-amber-700 uppercase tracking-widest shadow-sm">
-                   Featured
+                  Featured
                 </span>
               </div>
               <p className="text-slate-600">正在尋找合作夥伴的精選飯店與餐廳</p>
             </div>
-            <Link href="/opportunities" className="text-slate-600 font-semibold hover:text-slate-900 flex items-center gap-1 bg-slate-50 px-4 py-2 rounded-full transition-colors border border-slate-200">
+            <Link href="/opportunities" className="text-slate-600 font-semibold hover:text-slate-900 flex items-center gap-1 bg-white px-4 py-2 rounded-full transition-colors border border-slate-200 shadow-sm">
               我是網紅，查看更多招募 <ArrowRight size={16} />
             </Link>
           </div>
@@ -558,7 +486,6 @@ export default function Home() {
                 onClick={() => setSelectedProvider(provider)}
                 className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative cursor-pointer"
               >
-                
                 {/* Image Area */}
                 <div className="h-48 relative overflow-hidden">
                   <img 
@@ -598,8 +525,7 @@ export default function Home() {
 
                 {/* Content Area */}
                 <div className="p-5 pt-8 flex-grow flex flex-col">
-                  
-                  {/* Title (New) */}
+                  {/* Title */}
                   <h4 className="font-bold text-slate-900 text-lg mb-2 line-clamp-1 group-hover:text-sky-600 transition-colors">
                     {provider.title || provider.name}
                   </h4>
@@ -639,61 +565,138 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Success Stories */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        <div className="text-center mb-16">
-          <span className="text-sky-600 font-bold tracking-wider uppercase text-sm mb-2 block">Success Stories</span>
-          <h2 className="text-3xl font-bold text-slate-900 mb-4 flex items-center justify-center gap-3">
-            聽聽他們怎麼說
-            <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-[9px] font-bold text-slate-500 uppercase tracking-widest">
-              Cloud CMS Ready
-            </span>
-          </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto">
-            加入 X-Match 的夥伴們，已經創造了無數雙贏的合作案例。
-          </p>
+      {/* Featured Creators Section (本週駐站熱門創作者 - 移至上方並緊接廠商區塊) */}
+      <div className="bg-white py-20 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h2 className="text-3xl font-bold text-slate-900">本週駐站熱門創作者</h2>
+                <span className="flex items-center gap-1.5 px-2.5 py-1 bg-green-100 border border-green-200 rounded-full text-[10px] font-bold text-green-700 uppercase tracking-widest shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                  Live Sync
+                </span>
+              </div>
+              <p className="text-slate-600">最新加入且經系統認證的高互動潛力新星</p>
+            </div>
+            <Link href="/creators" className="text-sky-600 font-semibold hover:underline flex items-center gap-1 bg-sky-50 px-4 py-2 rounded-full transition-colors border border-sky-100">
+              查看全部創作者 <ArrowRight size={16} />
+            </Link>
+          </div>
+          
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+              <Loader2 className="w-8 h-8 animate-spin mb-3 text-sky-500" />
+              <p className="font-bold text-sm tracking-widest uppercase">資料庫同步中...</p>
+            </div>
+          ) : creators.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {creators.map(creator => (
+                <div 
+                  key={creator.id} 
+                  className="cursor-pointer transition-transform hover:-translate-y-1"
+                  onClick={() => setSelectedCreator(creator)}
+                >
+                  <CreatorCard creator={creator} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+               <p className="text-slate-500 font-medium">尚未有創作者加入平台，搶先成為第一位！</p>
+               <Link href="/dashboard" className="mt-4 inline-block text-sky-600 font-bold hover:underline">立即註冊入駐</Link>
+            </div>
+          )}
         </div>
+      </div>
 
-        {testimonials.length === 0 && isLoading ? (
-           <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-300"/></div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {testimonials.map((item, index) => (
-              <div key={item.id || index} className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 flex flex-col md:flex-row hover:shadow-xl transition-shadow duration-300">
-                <div className="md:w-2/5 relative min-h-[200px] md:min-h-full">
-                  <img 
-                    src={item.image} 
-                    alt={item.authorName} 
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
+      {/* How it Works Section */}
+      <div className="bg-slate-50 py-20 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">簡單三步驟，開啟互惠旅程</h2>
+            <p className="text-slate-600 max-w-2xl mx-auto">
+              我們簡化了繁瑣的溝通流程，讓您專注於創作與體驗。
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
+            <div className="hidden md:block absolute top-12 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
+            {[
+              { step: "01", title: "探索與許願", desc: "網紅發布旅遊行程（許願池），或業者發布體驗招募。", icon: Search },
+              { step: "02", title: "智能媒合", desc: "系統根據地區、風格與互惠標準，推薦最適合的合作對象。", icon: MessageCircle },
+              { step: "03", title: "體驗與分享", desc: "完成體驗行程，系統自動生成數據結案報告，累積信用評價。", icon: Heart }
+            ].map((item, idx) => (
+              <div key={idx} className="flex flex-col items-center text-center bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+                <div className="w-24 h-24 bg-white border-4 border-sky-100 rounded-full flex items-center justify-center mb-6 shadow-sm relative z-10">
+                  <item.icon className="w-10 h-10 text-sky-500" />
+                  <span className="absolute -top-2 -right-2 w-8 h-8 bg-slate-900 text-white rounded-full flex items-center justify-center font-bold text-sm border-2 border-white">{item.step}</span>
                 </div>
-                <div className="p-8 md:w-3/5 flex flex-col justify-center bg-white relative z-10">
-                  <div className="flex items-center gap-1 mb-4">
-                    {[...Array(item.rating || 5)].map((_, i) => <Star key={i} size={16} className="text-yellow-400 fill-yellow-400" />)}
-                  </div>
-                  <blockquote className="text-lg font-medium text-slate-800 mb-6 italic leading-relaxed">
-                    "{item.quote}"
-                  </blockquote>
-                  <div className="flex items-center gap-4 border-t border-slate-100 pt-4 mt-auto">
-                    <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shrink-0">
-                      {item.authorInitial || item.authorName.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-900 text-sm">{item.authorName}</p>
-                      <p className="text-xs text-slate-500">{item.authorLocation || '優質合作夥伴'}</p>
-                    </div>
-                    {item.metricLabel && (
-                      <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold shrink-0 bg-green-50 text-green-700">
-                        {item.metricIcon === 'BarChart' ? <BarChart size={14} /> : <TrendingUp size={14} />} 
-                        {item.metricLabel}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-3">{item.title}</h3>
+                <p className="text-slate-600 leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
-        )}
+        </div>
+      </div>
+
+      {/* Success Stories */}
+      <div className="bg-white py-20 pb-28 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <span className="text-sky-600 font-bold tracking-wider uppercase text-sm mb-2 block">Success Stories</span>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4 flex items-center justify-center gap-3">
+              聽聽他們怎麼說
+              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-full text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                Cloud CMS Ready
+              </span>
+            </h2>
+            <p className="text-slate-600 max-w-2xl mx-auto">
+              加入 X-Match 的夥伴們，已經創造了無數雙贏的合作案例。
+            </p>
+          </div>
+
+          {testimonials.length === 0 && isLoading ? (
+             <div className="flex justify-center py-12"><Loader2 className="animate-spin text-slate-300"/></div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {testimonials.map((item, index) => (
+                <div key={item.id || index} className="bg-white rounded-2xl overflow-hidden shadow-lg border border-slate-100 flex flex-col md:flex-row hover:shadow-xl transition-shadow duration-300">
+                  <div className="md:w-2/5 relative min-h-[200px] md:min-h-full">
+                    <img 
+                      src={item.image} 
+                      alt={item.authorName} 
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="p-8 md:w-3/5 flex flex-col justify-center bg-white relative z-10">
+                    <div className="flex items-center gap-1 mb-4">
+                      {[...Array(item.rating || 5)].map((_, i) => <Star key={i} size={16} className="text-yellow-400 fill-yellow-400" />)}
+                    </div>
+                    <blockquote className="text-lg font-medium text-slate-800 mb-6 italic leading-relaxed">
+                      "{item.quote}"
+                    </blockquote>
+                    <div className="flex items-center gap-4 border-t border-slate-100 pt-4 mt-auto">
+                      <div className="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-600 shrink-0">
+                        {item.authorInitial || item.authorName.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 text-sm">{item.authorName}</p>
+                        <p className="text-xs text-slate-500">{item.authorLocation || '優質合作夥伴'}</p>
+                      </div>
+                      {item.metricLabel && (
+                        <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-bold shrink-0 bg-green-50 text-green-700">
+                          {item.metricIcon === 'BarChart' ? <BarChart size={14} /> : <TrendingUp size={14} />} 
+                          {item.metricLabel}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* --- Creator Details Modal --- */}
