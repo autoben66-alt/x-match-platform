@@ -181,6 +181,8 @@ export default function TripsPage() {
 
   const [showAuthModal, setShowAuthModal] = useState(false); // 登入視窗
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示視窗
+  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit'); // ✨ 記錄升級的原因，顯示不同文案
+
   const [isVerifying, setIsVerifying] = useState(false); // 登入驗證中
   const [isSending, setIsSending] = useState(false);
 
@@ -265,13 +267,21 @@ export default function TripsPage() {
       return;
     }
 
-    // 2. 檢查額度 (僅針對免費版)
-    if (providerPlan === 'free' && usageCount >= FREE_LIMIT) {
+    // ✨ 2. 檢查是否為 S/A 級網紅 (若未付費則擋住並要求升級)
+    if ((selectedTrip?.tier === 'S' || selectedTrip?.tier === 'A') && providerPlan !== 'pro') {
+      setUpgradeReason('tier');
       setShowUpgradeModal(true);
       return;
     }
 
-    // 3. 通過檢查，進入填寫表單
+    // 3. 檢查額度 (僅針對免費版)
+    if (providerPlan === 'free' && usageCount >= FREE_LIMIT) {
+      setUpgradeReason('limit');
+      setShowUpgradeModal(true);
+      return;
+    }
+
+    // 4. 通過檢查，進入填寫表單
     setInviteStep('form');
   };
 
@@ -283,6 +293,7 @@ export default function TripsPage() {
       return;
     }
     if (providerPlan !== 'pro') {
+      setUpgradeReason('line');
       setShowUpgradeModal(true); 
       return;
     }
@@ -709,15 +720,21 @@ export default function TripsPage() {
                          <MessageCircle size={18}/> LINE
                        </button>
                     ) : (
-                       <button onClick={() => setShowUpgradeModal(true)} className="flex-1 sm:flex-none py-3 px-4 bg-slate-800 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-1 active:scale-95 transition-all text-sm">
+                       <button onClick={handleLineContact} className="flex-1 sm:flex-none py-3 px-4 bg-slate-800 text-white font-bold rounded-xl shadow-md flex items-center justify-center gap-1 active:scale-95 transition-all text-sm hover:bg-slate-700">
                          <Lock size={16}/> LINE
                        </button>
                     )}
+                    
+                    {/* ✨ 發送邀請按鈕 (加入評級付費牆防護) */}
                     <button 
                       onClick={handleGoToInvite}
                       className="flex-[2] py-3 bg-indigo-600 rounded-xl font-bold text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2 active:scale-95"
                     >
-                      前往邀請 <ArrowRight size={18} />
+                      {providerPlan !== 'pro' && (selectedTrip?.tier === 'S' || selectedTrip?.tier === 'A') ? (
+                        <><Lock size={18}/> 升級解鎖邀請</>
+                      ) : (
+                        <>前往邀請 <ArrowRight size={18} /></>
+                      )}
                     </button>
                   </>
                 ) : (
@@ -785,24 +802,26 @@ export default function TripsPage() {
         </div>
       )}
 
-      {/* --- Upgrade Alert Modal (額度不足 / 權限提示) --- */}
+      {/* --- Upgrade Alert Modal (動態升級 / 權限提示) --- */}
       {showUpgradeModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                 {providerPlan === 'free' && usageCount >= FREE_LIMIT ? (
+                 {upgradeReason === 'limit' ? (
                     <AlertCircle size={32} className="text-red-500" />
                  ) : (
                     <Lock size={32} className="text-amber-500" />
                  )}
               </div>
               <h2 className="text-xl font-bold text-slate-900 mb-2">
-                 {providerPlan === 'free' && usageCount >= FREE_LIMIT ? '免費額度已用完' : '付費會員專屬功能'}
+                 {upgradeReason === 'limit' ? '免費額度已用完' : '付費會員專屬功能'}
               </h2>
-              <p className="text-slate-500 text-sm mb-6">
-                 {providerPlan === 'free' && usageCount >= FREE_LIMIT 
+              <p className="text-slate-500 text-sm mb-6 whitespace-pre-line leading-relaxed">
+                 {upgradeReason === 'limit' 
                    ? `您本月的 ${FREE_LIMIT} 次邀請額度已達上限。\n升級至專業版即可解鎖無限邀請！`
-                   : `「LINE 直接聯繫」為專業版 (Pro) 專屬功能。\n升級後即可查看所有創作者的私人聯繫方式！`}
+                   : upgradeReason === 'tier'
+                   ? `「邀請 S/A 級頂尖創作者」為專業版 (Pro) 專屬。\n升級後即可無限制邀約高影響力網紅！`
+                   : `「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。\n升級後即可與創作者零距離洽談！`}
               </p>
               
               <div className="space-y-3">
@@ -810,7 +829,9 @@ export default function TripsPage() {
                    onClick={() => {
                        setProviderPlan('pro'); // 模擬升級
                        setShowUpgradeModal(false);
-                       if(inviteStep === 'form') setInviteStep('form');
+                       if (inviteStep === 'form' || upgradeReason === 'tier') {
+                         setInviteStep('form');
+                       }
                    }}
                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                  >
