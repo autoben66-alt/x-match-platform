@@ -6,7 +6,7 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye, Lock, Link as LinkIcon, Instagram, Youtube, Sparkles
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye, Lock, Link as LinkIcon, Instagram, Youtube, Sparkles, AlertCircle
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
@@ -256,7 +256,8 @@ export default function DashboardPage() {
 
   const handleCreatorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar' | 'portfolio') => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !storage) return;
+    if (!files || files.length === 0) return;
+    if (!storage) { alert("Storage連線中斷"); return; }
     const currentUid = fbUser?.uid || localUid;
 
     if (type === 'cover') setIsUploadingCover(true);
