@@ -99,6 +99,7 @@ export default function DashboardPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
+  const [editProjectId, setEditProjectId] = useState<string | null>(null); // ✨ 新增：紀錄目前正在編輯的案源 ID
   const [newProject, setNewProject] = useState({
     title: '', category: '住宿', type: '互惠體驗', location: '',
     numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[]
@@ -146,6 +147,10 @@ export default function DashboardPage() {
   const [purchaseItem, setPurchaseItem] = useState<PaymentItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
+
+  // ✨ 新增缺失的狀態控制變數 (用於付費牆提示)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit');
 
   // ✨ 初始化備用 UID 與檢查登入狀態
   useEffect(() => {
@@ -269,32 +274,31 @@ export default function DashboardPage() {
     setNewProject(prev => ({ ...prev, gallery: prev.gallery.filter((_, idx) => idx !== indexToRemove) }));
   };
 
+  // ✨ 新增缺失的圖片上傳函數 (頭像、封面、作品集)
   const handleCreatorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar' | 'portfolio') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const currentUid = fbUser?.uid || localUid;
-
+    
+    // 開啟 loading 狀態
     if (type === 'cover') setIsUploadingCover(true);
     else if (type === 'avatar') setIsUploadingAvatar(true);
     else setIsUploadingPortfolio(true);
 
-    // 如果沒有 Storage，改用本地模擬機制
-    if (!storage) {
-        setTimeout(() => {
-          const fakeUrls = {
-             cover: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
-             portfolio: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3"
-          };
-          if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: fakeUrls.cover }));
-          else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: fakeUrls.avatar }));
-          else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, fakeUrls.portfolio] }));
-          
-          if (type === 'cover') setIsUploadingCover(false);
-          else if (type === 'avatar') setIsUploadingAvatar(false);
-          else setIsUploadingPortfolio(false);
-        }, 1000);
-        return;
+    const currentUid = fbUser?.uid || localUid;
+
+    // 如果沒有 Storage，改用本地模擬上傳機制
+    if (!storage) { 
+      setTimeout(() => {
+        const fakeUrl = `https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80`;
+        if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: fakeUrl }));
+        else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: fakeUrl }));
+        else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, fakeUrl] }));
+        
+        if (type === 'cover') setIsUploadingCover(false);
+        else if (type === 'avatar') setIsUploadingAvatar(false);
+        else setIsUploadingPortfolio(false);
+      }, 1000);
+      return; 
     }
 
     try {
@@ -304,20 +308,12 @@ export default function DashboardPage() {
         const uploadTask = await uploadBytesResumable(fileRef, files[i]);
         urls.push(await getDownloadURL(uploadTask.ref));
       }
+      
       if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: urls[0] }));
       else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: urls[0] }));
       else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, ...urls] }));
     } catch (error) {
-      console.error("Firebase 照片上傳失敗，啟動模擬機制:", error);
-      // 🔥 Firebase 權限報錯時，使用模擬資料代替
-      const fakeUrls = {
-         cover: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
-         avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}`,
-         portfolio: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3"
-      };
-      if (type === 'cover') setCreatorProfile(p => ({ ...p, coverImage: fakeUrls.cover }));
-      else if (type === 'avatar') setCreatorProfile(p => ({ ...p, avatar: fakeUrls.avatar }));
-      else setCreatorProfile(p => ({ ...p, portfolio: [...p.portfolio, fakeUrls.portfolio] }));
+      console.error("照片上傳失敗:", error);
     } finally {
       if (type === 'cover') setIsUploadingCover(false);
       else if (type === 'avatar') setIsUploadingAvatar(false);
@@ -325,37 +321,45 @@ export default function DashboardPage() {
     }
   };
 
+  // ✨ 新增：點擊編輯案源
+  const handleEditProject = (project: ProjectData) => {
+    setNewProject({
+      title: project.title, category: project.category, type: project.type, location: project.location,
+      numericValue: project.numericValue || 0, valueBreakdown: project.valueBreakdown, 
+      requirements: project.requirements, spots: project.spots, gallery: project.gallery || (project.image ? [project.image] : [])
+    });
+    setEditProjectId(project.id);
+    setShowCreateModal(true);
+  };
+
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProject.title || !newProject.location || newProject.numericValue <= 0) { alert("請填寫完整資訊與總價值"); return; }
     
-    const newId = Date.now().toString();
-    const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制';
-    
-    // 防護機制
-    if (!db) {
-      console.log("Mock Project Created", newProject);
+    const targetId = editProjectId || Date.now().toString(); // ✨ 判斷是更新還是新增
+    const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制'; 
+
+    if (!db || !fbUser) {
       setShowCreateModal(false);
+      setEditProjectId(null);
       setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
       return;
     }
-
+    
     try {
-      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', newId), {
-        id: newId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
+      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', targetId), {
+        id: targetId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
         numericValue: newProject.numericValue, totalValue: `NT$ ${newProject.numericValue.toLocaleString()}`, 
         valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
         spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
         requiredTier: requiredTier,
         image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
         gallery: newProject.gallery
-      });
+      }, { merge: true }); // 使用 merge 確保保留原本其他的屬性
       setShowCreateModal(false);
+      setEditProjectId(null); // 清空編輯狀態
       setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] });
-    } catch (err) { 
-      console.error("專案建立失敗:", err); 
-      alert("無法發布，請確認 Firebase 資料庫規則。");
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleCreateTrip = async (e: React.FormEvent) => {
@@ -815,7 +819,13 @@ export default function DashboardPage() {
                             <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${project.status === '招募中' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{project.status}</span>
                           </td>
                           <td className="px-6 py-4"><div className="flex items-center gap-1.5 font-bold text-slate-700"><Users size={14} className="text-slate-400"/> {applicantCount} 人</div></td>
-                          <td className="px-6 py-4 text-right"><button onClick={() => handleManageApplicants(project)} className={`font-bold hover:underline ${themeText}`}>管理名單</button></td>
+                          <td className="px-6 py-4 text-slate-400 text-xs">{project.date}</td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end items-center gap-3">
+                              <button onClick={() => handleEditProject(project)} className="font-bold text-slate-400 hover:text-indigo-600 transition-colors">編輯</button>
+                              <button onClick={() => handleManageApplicants(project)} className={`font-bold hover:underline ${themeText}`}>管理名單</button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -838,6 +848,43 @@ export default function DashboardPage() {
                          {currentProjectApplicants.map(app => {
                            const info = app.creatorInfo || {};
                            const myReview = app.businessReview;
+                           
+                           // ✨ 判斷是否為 S/A 級網紅且未付費 (Paywall 機制)
+                           const isPremiumTier = info.tier === 'S' || info.tier === 'A';
+                           const isLocked = isPremiumTier && providerPlan !== 'pro';
+
+                           // 若觸發付費牆，顯示上鎖的模糊卡片
+                           if (isLocked) {
+                             return (
+                               <div key={app.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden h-48 flex items-center justify-center group cursor-not-allowed">
+                                  {/* 上鎖提示區塊 */}
+                                  <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
+                                    <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mb-3 shadow-inner">
+                                      <Lock size={24} className="text-amber-500" />
+                                    </div>
+                                    <h4 className="font-bold text-slate-900 mb-1">發現 {info.tier} 級高影響力創作者！</h4>
+                                    <p className="text-xs text-slate-500 mb-4 max-w-sm">有高影響力網紅對您的案源感興趣並提出了加碼方案。升級專業版 (Pro) 即可解鎖完整履歷與聯繫方式。</p>
+                                    <button 
+                                      onClick={() => { setShowApplicantsModal(false); setUpgradeReason('tier'); setShowUpgradeModal(true); }}
+                                      className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-xl shadow-lg hover:scale-105 transition-transform"
+                                    >
+                                      立即升級解鎖
+                                    </button>
+                                  </div>
+                                  {/* 底層模糊假資料 (視覺誘餌) */}
+                                  <div className="opacity-40 flex w-full p-6 items-start gap-4 filter blur-[3px]">
+                                    <div className="w-16 h-16 bg-slate-300 rounded-full shrink-0 border-2 border-white"></div>
+                                    <div className="flex-1 space-y-3">
+                                      <div className="h-5 bg-slate-300 rounded w-1/3"></div>
+                                      <div className="h-4 bg-slate-200 rounded w-1/4"></div>
+                                      <div className="h-12 bg-slate-200 rounded w-full mt-2"></div>
+                                    </div>
+                                  </div>
+                               </div>
+                             );
+                           }
+
+                           // 正常顯示的履歷卡片
                            return (
                              <div key={app.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
                                {/* 創作者卡片頭部 */}
@@ -956,9 +1003,9 @@ export default function DashboardPage() {
                  <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
                   <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
-                      <ListPlus size={20} className="text-sky-500"/> 發布新案源 (Cloud Sync)
+                      <ListPlus size={20} className="text-sky-500"/> {editProjectId ? '編輯案源' : '發布新案源'} (Cloud Sync)
                     </h3>
-                    <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                    <button onClick={() => { setShowCreateModal(false); setEditProjectId(null); setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] }); }} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                   </div>
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-6" onSubmit={handleCreateProject}>
@@ -1053,7 +1100,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="pt-4 border-t border-slate-200">
                         <button type="submit" className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                          <CheckCircle2 size={18} /> 確認發布
+                          <CheckCircle2 size={18} /> {editProjectId ? '儲存修改' : '確認發布'}
                         </button>
                       </div>
                     </form>
