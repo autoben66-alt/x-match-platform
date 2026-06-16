@@ -160,12 +160,17 @@ export default function AdminDashboardPage() {
     // 監聽用戶列表
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
-      if (snapshot.empty) {
-        MOCK_USERS.forEach(u => setDoc(doc(usersCol, u.id), u));
-      } else {
-        const data = snapshot.docs.map(d => d.data() as UserData);
-        setUsers(data.sort((a, b) => Number(a.id) - Number(b.id)));
+      // 若資料庫內的用戶少於預設值，將測試資料補齊 (確保列表不空)
+      if (snapshot.docs.length < MOCK_USERS.length) {
+        MOCK_USERS.forEach(u => {
+          if (!snapshot.docs.find(d => d.id === u.id)) {
+            setDoc(doc(usersCol, u.id), u);
+          }
+        });
       }
+      const data = snapshot.docs.map(d => d.data() as UserData);
+      // 修復：將字串 ID 進行正確排序，並反轉讓最新註冊的排在最上方
+      setUsers(data.sort((a, b) => String(b.id).localeCompare(String(a.id))));
     }, (err) => console.error("無法讀取用戶資料:", err));
 
     // 監聽交易紀錄
@@ -194,7 +199,11 @@ export default function AdminDashboardPage() {
   }, [fbUser, isLoggedIn]);
 
   const filteredUsers = users.filter(u => {
-    const matchSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase());
+    // 修復：增加安全防護，避免因為某些用戶缺少 name 或 email 導致整個畫面崩潰
+    const safeName = u.name || '';
+    const safeEmail = u.email || '';
+    const matchSearch = safeName.toLowerCase().includes(searchTerm.toLowerCase()) || safeEmail.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchRole = filterRole === '全部角色' || u.role === filterRole;
     const matchStatus = filterStatus === '全部狀態' || u.status === filterStatus;
     return matchSearch && matchRole && matchStatus;

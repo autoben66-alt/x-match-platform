@@ -285,7 +285,7 @@ export default function CreatorsPage() {
               });
 
               return {
-                id: Number(u.id) || Date.now() + index,
+                id: u.id || Date.now() + index, // 修復：保留 Firebase 原始字串 ID
                 name: u.name || enrich.name,
                 handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
                 lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
@@ -308,7 +308,8 @@ export default function CreatorsPage() {
                 completionScore: u.completionScore || enrich.completionScore || 5.0
               };
             });
-            setCreators(mappedCreators);
+            // 將陣列反轉，確保最新新增的創作者會出現在最前面
+            setCreators(mappedCreators.reverse());
         } else {
             setCreators(fallbackCreators);
         }
@@ -346,9 +347,15 @@ export default function CreatorsPage() {
   const topCreators = [...creators].sort((a, b) => b.completedJobs - a.completedJobs).slice(0, 3);
   
   const filteredCreators = creators.filter(creator => {
-    const matchesSearch = creator.name.toLowerCase().includes(searchTerm.toLowerCase()) || creator.handle.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === '全部' || creator.tags.some(tag => tag.includes(categoryFilter));
-    const matchesLocation = locationFilter === '全部' || creator.location.includes(locationFilter);
+    // 修復：增加防護，避免 undefined 造成搜尋功能崩潰
+    const safeName = creator.name || '';
+    const safeHandle = creator.handle || '';
+    const safeTags = Array.isArray(creator.tags) ? creator.tags : [];
+    const safeLocation = creator.location || '';
+
+    const matchesSearch = safeName.toLowerCase().includes(searchTerm.toLowerCase()) || safeHandle.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === '全部' || safeTags.some(tag => tag.includes(categoryFilter));
+    const matchesLocation = locationFilter === '全部' || safeLocation.includes(locationFilter);
     return matchesSearch && matchesCategory && matchesLocation;
   }).sort((a, b) => {
     switch (sortBy) {
