@@ -443,17 +443,18 @@ export default function Home() {
       <div className="relative bg-slate-900 overflow-hidden w-full h-[60vh] md:h-[80vh] lg:h-[90vh]">
         <div className="absolute inset-0">
           <img 
-            src="/images/ChatGPT Image 2026年6月16日 下午02_44_02.png" 
-            alt="X-Match 餐旅業 x 創作者 媒合新標準" 
-            className="w-full h-full object-cover md:object-center"
+            /* 💡 請在這裡替換您的圖片路徑 */
+            src="/hero.png" 
+            alt="X-Match 媒合新標準" 
+            className="w-full h-full object-cover object-center"
           />
-          {/* 選擇性：添加一個非常輕微的漸層，確保如果底下有按鈕，能提高清晰度，如果不需要可以移除 */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"></div>
+          {/* 底部保留一點微弱漸層，讓下方的按鈕能清楚顯示，不會被背景吃掉 */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-80"></div>
         </div>
         
-        {/* 按鈕區域：移除了原本的標題文字，只保留按鈕，並將位置調整到底部，避免遮擋您的設計圖 */}
-        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-16 md:pb-24">
-          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto lg:mx-0 lg:ml-12">
+        {/* 按鈕區域：已移除所有多餘文字，只保留按鈕並放置於左下方 */}
+        <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-12 md:pb-20">
+          <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md mx-auto lg:mx-0 lg:ml-8">
             <Link 
               href="/creators"
               className="flex-1 bg-white text-slate-900 py-3.5 px-6 rounded-xl font-bold text-lg hover:bg-slate-50 transition-all hover:scale-105 shadow-xl flex items-center justify-center gap-2"
