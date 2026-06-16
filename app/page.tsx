@@ -445,7 +445,7 @@ export default function Home() {
         <div className="absolute inset-0">
           <img 
             /* 💡 請在這裡替換您的圖片路徑 */
-            src="/images/ChatGPT Image 2026年6月16日 下午02_44_02.png" 
+            src="/hero.png" 
             alt="X-Match 媒合新標準" 
             /* 修改處 2: 新增 object-left 讓手機版強制對齊左側文字，md 版以上才置中 */
             className="w-full h-full object-cover object-left md:object-center"
