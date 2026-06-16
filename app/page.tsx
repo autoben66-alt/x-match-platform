@@ -45,7 +45,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
-// --- 整合 CreatorCard 元件 (來自您提供的原始檔) ---
+// --- 整合 CreatorCard 元件 ---
 
 export interface Creator {
   id: number | string;
@@ -221,7 +221,7 @@ const ENRICH_DATA: EnrichData[] = [
   }
 ];
 
-// 新增：模擬優質廠商資料 (當 DB 無連線時使用，與案源頁面一致)
+// 模擬優質廠商資料 (當 DB 無連線時使用，與案源頁面一致)
 const FALLBACK_PROJECTS: ProviderDetail[] = [
     {
         id: "p1", 
@@ -298,14 +298,38 @@ export default function Home() {
 
   // 監聽 Firebase 資料
   useEffect(() => {
+    // 建立預設的展示創作者資料 (Fallback)
+    const fallbackCreators: CreatorDetail[] = ENRICH_DATA.map((enrich, index) => ({
+      id: 'fallback-' + index,
+      name: enrich.name,
+      handle: enrich.handle,
+      lineId: enrich.lineId,
+      avatar: enrich.avatar,
+      location: enrich.location,
+      bio: enrich.bio,
+      followers: enrich.followers,
+      engagement: enrich.engagement,
+      completedJobs: enrich.completedJobs,
+      rating: enrich.rating,
+      coverImage: enrich.coverImage,
+      portfolio: enrich.portfolio,
+      audience: enrich.audience,
+      rates: enrich.rates,
+      tags: ['👑 創始會員', ...enrich.tags],
+      badges: ['創始會員', '官方認證'],
+      averageViews: enrich.averageViews,
+      completionScore: enrich.completionScore
+    }));
+
     if (!db) {
-      setIsLoading(false);
+      setCreators(fallbackCreators);
       setTestimonials(FALLBACK_TESTIMONIALS);
       setProviders(FALLBACK_PROJECTS); // 若無 DB，使用 Fallback Projects
+      setIsLoading(false);
       return;
     }
 
-    // 1. 抓取創作者清單 (維持不變，抓取 users)
+    // 1. 抓取創作者清單 (加入完整錯誤處理與 Fallback 機制)
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       if (!snapshot.empty) {
@@ -313,40 +337,51 @@ export default function Home() {
         
         // --- 處理創作者 ---
         const creatorUsers = allUsers.filter(u => u.role === '創作者');
-        const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
-          const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
-          const isFounder = index < 50; 
-          const formatRates = (rates: any) => ({
-            post: rates?.post ? `NT$ ${rates.post.toLocaleString()}` : enrich.rates.post,
-            story: rates?.story ? `NT$ ${rates.story.toLocaleString()}` : enrich.rates.story,
-            reels: rates?.reels ? `NT$ ${rates.reels.toLocaleString()}` : enrich.rates.reels,
-          });
+        
+        if (creatorUsers.length > 0) {
+          const mappedCreators: CreatorDetail[] = creatorUsers.map((u, index) => {
+            const enrich = ENRICH_DATA[index % ENRICH_DATA.length];
+            const isFounder = index < 50; 
+            const formatRates = (rates: any) => ({
+              post: rates?.post ? `NT$ ${rates.post.toLocaleString()}` : enrich.rates.post,
+              story: rates?.story ? `NT$ ${rates.story.toLocaleString()}` : enrich.rates.story,
+              reels: rates?.reels ? `NT$ ${rates.reels.toLocaleString()}` : enrich.rates.reels,
+            });
 
-          return {
-            id: Number(u.id) || Date.now() + index,
-            name: u.name || enrich.name,
-            handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
-            lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
-            avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
-            location: u.location || enrich.location,
-            bio: u.bio || enrich.bio,
-            followers: u.followers || enrich.followers,
-            engagement: u.engagement || enrich.engagement,
-            completedJobs: u.completedJobs || enrich.completedJobs,
-            rating: u.rating || enrich.rating,
-            coverImage: u.coverImage || enrich.coverImage,
-            portfolio: u.portfolio?.length > 0 ? u.portfolio : enrich.portfolio,
-            audience: u.audience || enrich.audience,
-            rates: formatRates(u.rates),
-            tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
-            badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
-            averageViews: u.averageViews || enrich.averageViews || 5000,
-            completionScore: u.completionScore || enrich.completionScore || 5.0
-          };
-        });
-        setCreators(mappedCreators.slice(0, 3)); 
+            return {
+              id: Number(u.id) || Date.now() + index,
+              name: u.name || enrich.name,
+              handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
+              lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
+              avatar: u.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.name}`,
+              location: u.location || enrich.location,
+              bio: u.bio || enrich.bio,
+              followers: u.followers || enrich.followers,
+              engagement: u.engagement || enrich.engagement,
+              completedJobs: u.completedJobs || enrich.completedJobs,
+              rating: u.rating || enrich.rating,
+              coverImage: u.coverImage || enrich.coverImage,
+              portfolio: u.portfolio?.length > 0 ? u.portfolio : enrich.portfolio,
+              audience: u.audience || enrich.audience,
+              rates: formatRates(u.rates),
+              tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
+              badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
+              averageViews: u.averageViews || enrich.averageViews || 5000,
+              completionScore: u.completionScore || enrich.completionScore || 5.0
+            };
+          });
+          setCreators(mappedCreators.slice(0, 3)); 
+        } else {
+          setCreators(fallbackCreators); // 有資料表但沒有創作者資料時
+        }
+      } else {
+        setCreators(fallbackCreators); // 資料表完全為空時
       }
       setIsLoading(false);
+    }, (error) => {
+      console.error("讀取創作者失敗 (可能由於無資料庫權限或連線異常):", error);
+      setCreators(fallbackCreators); // 發生錯誤時退回顯示展示資料
+      setIsLoading(false); // ⚠️ 重要：解除轉圈狀態
     });
 
     // 2. 抓取真實廠商案源 (監聽 projects 集合)
@@ -390,6 +425,9 @@ export default function Home() {
       } else {
         setTestimonials(FALLBACK_TESTIMONIALS);
       }
+    }, (error) => {
+      console.error("Fetching testimonials failed:", error);
+      setTestimonials(FALLBACK_TESTIMONIALS);
     });
 
     return () => {
@@ -404,10 +442,10 @@ export default function Home() {
       {/* Hero Section */}
       <div className="relative bg-slate-900 overflow-hidden">
         <div className="absolute inset-0 opacity-40">
-          {/* 更換為更適合「媒合/合作」的高畫質咖啡廳商業合作示意圖 */}
+          {/* 更換為更適合「現代創意合作與商務」的高畫質示意圖 */}
           <img 
-            src="https://images.unsplash.com/photo-1556761175-4b46a572b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
-            alt="Business Collaboration and Matching" 
+            src="https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80" 
+            alt="Business Collaboration and Partnership" 
             className="w-full h-full object-cover"
           />
         </div>
