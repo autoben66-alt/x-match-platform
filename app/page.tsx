@@ -482,7 +482,7 @@ export default function Home() {
         <div className="absolute inset-0">
           <img 
             /* 💡 請在這裡替換您的圖片路徑 */
-            src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80" 
+            src="/hero.png" 
             alt="X-Match 媒合新標準" 
             className="w-full h-full object-cover object-left md:object-center"
           />
