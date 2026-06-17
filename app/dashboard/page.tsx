@@ -135,6 +135,7 @@ export default function DashboardPage() {
     socialLinks: { ig: '', yt: '', tiktok: '', other: '' },
     rates: { post: 5000, story: 1500, reels: 8000 },
     audience: { gender: '女性 85%', age: '25-34歲', topCity: '台北/新北' },
+    followers: 45000, // ✨ 新增粉絲數欄位初始值
     averageViews: 5000,
     completionScore: 5.0
   });
@@ -224,6 +225,7 @@ export default function DashboardPage() {
             bio: d.bio || prev.bio, coverImage: d.coverImage || '',
             avatar: d.avatar || '', portfolio: d.portfolio || [],
             rates: d.rates || prev.rates, audience: d.audience || prev.audience,
+            followers: d.followers || prev.followers, // ✨ 抓取粉絲數
             averageViews: d.averageViews || prev.averageViews,
             completionScore: d.completionScore || prev.completionScore
           }));
@@ -422,7 +424,8 @@ export default function DashboardPage() {
         audience: creatorProfile.audience,
         socialLinks: creatorProfile.socialLinks, 
         tier: creatorProfile.tier,
-        followers: 12000, engagement: 4.5, completedJobs: 0,
+        followers: creatorProfile.followers, // ✨ 使用狀態中的粉絲數
+        engagement: 4.5, completedJobs: 0,
         averageViews: creatorProfile.averageViews, 
         completionScore: creatorProfile.completionScore
       }, { merge: true });
@@ -1207,7 +1210,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+                <div className="bg-white rounded-xl border border-slate-200 p-12 text-center flex flex-col items-center">
                   <Mail className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <p className="text-slate-500 font-medium">您尚未向任何創作者發送邀請</p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm mt-4">
@@ -1614,6 +1617,17 @@ export default function DashboardPage() {
                </button>
              </div>
 
+             {/* ✨ 數據真實性警告 */}
+             <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl shadow-sm flex items-start gap-3">
+               <AlertCircle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+               <div>
+                 <h4 className="font-bold text-amber-900 text-sm">數據真實性聲明</h4>
+                 <p className="text-xs text-amber-800 mt-1 leading-relaxed">
+                   請務必確保您填寫的「粉絲數」、「平均觀看」及「合作報價」等資訊皆為真實數據。平台將進行人工與系統查核，若發現填寫不實數據以獲取高等級案源，為維護商家權益，<span className="font-bold text-red-600">平台有權永久關閉您的帳號與接案權限</span>。
+                 </p>
+               </div>
+             </div>
+
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                <div className="lg:col-span-2 space-y-6">
                  
@@ -1771,9 +1785,26 @@ export default function DashboardPage() {
                  </div>
 
                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                   <h3 className="font-black text-slate-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><BarChart3 size={18} className="text-indigo-500"/> 社群受眾分析</h3>
+                   <h3 className="font-black text-slate-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><BarChart3 size={18} className="text-indigo-500"/> 社群數據與受眾分析</h3>
                    <div className="space-y-4">
+                     {/* ✨ 新增粉絲數與觀看數的輸入欄位 */}
                      <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5">粉絲總數 (Followers)</label>
+                       <div className="flex items-center relative">
+                          <Users size={16} className="absolute left-3 text-slate-400"/>
+                          <input type="number" className="w-full pl-9 p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
+                                 value={creatorProfile.followers} onChange={(e) => setCreatorProfile(p => ({...p, followers: Number(e.target.value)}))} />
+                       </div>
+                     </div>
+                     <div>
+                       <label className="block text-xs font-bold text-slate-500 mb-1.5">平均觀看數 (Average Views)</label>
+                       <div className="flex items-center relative">
+                          <Eye size={16} className="absolute left-3 text-slate-400"/>
+                          <input type="number" className="w-full pl-9 p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
+                                 value={creatorProfile.averageViews} onChange={(e) => setCreatorProfile(p => ({...p, averageViews: Number(e.target.value)}))} />
+                       </div>
+                     </div>
+                     <div className="border-t border-slate-100 pt-4 mt-2">
                        <label className="block text-xs font-bold text-slate-500 mb-1.5">性別分佈</label>
                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
                               value={creatorProfile.audience.gender} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, gender: e.target.value}}))} />
@@ -1787,14 +1818,6 @@ export default function DashboardPage() {
                        <label className="block text-xs font-bold text-slate-500 mb-1.5">熱門分佈城市</label>
                        <input type="text" className="w-full p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
                               value={creatorProfile.audience.topCity} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, topCity: e.target.value}}))} />
-                     </div>
-                     <div>
-                       <label className="block text-xs font-bold text-slate-500 mb-1.5">平均觀看數 (Average Views)</label>
-                       <div className="flex items-center relative">
-                          <Eye size={16} className="absolute left-3 text-slate-400"/>
-                          <input type="number" className="w-full pl-9 p-3 border border-slate-200 rounded-xl text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white" 
-                                 value={creatorProfile.averageViews} onChange={(e) => setCreatorProfile(p => ({...p, averageViews: Number(e.target.value)}))} />
-                       </div>
                      </div>
                    </div>
                  </div>
