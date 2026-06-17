@@ -340,8 +340,6 @@ export default function DashboardPage() {
     const targetId = editProjectId || Date.now().toString(); 
     const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制'; 
 
-    const currentUid = fbUser?.uid || localUid;
-
     try {
       await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', targetId), {
         id: targetId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
@@ -364,7 +362,6 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!newTrip.destination || !newTrip.startDate || !newTrip.endDate) { alert("請填寫完整目的地與日期"); return; }
     
-    const currentUid = fbUser?.uid || localUid;
     const newId = `t${Date.now()}`;
     
     // ✨ 格式化日期顯示 (例如 2024/07/15 - 2024/07/17)
@@ -1451,7 +1448,7 @@ export default function DashboardPage() {
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 每月 3 次合作邀請</li>
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 查看所有公開行程許願池</li>
                     <li className="flex items-center text-sm text-slate-600"><CheckCircle2 className="w-4 h-4 text-green-500 mr-2"/> 基礎智能合約 (每月 1 份)</li>
-                    <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅深度數據</li>
+                    <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法觀看及邀請 S/A 級網紅</li>
                     <li className="flex items-center text-sm text-slate-400"><X className="w-4 h-4 text-slate-400 mr-2"/> 無法查看網紅 LINE 聯繫方式</li>
                   </ul>
                 </div>
@@ -1469,8 +1466,9 @@ export default function DashboardPage() {
                     <span className="text-4xl font-extrabold">$1,200</span><span className="text-indigo-200 ml-2">/ 月</span>
                   </div>
                   <ul className="space-y-3 mb-6 text-indigo-100">
-                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送合作邀請</li>
+                    <li className="flex items-center text-sm"><Crown className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 解鎖觀看及邀請 S/A 高流量網紅</li>
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 解鎖直接查看網紅 LINE ID</li>
+                    <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 無限發送合作邀請</li>
                     <li className="flex items-center text-sm"><BarChart3 className="w-4 h-4 text-white mr-2"/> 網紅深度數據解鎖 (受眾分析)</li>
                     <li className="flex items-center text-sm"><Shield className="w-4 h-4 text-white mr-2"/> 無限使用智能合約與數位簽署</li>
                   </ul>
@@ -1498,6 +1496,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-indigo-300 mb-4">(現省 $4,400，平均每月僅 $833)</p>
                   <ul className="space-y-3 mb-6 text-indigo-100">
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 包含月訂閱所有 Pro 權限</li>
+                    <li className="flex items-center text-sm"><Crown className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 解鎖觀看及邀請 S/A 高流量網紅</li>
                     <li className="flex items-center text-sm"><Zap className="w-4 h-4 text-yellow-400 fill-yellow-400 mr-2"/> 每月免費贈送 1 次置頂推廣 ($300)</li>
                     <li className="flex items-center text-sm"><Rocket className="w-4 h-4 text-sky-400 fill-sky-400 mr-2"/> 案源優先曝光與尊榮標章</li>
                     <li className="flex items-center text-sm"><CheckCircle2 className="w-4 h-4 text-white mr-2"/> 專屬 1 對 1 優先客服</li>
@@ -2118,6 +2117,50 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* --- Upgrade Alert Modal (動態升級 / 權限提示) --- */}
+          {showUpgradeModal && (
+            <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+               <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
+                  <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                     {upgradeReason === 'limit' ? (
+                        <AlertCircle size={32} className="text-red-500" />
+                     ) : (
+                        <Lock size={32} className="text-amber-500" />
+                     )}
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900 mb-2">
+                     {upgradeReason === 'limit' ? '免費額度已用完' : '付費會員專屬功能'}
+                  </h2>
+                  <p className="text-slate-500 text-sm mb-6 whitespace-pre-line leading-relaxed">
+                     {upgradeReason === 'limit' 
+                       ? `您本月的免費額度已達上限。\n升級至專業版即可解鎖無限邀請！`
+                       : upgradeReason === 'tier'
+                       ? `「查看及邀請 S/A 級高流量網紅」為專業版 (Pro) 專屬。\n升級後即可無限制邀約高影響力網紅！`
+                       : `「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。\n升級後即可與創作者零距離洽談！`}
+                  </p>
+                  
+                  <div className="space-y-3">
+                     <button 
+                       onClick={() => {
+                           setActiveTab('wallet');
+                           setShowUpgradeModal(false);
+                       }}
+                       className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                     >
+                       <Zap size={18} fill="currentColor"/> 前往升級 Pro
+                     </button>
+                     <button 
+                       onClick={() => setShowUpgradeModal(false)}
+                       className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 text-sm"
+                     >
+                       稍後再說
+                     </button>
+                  </div>
+               </div>
+            </div>
+          )}
+
         </div>
       </div>
       {/* 行動版底部導覽 */}
