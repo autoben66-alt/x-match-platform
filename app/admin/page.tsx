@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
-  Activity, PieChart, ArrowUpRight, ArrowDownRight, FileText, Briefcase, Bell,
-  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit, Save, CreditCard, UserCog, Medal
+  Activity, ArrowUpRight, FileText, Briefcase, Bell,
+  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit, Save, UserCog, Medal, Crown, Instagram, Youtube, Link as LinkIcon
 } from 'lucide-react';
 
-// --- 自定義 Link 元件 (解決預覽環境無法解析 next/link 的問題) ---
+// --- 自定義 Link 元件 (解決預覽環境問題) ---
 const Link = ({ href, children, className, ...props }: any) => {
   return (
     <a href={href} className={className} {...props}>
@@ -55,50 +55,37 @@ const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a8
 type AdminTab = 'overview' | 'users' | 'revenue' | 'settings';
 
 interface UserData {
-  id: string;
-  name: string;
-  email: string;
-  role: string;
-  plan: string;
-  status: string;
-  joinDate: string;
-  tier?: string; // ✨ 新增：網紅評級欄位 (例如: S, A, B, C, 未評級)
+  id: string; name: string; email: string; role: string; plan: string; status: string; joinDate: string; tier?: string;
+  // ✨ 創作者專屬欄位 (供後台查核)
+  handle?: string; lineId?: string; location?: string; bio?: string;
+  followers?: number; averageViews?: number; completionScore?: number;
+  socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; };
+  rates?: { post?: number; story?: number; reels?: number; };
+  audience?: { gender?: string; age?: string; topCity?: string; };
+  tags?: string[]; avatar?: string; coverImage?: string; portfolio?: string[];
 }
 
 interface TransactionData {
-  id: string;
-  user: string;
-  item: string;
-  amount: number;
-  status: string;
-  date: string;
+  id: string; user: string; item: string; amount: number; status: string; date: string;
 }
 
 interface TestimonialData {
-  id: string;
-  image: string;
-  quote: string;
-  authorInitial: string;
-  authorName: string;
-  authorLocation: string;
-  metricIcon: string;
-  metricLabel: string;
-  rating: number;
+  id: string; image: string; quote: string; authorInitial: string; authorName: string; authorLocation: string; metricIcon: string; metricLabel: string; rating: number;
 }
 
-// 初始模擬資料 (加入預設 tier)
+// 初始模擬資料
 const MOCK_USERS: UserData[] = [
   { id: '1', name: '海角七號民宿', email: 'cape7@example.com', role: '商家', plan: 'Pro', status: '活躍', joinDate: '2024/02/15' },
-  { id: '2', name: '林小美', email: 'may_travel@example.com', role: '創作者', plan: 'Free', status: '活躍', joinDate: '2024/01/10', tier: 'A' },
+  { id: '2', name: '林小美', email: 'may_travel@example.com', role: '創作者', plan: 'Free', status: '活躍', joinDate: '2024/01/10', tier: 'A', followers: 45000, averageViews: 12500, socialLinks: {ig: 'https://instagram.com'} },
   { id: '3', name: '山林秘境露營區', email: 'mountain@example.com', role: '商家', plan: 'Free', status: '待審核', joinDate: '2024/06/01' },
-  { id: '4', name: 'Jason 攝影', email: 'jason@example.com', role: '創作者', plan: 'Free', status: '停權', joinDate: '2023/11/20', tier: 'S' },
-  { id: '5', name: '新手強尼', email: 'johnny@example.com', role: '創作者', plan: 'Free', status: '待審核', joinDate: '2024/06/15', tier: '未評級' },
+  { id: '4', name: 'Jason 攝影', email: 'jason@example.com', role: '創作者', plan: 'Free', status: '停權', joinDate: '2023/11/20', tier: 'S', followers: 120000, averageViews: 45000 },
+  { id: '5', name: '新手強尼', email: 'johnny@example.com', role: '創作者', plan: 'Free', status: '待審核', joinDate: '2024/06/15', tier: '未評級', followers: 2000 },
 ];
 
 const MOCK_TX: TransactionData[] = [
-  { id: 'TX-1049', user: '海角七號民宿', item: '專業成長版 Pro (月訂閱)', amount: 999, status: '成功', date: '2024/06/01 10:23' },
-  { id: 'TX-1048', user: 'Ocean Blue 衝浪店', item: '單次置頂推廣 (Boost)', amount: 300, status: '成功', date: '2024/05/28 15:40' },
-  { id: 'TX-1047', user: '老宅咖啡·午後', item: '精準推播 (Smart Push)', amount: 100, status: '成功', date: '2024/05/25 09:12' },
+  { id: 'TX-1049', user: '海角七號民宿', item: '專業版 Pro (月訂閱)', amount: 1200, status: '成功', date: '2024/06/01 10:23' },
+  { id: 'TX-1048', user: 'Ocean Blue 衝浪店', item: '置頂推廣 (單次)', amount: 300, status: '成功', date: '2024/05/28 15:40' },
+  { id: 'TX-1047', user: '老宅咖啡·午後', item: '精準推播 (單次)', amount: 100, status: '成功', date: '2024/05/25 09:12' },
 ];
 
 export default function AdminDashboardPage() {
@@ -160,17 +147,12 @@ export default function AdminDashboardPage() {
     // 監聽用戶列表
     const usersCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
-      // 若資料庫內的用戶少於預設值，將測試資料補齊 (確保列表不空)
-      if (snapshot.docs.length < MOCK_USERS.length) {
-        MOCK_USERS.forEach(u => {
-          if (!snapshot.docs.find(d => d.id === u.id)) {
-            setDoc(doc(usersCol, u.id), u);
-          }
-        });
+      if (snapshot.empty) {
+        MOCK_USERS.forEach(u => setDoc(doc(usersCol, u.id), u));
+      } else {
+        const data = snapshot.docs.map(d => d.data() as UserData);
+        setUsers(data.sort((a, b) => b.id.localeCompare(a.id))); // ✨ 使用 localeCompare 反轉排序，讓新用戶在最上面
       }
-      const data = snapshot.docs.map(d => d.data() as UserData);
-      // 修復：將字串 ID 進行正確排序，並反轉讓最新註冊的排在最上方
-      setUsers(data.sort((a, b) => String(b.id).localeCompare(String(a.id))));
     }, (err) => console.error("無法讀取用戶資料:", err));
 
     // 監聽交易紀錄
@@ -199,11 +181,10 @@ export default function AdminDashboardPage() {
   }, [fbUser, isLoggedIn]);
 
   const filteredUsers = users.filter(u => {
-    // 修復：增加安全防護，避免因為某些用戶缺少 name 或 email 導致整個畫面崩潰
+    // ✨ 防護機制：確保 name 和 email 不為空才執行 toLowerCase()
     const safeName = u.name || '';
     const safeEmail = u.email || '';
     const matchSearch = safeName.toLowerCase().includes(searchTerm.toLowerCase()) || safeEmail.toLowerCase().includes(searchTerm.toLowerCase());
-    
     const matchRole = filterRole === '全部角色' || u.role === filterRole;
     const matchStatus = filterStatus === '全部狀態' || u.status === filterStatus;
     return matchSearch && matchRole && matchStatus;
@@ -222,7 +203,7 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // 更新用戶資料 (角色、方案、✨ 網紅評級)
+  // 更新用戶資料 (角色、方案、網紅評級)
   const handleUpdateUser = async () => {
     if (!db || !fbUser || !editingUser) return;
     try {
@@ -230,7 +211,6 @@ export default function AdminDashboardPage() {
       await updateDoc(userRef, { 
         role: editingUser.role,
         plan: editingUser.plan,
-        // ✨ 如果是創作者，一併寫入 tier 欄位
         ...(editingUser.role === '創作者' ? { tier: editingUser.tier || '未評級' } : {})
       });
       setEditingUser(null);
@@ -403,7 +383,7 @@ export default function AdminDashboardPage() {
                   <div className="p-4 bg-orange-50 border border-orange-100 rounded-xl flex justify-between items-center">
                     <div>
                       <p className="text-sm font-bold text-orange-800">用戶實名與評級審核</p>
-                      <p className="text-xs text-orange-600 font-medium mt-0.5">有 {users.filter(u => u.status === '待審核' || u.tier === '未評級').length} 筆待處理</p>
+                      <p className="text-xs text-orange-600 font-medium mt-0.5">有 {users.filter(u => u.status === '待審核' || (u.role === '創作者' && u.tier === '未評級')).length} 筆待處理</p>
                     </div>
                     <button onClick={() => setActiveTab('users')} className="text-xs bg-white text-orange-600 font-bold px-3 py-1.5 rounded-lg shadow-sm hover:bg-orange-100 transition-colors">前往審核</button>
                   </div>
@@ -444,7 +424,6 @@ export default function AdminDashboardPage() {
                     <tr>
                       <th className="px-6 py-5">用戶資訊</th>
                       <th className="px-6 py-5">角色定位</th>
-                      {/* ✨ 新增評級欄位 */}
                       <th className="px-6 py-5">網紅評級</th>
                       <th className="px-6 py-5">訂閱方案</th>
                       <th className="px-6 py-5">目前狀態</th>
@@ -464,7 +443,6 @@ export default function AdminDashboardPage() {
                           }`}>{u.role}</span>
                         </td>
                         <td className="px-6 py-4">
-                           {/* ✨ 顯示創作者目前的評級 */}
                            {u.role === '創作者' ? (
                               <TierBadge tier={u.tier} />
                            ) : (
@@ -522,22 +500,22 @@ export default function AdminDashboardPage() {
               </div>
             </div>
             
-            {/* ✨ 編輯用戶權限與評級 Modal */}
+            {/* ✨ 編輯用戶權限與評級 Modal (包含創作者資料查核) */}
             {editingUser && (
                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-                  <div className="bg-white rounded-2xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
-                    <div className="flex items-center justify-between mb-6">
+                  <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
                       <div className="flex items-center gap-3 text-indigo-600">
                         <div className="p-3 bg-indigo-50 rounded-2xl"><UserCog size={24}/></div>
-                        <h3 className="font-black text-xl text-slate-900">審核與編輯</h3>
+                        <h3 className="font-black text-xl text-slate-900">審核與編輯權限</h3>
                       </div>
-                      <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                      <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
                     </div>
 
                     <div className="space-y-4 mb-8">
                        <div>
-                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">用戶名稱</label>
-                         <p className="font-bold text-slate-900 px-3 py-2 bg-slate-50 rounded-lg flex items-center justify-between">
+                         <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">用戶名稱與信箱</label>
+                         <p className="font-bold text-slate-900 px-3 py-2.5 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between">
                             {editingUser.name}
                             <span className="text-[10px] text-slate-400 font-normal">{editingUser.email}</span>
                          </p>
@@ -545,9 +523,9 @@ export default function AdminDashboardPage() {
                        
                        <div className="grid grid-cols-2 gap-3">
                          <div>
-                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">角色設定 (Role)</label>
+                           <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">角色設定 (Role)</label>
                            <select 
-                             className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                             className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                              value={editingUser.role}
                              onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
                            >
@@ -556,9 +534,9 @@ export default function AdminDashboardPage() {
                            </select>
                          </div>
                          <div>
-                           <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">訂閱方案 (Plan)</label>
+                           <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">訂閱方案 (Plan)</label>
                            <select 
-                             className="w-full p-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                             className="w-full p-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                              value={editingUser.plan}
                              onChange={(e) => setEditingUser({...editingUser, plan: e.target.value})}
                            >
@@ -568,32 +546,85 @@ export default function AdminDashboardPage() {
                          </div>
                        </div>
 
-                       {/* ✨ 創作者專屬：網紅評級審核區塊 */}
+                       {/* ✨ 創作者專屬：詳細資料查核區塊 */}
                        {editingUser.role === '創作者' && (
                          <div className="mt-6 pt-6 border-t border-slate-100">
                             <div className="flex items-center gap-2 mb-3">
-                              <ShieldCheck className="text-amber-500 w-5 h-5" />
-                              <h4 className="font-bold text-slate-900">接案評級審核 (Tier)</h4>
+                              <Search className="text-sky-500 w-5 h-5" />
+                              <h4 className="font-bold text-slate-900">創作者提報資料 (供查核)</h4>
                             </div>
-                            <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl mb-4">
-                              <p className="text-xs text-amber-800 font-medium leading-relaxed">
-                                <span className="font-bold">審核人員注意：</span>請先瀏覽該網紅之真實社群平台、加總粉絲數與實際互動率後，再給予對應的接案等級。<br/>
-                                <span className="text-[10px] text-amber-600 mt-1 block">* 評級越高，網紅前台可解鎖的「高單價」或「高門檻」案源越多。</span>
-                              </p>
+                            
+                            <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl mb-4 space-y-4">
+                               {/* 數據 */}
+                               <div className="grid grid-cols-2 gap-3">
+                                 <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm text-center">
+                                   <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-widest">粉絲總數</p>
+                                   <p className="font-black text-slate-800 text-lg">{editingUser.followers ? editingUser.followers.toLocaleString() : '未提供'}</p>
+                                 </div>
+                                 <div className="bg-white p-3 rounded-lg border border-slate-100 shadow-sm text-center">
+                                   <p className="text-[10px] text-slate-400 font-bold mb-1 uppercase tracking-widest">平均觀看</p>
+                                   <p className="font-black text-slate-800 text-lg">{editingUser.averageViews ? editingUser.averageViews.toLocaleString() : '未提供'}</p>
+                                 </div>
+                               </div>
+
+                               {/* 社群連結 */}
+                               <div>
+                                 <p className="text-xs text-slate-500 font-bold mb-2">社群頻道連結</p>
+                                 <div className="flex flex-wrap gap-2">
+                                   {editingUser.socialLinks?.ig ? <a href={editingUser.socialLinks.ig} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-3 py-1.5 bg-pink-50 text-pink-600 rounded-lg text-xs font-bold hover:bg-pink-100 transition-colors"><Instagram size={14}/> Instagram</a> : null}
+                                   {editingUser.socialLinks?.yt ? <a href={editingUser.socialLinks.yt} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"><Youtube size={14}/> YouTube</a> : null}
+                                   {editingUser.socialLinks?.tiktok ? <a href={editingUser.socialLinks.tiktok} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-3 py-1.5 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition-colors">TikTok</a> : null}
+                                   {editingUser.socialLinks?.other ? <a href={editingUser.socialLinks.other} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-colors"><LinkIcon size={14}/> 其他連結</a> : null}
+                                   {(!editingUser.socialLinks || (!editingUser.socialLinks.ig && !editingUser.socialLinks.yt && !editingUser.socialLinks.tiktok && !editingUser.socialLinks.other)) && <span className="text-xs text-slate-400 italic">未提供任何連結</span>}
+                                 </div>
+                               </div>
+
+                               {/* 報價與受眾 */}
+                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+                                  <div>
+                                    <p className="text-xs text-slate-500 font-bold mb-1.5">合作報價</p>
+                                    <ul className="text-xs text-slate-700 space-y-1">
+                                       <li>貼文：NT$ {editingUser.rates?.post?.toLocaleString() || 0}</li>
+                                       <li>限動：NT$ {editingUser.rates?.story?.toLocaleString() || 0}</li>
+                                       <li>影音：NT$ {editingUser.rates?.reels?.toLocaleString() || 0}</li>
+                                    </ul>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-slate-500 font-bold mb-1.5">受眾分析</p>
+                                    <ul className="text-xs text-slate-700 space-y-1">
+                                       <li>性別：{editingUser.audience?.gender || 'N/A'}</li>
+                                       <li>年齡：{editingUser.audience?.age || 'N/A'}</li>
+                                       <li>城市：{editingUser.audience?.topCity || 'N/A'}</li>
+                                    </ul>
+                                  </div>
+                               </div>
                             </div>
 
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">設定網紅等級</label>
-                            <select 
-                              className="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 bg-white shadow-sm"
-                              value={editingUser.tier || '未評級'}
-                              onChange={(e) => setEditingUser({...editingUser, tier: e.target.value})}
-                            >
-                              <option value="未評級">未評級 (待審核)</option>
-                              <option value="S">S 級 (頂規頭部網紅)</option>
-                              <option value="A">A 級 (高影響力創作者)</option>
-                              <option value="B">B 級 (中階穩健創作者)</option>
-                              <option value="C">C 級 (潛力微網紅 KOC)</option>
-                            </select>
+                            <div className="mt-6 pt-6 border-t border-slate-100">
+                               <div className="flex items-center gap-2 mb-3">
+                                 <ShieldCheck className="text-amber-500 w-5 h-5" />
+                                 <h4 className="font-bold text-slate-900">接案評級審核 (Tier)</h4>
+                               </div>
+                               <div className="bg-amber-50 border border-amber-100 p-3 rounded-xl mb-4">
+                                 <p className="text-xs text-amber-800 font-medium leading-relaxed">
+                                   <span className="font-bold">審核人員注意：</span>請先瀏覽該網紅之真實社群平台、加總粉絲數與實際互動率後，再給予對應的接案等級。<br/>
+                                   <span className="text-[10px] text-amber-600 mt-1 block">* 評級越高，網紅前台可解鎖的「高單價」或「高門檻」案源越多。</span>
+                                 </p>
+                               </div>
+
+                               <label className="block text-[10px] font-bold text-slate-400 mb-1.5 uppercase tracking-widest">設定網紅等級</label>
+                               <select 
+                                 className="w-full p-3 border border-slate-300 rounded-xl text-sm font-black text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 bg-white shadow-sm"
+                                 value={editingUser.tier || '未評級'}
+                                 onChange={(e) => setEditingUser({...editingUser, tier: e.target.value})}
+                               >
+                                 <option value="未評級">未評級 (待審核)</option>
+                                 <option value="S">S 級 (頂規頭部網紅)</option>
+                                 <option value="A">A 級 (高影響力創作者)</option>
+                                 <option value="B">B 級 (中階穩健創作者)</option>
+                                 <option value="C">C 級 (潛力微網紅 KOC)</option>
+                               </select>
+                            </div>
                          </div>
                        )}
 
@@ -613,10 +644,10 @@ export default function AdminDashboardPage() {
                 <div className="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95 duration-200">
                   <div className="flex items-center gap-3 mb-4 text-amber-500">
                     <div className="p-3 bg-amber-50 rounded-2xl"><AlertTriangle size={24}/></div>
-                    <h3 className="font-black text-xl text-slate-900">變更狀態確認</h3>
+                    <h3 className="font-bold text-xl text-slate-900">變更狀態確認</h3>
                   </div>
                   <p className="text-sm text-slate-600 mb-8 leading-relaxed font-medium">
-                    確定要將用戶 「<span className="font-black text-slate-900">{confirmAction.userName}</span>」 變更為 <span className="font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{confirmAction.newStatus}</span> 嗎？<br/><br/>此操作將永久寫入您的 Firebase 資料庫。
+                    確定要將用戶 「<span className="font-bold text-slate-900">{confirmAction.userName}</span>」 變更為 <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{confirmAction.newStatus}</span> 嗎？<br/><br/>此操作將永久寫入您的 Firebase 資料庫。
                   </p>
                   <div className="flex gap-3">
                     <button onClick={() => setConfirmAction(null)} className="flex-1 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:bg-slate-100 rounded-xl transition-all">取消操作</button>
@@ -707,7 +738,7 @@ export default function AdminDashboardPage() {
                     
                     {/* 照片上傳 */}
                     <div>
-                      <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價配圖 (Image)</label>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">評價配圖 (Image)</label>
                       <div className="flex items-center gap-4">
                         <label className="shrink-0 w-24 h-24 bg-slate-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 cursor-pointer hover:bg-slate-100 text-slate-400 transition-colors relative overflow-hidden">
                           {isUploadingImage ? (
@@ -748,7 +779,7 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">評價內容 (Quote) <span className="text-red-500">*</span></label>
+                      <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">評價內容 (Quote) <span className="text-red-500">*</span></label>
                       <textarea 
                         required
                         placeholder="例如：自從使用了 X-Match，我們的訂房率提升了 30%！"
@@ -760,7 +791,7 @@ export default function AdminDashboardPage() {
                     
                     <div className="grid grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">提供者名稱 <span className="text-red-500">*</span></label>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">提供者名稱 <span className="text-red-500">*</span></label>
                         <input 
                           required
                           type="text" 
@@ -771,7 +802,7 @@ export default function AdminDashboardPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">成效數字 <span className="text-red-500">*</span></label>
+                        <label className="block text-[10px] font-bold text-slate-400 mb-2 uppercase tracking-widest">成效數字 <span className="text-red-500">*</span></label>
                         <input 
                           required
                           type="text" 
@@ -788,7 +819,7 @@ export default function AdminDashboardPage() {
                         <button 
                           type="button"
                           onClick={handleCancelEdit}
-                          className="w-1/3 py-4 bg-slate-100 text-slate-500 font-black rounded-xl hover:bg-slate-200 transition-all text-xs uppercase tracking-widest active:scale-95"
+                          className="w-1/3 py-4 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-all text-xs uppercase tracking-widest active:scale-95"
                         >
                           取消
                         </button>
@@ -796,7 +827,7 @@ export default function AdminDashboardPage() {
                       <button 
                         disabled={isSubmittingTestimonial || isUploadingImage}
                         type="submit" 
-                        className="flex-1 py-4 bg-slate-900 text-white font-black rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-xs sm:text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="flex-1 py-4 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-all shadow-lg active:scale-95 text-xs sm:text-sm uppercase tracking-widest flex justify-center items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                       >
                         {isSubmittingTestimonial ? <Loader2 className="animate-spin" size={18}/> : (editingTestimonialId ? <Save size={18} /> : <Plus size={18} />)}
                         {isSubmittingTestimonial ? '寫入雲端...' : (editingTestimonialId ? '儲存修改' : '發布至前台首頁')}
@@ -869,7 +900,7 @@ export default function AdminDashboardPage() {
             <div className="p-2 bg-indigo-600 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-indigo-600/20">
               <ShieldCheck className="text-white w-5 h-5" />
             </div>
-            <span className="font-black text-xl text-white tracking-tighter uppercase italic">X-Match <span className="text-indigo-400 text-[10px] block font-black tracking-[0.3em] not-italic mt-0.5">Control Panel</span></span>
+            <span className="font-black text-xl text-white tracking-tighter uppercase italic">X-Match <span className="text-indigo-400 text-[10px] block font-bold tracking-[0.3em] not-italic mt-0.5">Control Panel</span></span>
           </Link>
         </div>
         <nav className="flex-1 p-6 space-y-2">
@@ -882,7 +913,7 @@ export default function AdminDashboardPage() {
             <button 
               key={item.id}
               onClick={() => setActiveTab(item.id as AdminTab)} 
-              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+              className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
                 activeTab === item.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-900/50' : 'hover:bg-slate-800 hover:text-white'
               }`}
             >
@@ -891,7 +922,7 @@ export default function AdminDashboardPage() {
           ))}
         </nav>
         <div className="p-6 border-t border-slate-800/50">
-           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-black text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
+           <button onClick={() => setIsLoggedIn(false)} className="w-full flex items-center gap-3 px-4 py-3.5 text-slate-500 font-bold text-xs uppercase tracking-widest hover:text-white hover:bg-red-500/10 rounded-xl transition-all"><LogOut size={16}/> 登出系統</button>
         </div>
       </aside>
 
@@ -909,7 +940,7 @@ export default function AdminDashboardPage() {
               <div className="flex items-center gap-3">
                  <div className="text-right hidden sm:block">
                     <p className="text-[10px] font-black text-slate-900 uppercase tracking-tighter">Super Admin</p>
-                    <p className="text-[9px] text-green-500 font-black uppercase tracking-widest">● System Online</p>
+                    <p className="text-[9px] text-green-500 font-bold uppercase tracking-widest">● System Online</p>
                  </div>
                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center text-white font-black text-xs shadow-md border border-slate-700">AD</div>
               </div>
@@ -921,7 +952,7 @@ export default function AdminDashboardPage() {
               {renderContent()}
            </div>
            
-           <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200 shadow-xl text-[9px] font-black text-slate-500 animate-in slide-in-from-bottom-5">
+           <div className="fixed bottom-6 right-6 flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-slate-200 shadow-xl text-[9px] font-bold text-slate-500 animate-in slide-in-from-bottom-5">
               <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
               DB Sync: <span className="text-indigo-600 tracking-wider ml-1">{internalAppId.toUpperCase()}</span>
            </div>
