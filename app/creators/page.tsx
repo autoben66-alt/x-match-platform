@@ -517,6 +517,58 @@ export default function CreatorsPage() {
         )}
       </div>
 
+      {/* ✨ 創作者分級制度介紹 */}
+      <div className="bg-white border-b border-slate-200 py-8 sm:py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 mb-2 flex items-center justify-center gap-2">
+              <Award className="text-indigo-500" /> 平台專屬網紅分級制度
+            </h2>
+            <p className="text-slate-600 text-sm">
+              我們透過數據分析與完案信用，將創作者分為四個等級，幫助您快速找到最合適的合作對象。
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* S 級 */}
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="bg-gradient-to-r from-yellow-300 to-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-sm"><Crown size={14}/>S</span>
+                <h3 className="font-bold text-slate-900">頂規頭部網紅</h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">擁有極高流量與粉絲黏著度，能為品牌帶來爆炸性曝光。</p>
+              <div className="text-[10px] font-bold text-amber-700 bg-amber-100/50 px-2 py-1 rounded inline-block">Pro 會員專屬解鎖</div>
+            </div>
+            {/* A 級 */}
+            <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="bg-indigo-100 text-indigo-700 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border border-indigo-200">A</span>
+                <h3 className="font-bold text-slate-900">高影響力創作者</h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">穩定產出高質感內容，粉絲互動率極佳，口碑行銷首選。</p>
+              <div className="text-[10px] font-bold text-indigo-700 bg-indigo-100/50 px-2 py-1 rounded inline-block">Pro 會員專屬解鎖</div>
+            </div>
+            {/* B 級 */}
+            <div className="bg-sky-50/50 border border-sky-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="bg-sky-100 text-sky-700 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border border-sky-200">B</span>
+                <h3 className="font-bold text-slate-900">中階穩健創作者</h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">具備明確個人風格與穩定的觀看基數，適合常態性互惠合作。</p>
+              <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block">所有會員皆可邀請</div>
+            </div>
+            {/* C 級 */}
+            <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="bg-emerald-100 text-emerald-700 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border border-emerald-200">C</span>
+                <h3 className="font-bold text-slate-900">潛力微網紅 KOC</h3>
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">素人或新手創作者，粉絲少但極具真實感，適合大量鋪陳口碑。</p>
+              <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block">所有會員皆可邀請</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 🏆 Leaderboard Section */}
       {topCreators.length > 0 && (
         <div className="bg-white border-b border-slate-200 pt-12 pb-16">
@@ -797,15 +849,15 @@ export default function CreatorsPage() {
                   <div className="space-y-4 relative z-10">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Camera size={14} className="text-slate-400"/> 圖文貼文</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">NT$ {selectedCreator.rates?.post?.toLocaleString() || 0}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.post}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-slate-400"></div> 限時動態</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">NT$ {selectedCreator.rates?.story?.toLocaleString() || 0}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.story}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Reels 短影音</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">NT$ {selectedCreator.rates?.reels?.toLocaleString() || 0}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.reels}</span>
                     </div>
                   </div>
                 </div>
@@ -814,9 +866,9 @@ export default function CreatorsPage() {
               {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
-                <div className="grid grid-cols-3 gap-3 sm:gap-4">
-                  {selectedCreator.portfolio?.map((img, i) => (
-                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+                  {selectedCreator.portfolio.map((img, i) => (
+                    <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer border border-slate-200">
                       <img src={img} className="w-full h-full object-cover" alt="Portfolio" />
                     </div>
                   ))}
