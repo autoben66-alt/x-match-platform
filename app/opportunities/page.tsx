@@ -7,6 +7,15 @@ import {
   Loader2, Building2, Briefcase, Award, Link as LinkIcon, AtSign, MessageSquare, LogIn, UserCircle2, Edit3, Crown, AlertCircle, Search, ChevronDown
 } from 'lucide-react';
 
+// --- 自定義 Link 元件 (解決預覽環境問題) ---
+const Link = ({ href, children, className, ...props }: any) => {
+  return (
+    <a href={href} className={className} {...props}>
+      {children}
+    </a>
+  );
+};
+
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
@@ -64,20 +73,8 @@ interface Opportunity {
   spotsLeft?: number;        
   applicants: number;        
   date?: string;
-  requiredTier?: string; // ✨ 新增案源限制評級
+  requiredTier?: string; 
 }
-
-// 模擬會員資料 (Demo User)
-const DEMO_USER = {
-  name: '林小美',
-  handle: '@may_travel',
-  avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
-  contact: 'may_travel@example.com',
-  socialLink: 'instagram.com/may_travel',
-  followers: '45k',
-  engagement: '3.2%',
-  tier: 'B' // ✨ 模擬該創作者為 B 級
-};
 
 // 備用模擬資料 (加入一個 S 級案源做示範)
 const FALLBACK_DATA: Opportunity[] = [
@@ -100,7 +97,7 @@ const FALLBACK_DATA: Opportunity[] = [
     matchScore: 99,
     spotsLeft: 1, 
     applicants: 24,
-    requiredTier: "S" // ✨ 此為 S 級專屬
+    requiredTier: "S" 
   },
   {
     id: 'fallback-2',
@@ -138,29 +135,54 @@ export default function OpportunitiesPage() {
   const [locationFilter, setLocationFilter] = useState('全部');
 
   // --- 狀態管理 ---
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // 模擬登入狀態
+  const [isLoggedIn, setIsLoggedIn] = useState(false); // 真實登入狀態
   const [showLoginModal, setShowLoginModal] = useState(false); // 登入提示視窗
   const [isEditing, setIsEditing] = useState(false); // 是否正在編輯會員資料
-  const [creatorProfile, setCreatorProfile] = useState(DEMO_USER); // 本地創作者狀態
+  
+  // ✨ 真實創作者狀態 (預設空值，由資料庫讀取)
+  const [creatorProfile, setCreatorProfile] = useState({
+    name: '',
+    handle: '',
+    avatar: '',
+    contact: '',
+    socialLink: '',
+    followers: 0,
+    engagement: 0,
+    tier: '未評級'
+  }); 
 
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
     socialLink: '',
     message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！',
-    extraConditions: '' // ✨ 加碼提案欄位
+    extraConditions: '' 
   });
 
   // Firebase 資料狀態
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. 初始化 Auth
+  // 1. 初始化 Auth 與 檢查登入狀態
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
+      if (savedLoginStatus === 'true') {
+        setIsLoggedIn(true);
+      }
+    }
+
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) setFbUser(user);
-      else { try { await signInAnonymously(auth); } catch (e) { console.error(e); } }
+      if (user) {
+        setFbUser(user);
+        if (localStorage.getItem('xmatch_logged_in') === 'true') {
+          setIsLoggedIn(true);
+        }
+      } else { 
+        setFbUser(null);
+        setIsLoggedIn(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -188,7 +210,7 @@ export default function OpportunitiesPage() {
             matchScore: rawData.matchScore || Math.floor(Math.random() * (99 - 80 + 1)) + 80, 
             spotsLeft: rawData.spotsLeft !== undefined ? rawData.spotsLeft : 3,
             applicants: rawData.applicants || 0,
-            requiredTier: rawData.requiredTier || '無限制' // ✨ 抓取限制評級
+            requiredTier: rawData.requiredTier || '無限制' 
           };
         });
         setOpportunities(data.sort((a, b) => Number(b.id) - Number(a.id)));
@@ -202,19 +224,22 @@ export default function OpportunitiesPage() {
       setIsLoading(false);
     });
 
-    // ✨ 若已登入，可嘗試抓取創作者真實的 Tier，此處為了展示，先使用 DEMO_USER
+    // ✨ 若已登入，抓取創作者真實的資料帶入應徵表單
     if (isLoggedIn && fbUser) {
       const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', fbUser.uid);
       onSnapshot(userRef, (docSnap) => {
         if (docSnap.exists() && docSnap.data().role === '創作者') {
            const d = docSnap.data();
-           setCreatorProfile(prev => ({
-             ...prev,
-             name: d.name || prev.name,
+           setCreatorProfile({
+             name: d.name || '',
+             handle: d.handle || '', // ✨ 補上這行，解決 TS 報錯
              tier: d.tier || '未評級',
-             avatar: d.avatar || prev.avatar,
-             contact: d.email || prev.contact
-           }));
+             avatar: d.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${d.name}`,
+             contact: d.email || d.lineId || '',
+             socialLink: d.handle || '',
+             followers: d.followers || 0,
+             engagement: d.engagement || 0
+           });
         }
       });
     }
@@ -233,7 +258,7 @@ export default function OpportunitiesPage() {
     if (!isLoggedIn) {
         setShowLoginModal(true);
     } else {
-        // 載入會員資料並清空加碼欄位
+        // 載入真實會員資料並清空加碼欄位
         setFormData({
             name: creatorProfile.name,
             contact: creatorProfile.contact,
@@ -244,22 +269,8 @@ export default function OpportunitiesPage() {
     }
   };
 
-  // 執行模擬登入
-  const handleLogin = () => {
-      setIsLoggedIn(true);
-      setShowLoginModal(false);
-      setFormData({
-        name: DEMO_USER.name,
-        contact: DEMO_USER.contact,
-        socialLink: DEMO_USER.socialLink,
-        message: '您好，我對這個案源非常有興趣，這是我的相關作品，希望能有機會合作！',
-        extraConditions: ''
-      });
-  };
-
   // 執行訪客應徵
   const handleGuestApply = () => {
-      setIsLoggedIn(false);
       setShowLoginModal(false);
       setFormData({
         name: '',
@@ -312,8 +323,8 @@ export default function OpportunitiesPage() {
           link: formData.socialLink,
           contact: formData.contact,
           tier: isLoggedIn ? creatorProfile.tier : '未評級', // ✨ 寫入應徵者評級
-          followers: isLoggedIn ? DEMO_USER.followers : 'N/A',
-          engagement: isLoggedIn ? DEMO_USER.engagement : 'N/A',
+          followers: isLoggedIn ? creatorProfile.followers : 'N/A',
+          engagement: isLoggedIn ? creatorProfile.engagement : 'N/A',
           tags: isLoggedIn ? ['會員應徵'] : ['主動應徵']
         }
       });
@@ -554,8 +565,12 @@ export default function OpportunitiesPage() {
       {/* --- Step 1: 登入提示視窗 (Login Gate) --- */}
       {showLoginModal && applyJob && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center animate-in zoom-in-95 duration-200">
-              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4">
+           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center animate-in zoom-in-95 duration-200 relative">
+              <button onClick={() => { setShowLoginModal(false); setApplyJob(null); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
+                 <X size={24} />
+              </button>
+              
+              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-4 mt-2">
                  <UserCircle2 size={32} className="text-indigo-600" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2">請先登入會員</h3>
@@ -564,25 +579,19 @@ export default function OpportunitiesPage() {
               </p>
               
               <div className="space-y-3">
-                 <button 
-                   onClick={handleLogin}
-                   className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all"
+                 <Link 
+                   href="/dashboard"
+                   className="flex w-full py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 items-center justify-center gap-2 active:scale-95 transition-all"
                  >
-                   <LogIn size={18} /> 模擬會員登入 (Demo)
-                 </button>
+                   <LogIn size={18} /> 前往登入 / 註冊
+                 </Link>
                  <button 
                    onClick={handleGuestApply}
-                   className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2"
+                   className="w-full py-3 bg-white border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-50 flex items-center justify-center gap-2 transition-colors"
                  >
-                   我是新訪客 (手動填寫)
+                   以訪客身分繼續 (手動填寫)
                  </button>
               </div>
-              <button 
-                onClick={() => { setShowLoginModal(false); setApplyJob(null); }}
-                className="mt-4 text-xs text-slate-400 hover:text-slate-600"
-              >
-                取消並關閉
-              </button>
            </div>
         </div>
       )}
@@ -642,12 +651,12 @@ export default function OpportunitiesPage() {
                 {isLoggedIn && !isEditing ? (
                    <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6 relative group">
                       <div className="flex items-center gap-4">
-                         <img src={creatorProfile.avatar} className="w-14 h-14 rounded-full border-2 border-white shadow-sm bg-slate-100 object-cover" alt="Avatar"/>
+                         <img src={creatorProfile.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${formData.name}&backgroundColor=0ea5e9`} className="w-14 h-14 rounded-full border-2 border-white shadow-sm bg-slate-100 object-cover" alt="Avatar"/>
                          <div>
                             <p className="font-bold text-slate-900 flex items-center gap-1.5 mb-0.5">
-                               {formData.name} <span className={`px-2 py-0.5 rounded text-[10px] font-black border bg-slate-100 text-slate-600`}>{creatorProfile.tier} 級</span>
+                               {formData.name || '未設定名稱'} <span className={`px-2 py-0.5 rounded text-[10px] font-black border bg-slate-100 text-slate-600`}>{creatorProfile.tier} 級</span>
                             </p>
-                            <p className="text-xs text-slate-500 mb-1">{formData.socialLink}</p>
+                            <p className="text-xs text-slate-500 mb-1">{formData.socialLink || '未設定連結'}</p>
                          </div>
                       </div>
                       <div className="mt-3 pt-3 border-t border-slate-100 flex items-start gap-2">
