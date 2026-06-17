@@ -10,7 +10,8 @@ import {
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+// ✨ 引入真實註冊與登入的 Auth API
+import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
@@ -56,8 +57,8 @@ interface ProjectData {
   numericValue: number; totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
   status: string; applicants: number; date: string; image?: string; gallery?: string[]; requiredTier?: string;
   validDays?: string;
-  deliverables?: string[]; // ✨ 內建交付項目
-  requirementsNote?: string; // ✨ 備註說明
+  deliverables?: string[]; 
+  requirementsNote?: string; 
 }
 
 interface TripData {
@@ -87,7 +88,6 @@ interface PaymentItem {
   id: string; name: string; price: number; type: 'subscription' | 'one-time';
 }
 
-// ✨ 內建的交付選項清單
 const deliverableOptions = ['IG 圖文貼文', 'IG 限時動態', 'IG Reels 短影音', 'FB 粉絲專頁貼文', 'YouTube 影片', 'TikTok 短影音', '部落格文章', 'Google 商家評論'];
 
 export default function DashboardPage() {
@@ -98,10 +98,16 @@ export default function DashboardPage() {
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
   const [localUid, setLocalUid] = useState<string>(''); 
 
+  // ✨ 表單註冊與登入狀態
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+
   // 業者權限與點數
   const [providerPlan, setProviderPlan] = useState<'free' | 'pro'>('free');
-  const [singleInvites, setSingleInvites] = useState<number>(0); // ✨ 單次解鎖票券
-  const [unlockedApps, setUnlockedApps] = useState<string[]>([]); // ✨ 已用票券解鎖的申請紀錄
+  const [singleInvites, setSingleInvites] = useState<number>(0); 
+  const [unlockedApps, setUnlockedApps] = useState<string[]>([]); 
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
@@ -127,9 +133,8 @@ export default function DashboardPage() {
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // 評價與合約 Modal 狀態
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [showContractModal, setShowContractModal] = useState(false); // ✨ 預覽合約
+  const [showContractModal, setShowContractModal] = useState(false); 
   const [reviewTargetId, setReviewTargetId] = useState<string | null>(null); 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -138,16 +143,12 @@ export default function DashboardPage() {
   const [activeImage, setActiveImage] = useState<string>('');
 
   const [creatorProfile, setCreatorProfile] = useState({
-    name: '林小美', handle: '@may_travel', lineId: '', location: '台北市', tags: '旅遊, 美食, 親子',
-    bio: '專注於親子友善飯店與在地美食推廣，擁有高黏著度的媽媽社群。',
-    tier: '未評級',
-    coverImage: '', avatar: '', portfolio: [] as string[],
+    name: '', handle: '', lineId: '', location: '', tags: '',
+    bio: '', tier: '未評級', coverImage: '', avatar: '', portfolio: [] as string[],
     socialLinks: { ig: '', yt: '', tiktok: '', other: '' },
-    rates: { post: 5000, story: 1500, reels: 8000 },
-    audience: { gender: '女性 85%', age: '25-34歲', topCity: '台北/新北' },
-    followers: 45000, 
-    averageViews: 5000,
-    completionScore: 5.0
+    rates: { post: 0, story: 0, reels: 0 },
+    audience: { gender: '', age: '', topCity: '' },
+    followers: 0, averageViews: 0, completionScore: 5.0
   });
   
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -172,29 +173,28 @@ export default function DashboardPage() {
           setRole(savedRole as 'business' | 'creator');
         }
       }
-      
-      let uid = localStorage.getItem('xmatch_uid');
-      if (!uid) {
-        uid = 'user_' + Date.now().toString().slice(-6);
-        localStorage.setItem('xmatch_uid', uid);
-      }
-      setLocalUid(uid);
     }
   }, []);
 
+  // ✨ Firebase 真實驗證監聽
   useEffect(() => {
     if (!auth) return;
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) setFbUser(user);
-      else { try { await signInAnonymously(auth); } catch (e) { console.error("匿名登入失敗:", e); } }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setFbUser(user);
+        setIsLoggedIn(true);
+      } else {
+        setFbUser(null);
+        setIsLoggedIn(false);
+      }
     });
     return () => unsubscribe();
   }, []);
 
   useEffect(() => {
-    if (!db || !isLoggedIn) return;
+    if (!db || !isLoggedIn || !fbUser) return;
     
-    const currentUid = fbUser?.uid || localUid;
+    const currentUid = fbUser.uid;
     
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubProjects = onSnapshot(projectsCol, (snapshot) => {
@@ -235,13 +235,13 @@ export default function DashboardPage() {
           }));
         } else if (role === 'business') {
           setProviderPlan(d.plan === 'Pro' ? 'pro' : 'free');
-          setSingleInvites(d.singleInvites || 0); // 讀取票券餘額
+          setSingleInvites(d.singleInvites || 0); 
         }
       }
     });
 
     return () => { unsubProjects(); unsubTrips(); unsubUser(); unsubInv(); };
-  }, [db, fbUser, isLoggedIn, role, localUid]);
+  }, [db, fbUser, isLoggedIn, role]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -326,8 +326,8 @@ export default function DashboardPage() {
       title: project.title, category: project.category, type: project.type, location: project.location,
       numericValue: project.numericValue || 0, valueBreakdown: project.valueBreakdown, 
       requirements: project.requirements, 
-      deliverables: project.deliverables || [], // ✨ 讀取基本交付內容
-      requirementsNote: project.requirementsNote || '', // ✨ 讀取自訂備註
+      deliverables: project.deliverables || [], 
+      requirementsNote: project.requirementsNote || '',
       spots: project.spots, gallery: project.gallery || (project.image ? [project.image] : []),
       validDays: project.validDays || '不限 (平假日皆可)' 
     });
@@ -342,7 +342,6 @@ export default function DashboardPage() {
     const targetId = editProjectId || Date.now().toString(); 
     const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制'; 
 
-    // ✨ 組合 Requirements
     const combinedRequirements = [
       (newProject.deliverables && newProject.deliverables.length > 0) ? `【基本交付需求】\n${newProject.deliverables.map(d => `✅ ${d}`).join('\n')}` : '',
       newProject.requirementsNote ? `【特殊備註】\n${newProject.requirementsNote}` : ''
@@ -391,8 +390,9 @@ export default function DashboardPage() {
 
   const handleSaveCreatorProfile = async () => {
     setIsSavingProfile(true);
-    const currentUid = fbUser?.uid || localUid;
-    
+    const currentUid = fbUser?.uid;
+    if(!currentUid) return;
+
     if (!db) { 
       setTimeout(() => {
         setIsSavingProfile(false);
@@ -415,7 +415,6 @@ export default function DashboardPage() {
         role: '創作者', 
         status: '活躍', 
         plan: 'Free',
-        joinDate: new Date().toLocaleDateString('zh-TW'), 
         handle: safeHandle, 
         lineId: creatorProfile.lineId, 
         location: creatorProfile.location,
@@ -436,7 +435,8 @@ export default function DashboardPage() {
       
       alert("🎉 履歷已成功儲存並同步至前台與 Admin 後台！");
     } catch (error) { 
-      alert("🎉 (本地模式) 您的履歷已暫存。如果要同步到前台，請至 Firebase 調整 Firestore 規則為 allow read, write: if true;");
+      console.error(error);
+      alert("儲存失敗，請重試");
     } finally { 
       setIsSavingProfile(false); 
     }
@@ -453,7 +453,6 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 刪除發送的邀請
   const handleDeleteInvitation = async (invId: string) => {
     if (!confirm("確定要收回這筆邀請紀錄嗎？刪除後廠商將無法看到您的邀請。")) return;
     if (!db) {
@@ -547,7 +546,6 @@ export default function DashboardPage() {
             setProviderPlan('pro');
           }
           
-          // ✨ 處理購買單次高流量解鎖券
           if (purchaseItem.id === 'boost-single-invite' && role === 'business') {
             const newCount = singleInvites + 1;
             await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', currentUid), { singleInvites: newCount });
@@ -555,7 +553,6 @@ export default function DashboardPage() {
           }
         } catch (err) { console.error(err); }
       } else {
-         // 本地模擬
          if (purchaseItem?.id === 'boost-single-invite') setSingleInvites(prev => prev + 1);
          if (purchaseItem?.id === 'pro' || purchaseItem?.id === 'pro-year') setProviderPlan('pro');
       }
@@ -563,20 +560,79 @@ export default function DashboardPage() {
     }, 2000);
   };
 
+  // ✨ 真實 Firebase Auth 註冊與登入
   const handleAuth = async (e: React.FormEvent) => { 
     e.preventDefault(); 
     if (!auth) return;
+    setIsVerifying(true);
+    
     try {
-      await signInAnonymously(auth);
-      setTimeout(() => { setIsLoggedIn(true); localStorage.setItem('xmatch_logged_in', 'true'); }, 800); 
-    } catch (e) {
+      if (authMode === 'register') {
+        if (!authName) {
+          alert("請填寫您的名稱！");
+          setIsVerifying(false);
+          return;
+        }
+        
+        // 1. 真實註冊：建立 Firebase 帳號
+        const userCredential = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        const user = userCredential.user;
+
+        // 2. 寫入初始資料至 Firestore
+        await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', user.uid), {
+          id: user.uid,
+          name: authName,
+          email: authEmail,
+          role: role === 'business' ? '商家' : '創作者',
+          plan: 'Free',
+          status: '活躍',
+          joinDate: new Date().toLocaleDateString('zh-TW'),
+          ...(role === 'creator' ? {
+            tier: '未評級',
+            handle: `@${authName.replace(/\s+/g, '').toLowerCase()}`,
+            followers: 0,
+            averageViews: 0,
+            completionScore: 5.0,
+            portfolio: [],
+            tags: []
+          } : {
+            singleInvites: 0
+          })
+        });
+      } else {
+        // 真實登入：驗證帳號密碼
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+      }
+      
       setIsLoggedIn(true);
       localStorage.setItem('xmatch_logged_in', 'true');
+    } catch (error: any) {
+      console.error("驗證失敗:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        alert('此 Email 已經註冊過，請直接登入！');
+      } else if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+        alert('帳號或密碼錯誤！');
+      } else if (error.code === 'auth/weak-password') {
+        alert('密碼太弱，請至少輸入 6 個字元！');
+      } else {
+        alert(`驗證失敗：請檢查網路連線`);
+      }
+    } finally {
+      setIsVerifying(false);
     }
   };
 
-  const handleLogout = () => {
+  // ✨ 真實 Firebase Auth 登出
+  const handleLogout = async () => {
+    if (auth) {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.error("登出失敗", error);
+      }
+    }
     setIsLoggedIn(false);
+    setFbUser(null);
     localStorage.removeItem('xmatch_logged_in');
     localStorage.removeItem('xmatch_role');
   };
@@ -636,23 +692,54 @@ export default function DashboardPage() {
                 <User size={16}/> 我是創作者
               </button>
             </div>
+            {/* ✨ 真實 Firebase 註冊/登入表單綁定 */}
             <form onSubmit={handleAuth} className="space-y-4">
               {authMode === 'register' && (
                 <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
                   <label className="block text-sm font-bold text-slate-700 mb-1">{role === 'business' ? '商家/品牌名稱' : '創作者暱稱'}</label>
-                  <input type="text" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder={role === 'business' ? "例如：海角七號民宿" : "例如：林小美"} required />
+                  <input 
+                    type="text" 
+                    value={authName}
+                    onChange={e => setAuthName(e.target.value)}
+                    className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" 
+                    placeholder={role === 'business' ? "例如：海角七號民宿" : "例如：林小美"} 
+                    required 
+                  />
                 </div>
               )}
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Email</label>
-                <input type="email" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder="example@mail.com" required />
+                <input 
+                  type="email" 
+                  value={authEmail}
+                  onChange={e => setAuthEmail(e.target.value)}
+                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" 
+                  placeholder="example@mail.com" 
+                  required 
+                />
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">密碼</label>
-                <input type="password" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" placeholder="••••••••" required />
+                <input 
+                  type="password" 
+                  value={authPassword}
+                  onChange={e => setAuthPassword(e.target.value)}
+                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none transition-all" 
+                  placeholder="••••••••" 
+                  required 
+                  minLength={6}
+                />
               </div>
-              <button type="submit" className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg transition-colors shadow-lg shadow-sky-200 active:scale-95 transform duration-150">
-                {authMode === 'login' ? '登入' : '免費註冊'} {role === 'business' ? '商家後台' : '創作者中心'}
+              <button 
+                type="submit" 
+                disabled={isVerifying}
+                className="w-full py-3 bg-sky-500 hover:bg-sky-600 text-white font-bold rounded-lg transition-colors shadow-lg shadow-sky-200 active:scale-95 transform duration-150 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isVerifying ? (
+                  <><Loader2 className="animate-spin" size={18} /> 處理中...</>
+                ) : (
+                  (authMode === 'login' ? '登入' : '免費註冊') + (role === 'business' ? ' 商家後台' : ' 創作者中心')
+                )}
               </button>
             </form>
             <div className="mt-6 text-center text-sm text-slate-600">
