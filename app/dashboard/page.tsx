@@ -5,13 +5,13 @@ import {
   LayoutDashboard, FileText, Users, Mail, DollarSign, Settings, LogOut, Bell, 
   Briefcase, Plane, FileSignature, CheckCircle2, Search, Plus, MapPin, 
   CreditCard, TrendingUp, User, Calendar, Save, Image as ImageIcon, Camera, Upload, BarChart3, Building2, Info, X,
-  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye, Lock, Link as LinkIcon, Instagram, Youtube, Sparkles, AlertCircle
+  Zap, Crown, Shield, Rocket, ListPlus, Loader2, Landmark, MessageCircle, Star, RefreshCcw, ChevronRight, Eye, Lock, Link as LinkIcon, Instagram, Youtube, Sparkles, AlertCircle, Trash2
 } from 'lucide-react';
 
 // --- Firebase 核心引入 ---
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 // --- 自定義 Link 元件 (解決 next/link 錯誤) ---
@@ -55,7 +55,9 @@ interface ProjectData {
   id: string; title: string; category: string; type: string; location: string; 
   numericValue: number; totalValue: string; valueBreakdown: string; requirements: string; spots: number; 
   status: string; applicants: number; date: string; image?: string; gallery?: string[]; requiredTier?: string;
-  validDays?: string; // ✨ 新增平假日選項
+  validDays?: string;
+  deliverables?: string[]; // ✨ 內建交付項目
+  requirementsNote?: string; // ✨ 備註說明
 }
 
 interface TripData {
@@ -85,24 +87,31 @@ interface PaymentItem {
   id: string; name: string; price: number; type: 'subscription' | 'one-time';
 }
 
+// ✨ 內建的交付選項清單
+const deliverableOptions = ['IG 圖文貼文', 'IG 限時動態', 'IG Reels 短影音', 'FB 粉絲專頁貼文', 'YouTube 影片', 'TikTok 短影音', '部落格文章', 'Google 商家評論'];
+
 export default function DashboardPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<'business' | 'creator'>('business');
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [fbUser, setFbUser] = useState<FirebaseUser | null>(null);
-  const [localUid, setLocalUid] = useState<string>(''); // ✨ 加入 localUid 狀態宣告
+  const [localUid, setLocalUid] = useState<string>(''); 
 
-  // 業者權限
+  // 業者權限與點數
   const [providerPlan, setProviderPlan] = useState<'free' | 'pro'>('free');
+  const [singleInvites, setSingleInvites] = useState<number>(0); // ✨ 單次解鎖票券
+  const [unlockedApps, setUnlockedApps] = useState<string[]>([]); // ✨ 已用票券解鎖的申請紀錄
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [projects, setProjects] = useState<ProjectData[]>([]);
   const [editProjectId, setEditProjectId] = useState<string | null>(null); 
   const [newProject, setNewProject] = useState({
     title: '', category: '住宿', type: '互惠體驗', location: '',
-    numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [] as string[],
-    validDays: '不限 (平假日皆可)' // ✨ 新增預設平假日選項
+    numericValue: 0, valueBreakdown: '', requirements: '', 
+    deliverables: [] as string[], requirementsNote: '',
+    spots: 1, gallery: [] as string[],
+    validDays: '不限 (平假日皆可)' 
   });
   const [isUploading, setIsUploading] = useState(false);
   
@@ -114,12 +123,13 @@ export default function DashboardPage() {
 
   const [showCreateTripModal, setShowCreateTripModal] = useState(false);
   const [trips, setTrips] = useState<TripData[]>([]);
-  const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', partySize: '1人', purpose: '', needs: '' }); // ✨ 修改日期為起迄選擇器
+  const [newTrip, setNewTrip] = useState({ destination: '', startDate: '', endDate: '', partySize: '1人', purpose: '', needs: '' }); 
 
   const [invitations, setInvitations] = useState<InvitationData[]>([]);
   
-  // 評價相關狀態
+  // 評價與合約 Modal 狀態
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showContractModal, setShowContractModal] = useState(false); // ✨ 預覽合約
   const [reviewTargetId, setReviewTargetId] = useState<string | null>(null); 
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
@@ -135,7 +145,7 @@ export default function DashboardPage() {
     socialLinks: { ig: '', yt: '', tiktok: '', other: '' },
     rates: { post: 5000, story: 1500, reels: 8000 },
     audience: { gender: '女性 85%', age: '25-34歲', topCity: '台北/新北' },
-    followers: 45000, // ✨ 新增粉絲數欄位初始值
+    followers: 45000, 
     averageViews: 5000,
     completionScore: 5.0
   });
@@ -149,11 +159,9 @@ export default function DashboardPage() {
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success'>('form');
 
-  // ✨ 新增缺失的狀態控制變數 (用於付費牆提示)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit');
 
-  // ✨ 初始化備用 UID 與檢查登入狀態
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedLoginStatus = localStorage.getItem('xmatch_logged_in');
@@ -174,7 +182,6 @@ export default function DashboardPage() {
     }
   }, []);
 
-  // Firebase Auth
   useEffect(() => {
     if (!auth) return;
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -184,11 +191,9 @@ export default function DashboardPage() {
     return () => unsubscribe();
   }, []);
 
-  // 監聽 Firestore 實時資料
   useEffect(() => {
     if (!db || !isLoggedIn) return;
     
-    // ✨ 確保無論是否取得 Auth 憑證，都有合法的 UID 可以讀寫
     const currentUid = fbUser?.uid || localUid;
     
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
@@ -209,7 +214,6 @@ export default function DashboardPage() {
       setInvitations(data.sort((a, b) => b.id.localeCompare(a.id)));
     });
 
-    // 監聽當前用戶資料
     const userRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', currentUid);
     const unsubUser = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -219,18 +223,19 @@ export default function DashboardPage() {
             ...prev,
             name: d.name || prev.name, handle: d.handle || prev.handle, lineId: d.lineId || prev.lineId,
             location: d.location || prev.location, 
-            tags: Array.isArray(d.tags) ? d.tags.join(', ') : (d.tags || prev.tags), // ✨ 安全陣列轉換
+            tags: Array.isArray(d.tags) ? d.tags.join(', ') : (d.tags || prev.tags), 
             tier: d.tier || '未評級',
             socialLinks: d.socialLinks || prev.socialLinks,
             bio: d.bio || prev.bio, coverImage: d.coverImage || '',
             avatar: d.avatar || '', portfolio: d.portfolio || [],
             rates: d.rates || prev.rates, audience: d.audience || prev.audience,
-            followers: d.followers || prev.followers, // ✨ 抓取粉絲數
+            followers: d.followers || prev.followers, 
             averageViews: d.averageViews || prev.averageViews,
             completionScore: d.completionScore || prev.completionScore
           }));
         } else if (role === 'business') {
           setProviderPlan(d.plan === 'Pro' ? 'pro' : 'free');
+          setSingleInvites(d.singleInvites || 0); // 讀取票券餘額
         }
       }
     });
@@ -241,10 +246,8 @@ export default function DashboardPage() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    
     setIsUploading(true);
     
-    // 如果沒有 Storage 或是被權限擋住，改用本地模擬上傳機制
     if (!storage) { 
       setTimeout(() => {
         const fakeUrl = `https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80`;
@@ -263,8 +266,6 @@ export default function DashboardPage() {
       }
       setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, ...urls] }));
     } catch (error) {
-      console.error("Firebase 上傳失敗，啟動模擬上傳機制:", error);
-      // 🔥 如果 Firebase 上傳失敗 (通常是權限問題)，模擬上傳一張預設圖片
       const fakeUrl = `https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80`;
       setNewProject(prev => ({ ...prev, gallery: [...prev.gallery, fakeUrl] }));
     } finally { 
@@ -276,19 +277,16 @@ export default function DashboardPage() {
     setNewProject(prev => ({ ...prev, gallery: prev.gallery.filter((_, idx) => idx !== indexToRemove) }));
   };
 
-  // ✨ 新增缺失的圖片上傳函數 (頭像、封面、作品集)
   const handleCreatorImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'cover' | 'avatar' | 'portfolio') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    // 開啟 loading 狀態
     if (type === 'cover') setIsUploadingCover(true);
     else if (type === 'avatar') setIsUploadingAvatar(true);
     else setIsUploadingPortfolio(true);
 
     const currentUid = fbUser?.uid || localUid;
 
-    // 如果沒有 Storage，改用本地模擬上傳機制
     if (!storage) { 
       setTimeout(() => {
         const fakeUrl = `https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80`;
@@ -323,13 +321,15 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 新增：點擊編輯案源
   const handleEditProject = (project: ProjectData) => {
     setNewProject({
       title: project.title, category: project.category, type: project.type, location: project.location,
       numericValue: project.numericValue || 0, valueBreakdown: project.valueBreakdown, 
-      requirements: project.requirements, spots: project.spots, gallery: project.gallery || (project.image ? [project.image] : []),
-      validDays: project.validDays || '不限 (平假日皆可)' // ✨ 加入平假日
+      requirements: project.requirements, 
+      deliverables: project.deliverables || [], // ✨ 讀取基本交付內容
+      requirementsNote: project.requirementsNote || '', // ✨ 讀取自訂備註
+      spots: project.spots, gallery: project.gallery || (project.image ? [project.image] : []),
+      validDays: project.validDays || '不限 (平假日皆可)' 
     });
     setEditProjectId(project.id);
     setShowCreateModal(true);
@@ -342,31 +342,39 @@ export default function DashboardPage() {
     const targetId = editProjectId || Date.now().toString(); 
     const requiredTier = newProject.numericValue >= 30000 ? 'S' : '無限制'; 
 
+    // ✨ 組合 Requirements
+    const combinedRequirements = [
+      (newProject.deliverables && newProject.deliverables.length > 0) ? `【基本交付需求】\n${newProject.deliverables.map(d => `✅ ${d}`).join('\n')}` : '',
+      newProject.requirementsNote ? `【特殊備註】\n${newProject.requirementsNote}` : ''
+    ].filter(Boolean).join('\n\n').trim();
+
     try {
-      await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', targetId), {
-        id: targetId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
-        numericValue: newProject.numericValue, totalValue: `NT$ ${newProject.numericValue.toLocaleString()}`, 
-        valueBreakdown: newProject.valueBreakdown, requirements: newProject.requirements,
-        spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
-        requiredTier: requiredTier,
-        validDays: newProject.validDays, // ✨ 寫入平假日設定
-        image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-        gallery: newProject.gallery
-      }, { merge: true }); 
+      if (db) {
+        await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'projects', targetId), {
+          id: targetId, title: newProject.title, category: newProject.category, type: newProject.type, location: newProject.location,
+          numericValue: newProject.numericValue, totalValue: `NT$ ${newProject.numericValue.toLocaleString()}`, 
+          valueBreakdown: newProject.valueBreakdown, 
+          deliverables: newProject.deliverables || [],
+          requirementsNote: newProject.requirementsNote || '',
+          requirements: combinedRequirements,
+          spots: newProject.spots, status: '招募中', applicants: 0, date: new Date().toLocaleDateString('zh-TW'),
+          requiredTier: requiredTier,
+          validDays: newProject.validDays, 
+          image: newProject.gallery.length > 0 ? newProject.gallery[0] : "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+          gallery: newProject.gallery
+        }, { merge: true }); 
+      }
       setShowCreateModal(false);
       setEditProjectId(null); 
-      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [], validDays: '不限 (平假日皆可)' });
+      setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', deliverables: [], requirementsNote: '', spots: 1, gallery: [], validDays: '不限 (平假日皆可)' });
     } catch (err) { console.error(err); }
   };
 
-  // ✨ 修復：保留這一個唯一的 handleCreateTrip 函數
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTrip.destination || !newTrip.startDate || !newTrip.endDate) { alert("請填寫完整目的地與日期"); return; }
     
     const newId = `t${Date.now()}`;
-    
-    // ✨ 格式化日期顯示 (例如 2024/07/15 - 2024/07/17)
     const formattedDates = `${newTrip.startDate.replace(/-/g, '/')} - ${newTrip.endDate.replace(/-/g, '/')}`;
 
     try {
@@ -381,13 +389,10 @@ export default function DashboardPage() {
     } catch (err) { console.error(err); }
   };
 
-
-  // ✨ 最關鍵的履歷寫入功能 (防跳島保護)
   const handleSaveCreatorProfile = async () => {
     setIsSavingProfile(true);
     const currentUid = fbUser?.uid || localUid;
     
-    // 如果沒有資料庫連線，模擬成功
     if (!db) { 
       setTimeout(() => {
         setIsSavingProfile(false);
@@ -397,7 +402,6 @@ export default function DashboardPage() {
     }
     
     try {
-      // 安全處理 tags 陣列
       const safeTags = typeof creatorProfile.tags === 'string'
         ? creatorProfile.tags.split(',').map(t => t.trim()).filter(Boolean)
         : Array.isArray(creatorProfile.tags) ? creatorProfile.tags : [];
@@ -424,7 +428,7 @@ export default function DashboardPage() {
         audience: creatorProfile.audience,
         socialLinks: creatorProfile.socialLinks, 
         tier: creatorProfile.tier,
-        followers: creatorProfile.followers, // ✨ 使用狀態中的粉絲數
+        followers: creatorProfile.followers, 
         engagement: 4.5, completedJobs: 0,
         averageViews: creatorProfile.averageViews, 
         completionScore: creatorProfile.completionScore
@@ -432,8 +436,6 @@ export default function DashboardPage() {
       
       alert("🎉 履歷已成功儲存並同步至前台與 Admin 後台！");
     } catch (error) { 
-      console.error("履歷寫入失敗:", error); 
-      // 🔥 如果因為 Firebase 權限報錯，給予用戶友善提示並假裝成功
       alert("🎉 (本地模式) 您的履歷已暫存。如果要同步到前台，請至 Firebase 調整 Firestore 規則為 allow read, write: if true;");
     } finally { 
       setIsSavingProfile(false); 
@@ -447,8 +449,23 @@ export default function DashboardPage() {
       await updateDoc(invRef, { status: newStatus });
       alert(`已將狀態標示為「${newStatus}」！`);
     } catch (e) {
-      console.error("更新狀態失敗:", e);
       alert("更新狀態失敗，請稍後再試。");
+    }
+  };
+
+  // ✨ 刪除發送的邀請
+  const handleDeleteInvitation = async (invId: string) => {
+    if (!confirm("確定要收回這筆邀請紀錄嗎？刪除後廠商將無法看到您的邀請。")) return;
+    if (!db) {
+      setInvitations(prev => prev.filter(inv => inv.id !== invId));
+      return;
+    }
+    try {
+      await deleteDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', invId));
+      alert("已成功收回該筆邀請。");
+    } catch (error) {
+      console.error("刪除失敗", error);
+      alert("收回失敗，請檢查權限");
     }
   };
 
@@ -462,26 +479,15 @@ export default function DashboardPage() {
   const handleSubmitReview = async () => {
     if (!db || !reviewTargetId) return;
     
-    const reviewData: ReviewData = {
-      rating: reviewRating,
-      comment: reviewComment,
-      date: new Date().toLocaleDateString('zh-TW')
-    };
+    const reviewData: ReviewData = { rating: reviewRating, comment: reviewComment, date: new Date().toLocaleDateString('zh-TW') };
 
     try {
       const invRef = doc(db, 'artifacts', internalAppId, 'public', 'data', 'invitations', reviewTargetId);
-      if (role === 'business') {
-        await updateDoc(invRef, { businessReview: reviewData });
-      } else {
-        await updateDoc(invRef, { creatorReview: reviewData });
-      }
-      
+      if (role === 'business') await updateDoc(invRef, { businessReview: reviewData });
+      else await updateDoc(invRef, { creatorReview: reviewData });
       alert("🎉 評價已送出！案件成功結案。");
       setShowReviewModal(false);
-    } catch (e) {
-      console.error("送出評價失敗:", e);
-      alert("發生錯誤，請稍後再試。");
-    }
+    } catch (e) { alert("發生錯誤，請稍後再試。"); }
   };
 
   const handleViewProject = (projectId?: string) => {
@@ -490,14 +496,11 @@ export default function DashboardPage() {
     if (proj) {
       setViewProject(proj);
       setActiveImage(proj.image || (proj.gallery && proj.gallery.length > 0 ? proj.gallery[0] : ''));
-    } else {
-      alert("此案源可能已關閉或被移除。");
-    }
+    } else alert("此案源可能已關閉或被移除。");
   };
 
   const handleManageApplicants = (project: ProjectData) => {
     const apps = invitations.filter(inv => inv.projectId === project.id && inv.type === 'application');
-    
     const simulatedApps = apps.length > 0 ? apps : [
       {
         id: `mock-app-${Date.now()}`,
@@ -515,13 +518,8 @@ export default function DashboardPage() {
         creatorInfo: {
           name: "潛力新星",
           avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=newstar",
-          followers: 8500,
-          averageViews: 2000,
-          completionScore: 4.8,
-          tier: 'A',
-          lineId: "new_star_line",
-          tags: ["旅遊", "新秀"],
-          socialLinks: { ig: "https://instagram.com", yt: "https://youtube.com" }
+          followers: 8500, averageViews: 2000, completionScore: 4.8, tier: 'A',
+          lineId: "new_star_line", tags: ["旅遊", "新秀"], socialLinks: { ig: "https://instagram.com", yt: "https://youtube.com" }
         }
       }
     ];
@@ -545,12 +543,21 @@ export default function DashboardPage() {
           });
           
           if ((purchaseItem.id === 'pro' || purchaseItem.id === 'pro-year') && role === 'business') {
-            await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', currentUid), {
-              plan: 'Pro'
-            });
+            await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', currentUid), { plan: 'Pro' });
             setProviderPlan('pro');
           }
+          
+          // ✨ 處理購買單次高流量解鎖券
+          if (purchaseItem.id === 'boost-single-invite' && role === 'business') {
+            const newCount = singleInvites + 1;
+            await updateDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', currentUid), { singleInvites: newCount });
+            setSingleInvites(newCount);
+          }
         } catch (err) { console.error(err); }
+      } else {
+         // 本地模擬
+         if (purchaseItem?.id === 'boost-single-invite') setSingleInvites(prev => prev + 1);
+         if (purchaseItem?.id === 'pro' || purchaseItem?.id === 'pro-year') setProviderPlan('pro');
       }
       setPaymentStep('success');
     }, 2000);
@@ -561,13 +568,8 @@ export default function DashboardPage() {
     if (!auth) return;
     try {
       await signInAnonymously(auth);
-      setTimeout(() => {
-        setIsLoggedIn(true);
-        localStorage.setItem('xmatch_logged_in', 'true');
-      }, 800); 
+      setTimeout(() => { setIsLoggedIn(true); localStorage.setItem('xmatch_logged_in', 'true'); }, 800); 
     } catch (e) {
-      console.error(e);
-      // Fallback for strict environments
       setIsLoggedIn(true);
       localStorage.setItem('xmatch_logged_in', 'true');
     }
@@ -589,9 +591,7 @@ export default function DashboardPage() {
   const themeBg = role === 'business' ? 'bg-indigo-600' : 'bg-purple-600';
 
   const TierBadge = ({ tier }: { tier?: string }) => {
-    if (!tier || tier === '未評級') {
-      return <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">未評級</span>;
-    }
+    if (!tier || tier === '未評級') return <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">未評級</span>;
     const colors: Record<string, string> = {
       'S': 'bg-gradient-to-r from-yellow-300 to-amber-500 text-slate-900 border-amber-300 shadow-sm',
       'A': 'bg-indigo-100 text-indigo-700 border-indigo-200',
@@ -716,8 +716,8 @@ export default function DashboardPage() {
                     <h3 className="text-3xl font-bold text-slate-900">{projects.length}</h3>
                   </div>
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-sm text-slate-500 mb-1">剩餘急單點數</p>
-                    <h3 className={`text-3xl font-bold ${themeText}`}>5 <span className="text-sm text-slate-400 font-normal">點</span></h3>
+                    <p className="text-sm text-slate-500 mb-1">單次高階邀約券</p>
+                    <h3 className={`text-3xl font-bold ${themeText}`}>{singleInvites} <span className="text-sm text-slate-400 font-normal">張</span></h3>
                   </div>
                 </>
               ) : (
@@ -849,27 +849,46 @@ export default function DashboardPage() {
                            const info = app.creatorInfo || {};
                            const myReview = app.businessReview;
                            
-                           // ✨ 判斷是否為 S/A 級網紅且未付費 (Paywall 機制)
+                           // ✨ 判斷是否為 S/A 級網紅且未付費且未解鎖 (Paywall 機制)
                            const isPremiumTier = info.tier === 'S' || info.tier === 'A';
-                           const isLocked = isPremiumTier && providerPlan !== 'pro';
+                           const isLocked = isPremiumTier && providerPlan !== 'pro' && !unlockedApps.includes(app.id);
 
                            // 若觸發付費牆，顯示上鎖的模糊卡片
                            if (isLocked) {
                              return (
-                               <div key={app.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden h-48 flex items-center justify-center group cursor-not-allowed">
+                               <div key={app.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col sm:flex-row items-center group">
                                   {/* 上鎖提示區塊 */}
                                   <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
                                     <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mb-3 shadow-inner">
                                       <Lock size={24} className="text-amber-500" />
                                     </div>
                                     <h4 className="font-bold text-slate-900 mb-1">發現 {info.tier} 級高影響力創作者！</h4>
-                                    <p className="text-xs text-slate-500 mb-4 max-w-sm">有高影響力網紅對您的案源感興趣並提出了加碼方案。升級專業版 (Pro) 即可解鎖完整履歷與聯繫方式。</p>
-                                    <button 
-                                      onClick={() => { setShowApplicantsModal(false); setUpgradeReason('tier'); setShowUpgradeModal(true); }}
-                                      className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-xl shadow-lg hover:scale-105 transition-transform"
-                                    >
-                                      立即升級解鎖
-                                    </button>
+                                    <p className="text-xs text-slate-500 mb-4 max-w-sm">有高影響力網紅對您的案源感興趣並提出了加碼方案。升級專業版 (Pro) 或使用單次解鎖即可查看完整履歷與聯繫方式。</p>
+                                    <div className="flex gap-2">
+                                      <button 
+                                        onClick={() => { setShowApplicantsModal(false); setUpgradeReason('tier'); setShowUpgradeModal(true); }}
+                                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-sm font-bold rounded-xl shadow-lg hover:scale-105 transition-transform"
+                                      >
+                                        立即升級 Pro
+                                      </button>
+                                      <button 
+                                        onClick={() => { 
+                                          if(singleInvites > 0) {
+                                            if(confirm('將消耗 1 張高階邀約券解鎖此網紅履歷，確定嗎？')) {
+                                               setSingleInvites(prev => prev - 1);
+                                               setUnlockedApps(prev => [...prev, app.id]);
+                                            }
+                                          } else {
+                                             setPurchaseItem({ id: 'boost-single-invite', name: '單次高流量解鎖券', price: 150, type: 'one-time' }); 
+                                             setShowApplicantsModal(false);
+                                             setPaymentStep('form');
+                                          }
+                                        }}
+                                        className="px-4 py-2 bg-white text-amber-600 border border-amber-200 text-sm font-bold rounded-xl shadow-sm hover:bg-amber-50 transition-colors"
+                                      >
+                                        單次解鎖 ($150)
+                                      </button>
+                                    </div>
                                   </div>
                                   {/* 底層模糊假資料 (視覺誘餌) */}
                                   <div className="opacity-40 flex w-full p-6 items-start gap-4 filter blur-[3px]">
@@ -912,24 +931,18 @@ export default function DashboardPage() {
                                         </span>
                                         {app.status === '已接受' && (
                                             <div className="flex gap-2 justify-end flex-wrap mt-2">
-                                                {/* ✨ 付費牆：LINE 聯繫 */}
-                                                {providerPlan === 'pro' ? (
-                                                  info.lineId ? (
-                                                    <a 
-                                                        href={`https://line.me/ti/p/~${info.lineId}`}
-                                                        target="_blank" 
-                                                        rel="noreferrer"
-                                                        className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
-                                                    >
-                                                        <MessageCircle size={12}/> LINE
-                                                    </a>
-                                                  ) : (
-                                                      <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
-                                                  )
+                                                {/* ✨ 付費牆/解鎖後可看 LINE */}
+                                                {info.lineId ? (
+                                                  <a 
+                                                      href={`https://line.me/ti/p/~${info.lineId}`}
+                                                      target="_blank" 
+                                                      rel="noreferrer"
+                                                      className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] flex items-center gap-1 shadow-sm transition-colors"
+                                                  >
+                                                      <MessageCircle size={12}/> LINE
+                                                  </a>
                                                 ) : (
-                                                  <button onClick={() => { setShowApplicantsModal(false); setActiveTab('wallet'); }} className="px-3 py-1.5 bg-slate-800 text-white rounded-lg text-[10px] font-bold hover:bg-slate-700 flex items-center gap-1 shadow-sm transition-colors">
-                                                      <Lock size={10}/> 升級解鎖 LINE
-                                                  </button>
+                                                    <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={12}/> 無 LINE</button>
                                                 )}
 
                                                 <Link href="/calculator" className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold hover:bg-purple-700 flex items-center gap-1 shadow-sm transition-colors">
@@ -966,7 +979,6 @@ export default function DashboardPage() {
                                  <span className="pl-6 block leading-relaxed">{app.message}</span>
                                </div>
 
-                               {/* ✨ 加碼提案顯示區塊 */}
                                {app.extraConditions && (
                                  <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl mb-5">
                                    <p className="text-xs font-bold text-orange-800 mb-1 flex items-center gap-1"><Sparkles size={14}/> 創作者加碼條件 (爭取 S 級案源)</p>
@@ -997,7 +1009,7 @@ export default function DashboardPage() {
               </div>
             )}
             
-            {/* 發布新案源 Modal */}
+            {/* 發布/編輯案源 Modal */}
             {showCreateModal && (
                <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                  <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
@@ -1005,7 +1017,7 @@ export default function DashboardPage() {
                     <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2">
                       <ListPlus size={20} className="text-sky-500"/> {editProjectId ? '編輯案源' : '發布新案源'} (Cloud Sync)
                     </h3>
-                    <button onClick={() => { setShowCreateModal(false); setEditProjectId(null); setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', spots: 1, gallery: [], validDays: '不限 (平假日皆可)' }); }} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                    <button onClick={() => { setShowCreateModal(false); setEditProjectId(null); setNewProject({ title: '', category: '住宿', type: '互惠體驗', location: '', numericValue: 0, valueBreakdown: '', requirements: '', deliverables: [], requirementsNote: '', spots: 1, gallery: [], validDays: '不限 (平假日皆可)' }); }} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
                   </div>
                   <div className="p-6 overflow-y-auto">
                     <form className="space-y-6" onSubmit={handleCreateProject}>
@@ -1072,7 +1084,6 @@ export default function DashboardPage() {
                             </div>
                           </div>
                           
-                          {/* ✨ 新增：輸入數值以判定網紅等級限制 */}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="block text-xs font-bold text-slate-700 mb-1">合作總價值 (填寫數字 NT$)</label>
@@ -1091,7 +1102,6 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          {/* 自動判定 S 級提示 */}
                           {newProject.numericValue >= 30000 && (
                             <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-xl text-xs mt-2 shadow-sm animate-in fade-in slide-in-from-top-2">
                               <p className="font-bold mb-1 flex items-center gap-1"><Crown size={14} className="text-amber-500"/> 高價值案源設定</p>
@@ -1100,9 +1110,35 @@ export default function DashboardPage() {
                             </div>
                           )}
 
+                          {/* ✨ 新增：基本交付內容需求選項 */}
                           <div>
-                            <label className="block text-xs font-bold text-slate-700 mb-1">基本交付內容需求</label>
-                            <textarea className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-20 resize-none text-sm" placeholder="例如：IG 貼文 1 則 + 限動 3 則..." value={newProject.requirements} onChange={(e) => setNewProject({...newProject, requirements: e.target.value})}></textarea>
+                            <label className="block text-xs font-bold text-slate-700 mb-2">基本交付內容需求 <span className="text-red-500">*</span></label>
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {deliverableOptions.map(opt => (
+                                <label key={opt} className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg border cursor-pointer transition-all ${newProject.deliverables?.includes(opt) ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={newProject.deliverables?.includes(opt) || false} 
+                                    onChange={(e) => {
+                                      const current = newProject.deliverables || [];
+                                      if (e.target.checked) setNewProject({...newProject, deliverables: [...current, opt]});
+                                      else setNewProject({...newProject, deliverables: current.filter(item => item !== opt)});
+                                    }}
+                                    className="hidden" 
+                                  />
+                                  <div className={`w-3.5 h-3.5 rounded-sm flex items-center justify-center border ${newProject.deliverables?.includes(opt) ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                                     {newProject.deliverables?.includes(opt) && <CheckCircle2 size={10} className="text-white"/>}
+                                  </div>
+                                  {opt}
+                                </label>
+                              ))}
+                            </div>
+                            <textarea 
+                              className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none h-16 resize-none text-sm" 
+                              placeholder="其他手動輸入備註 (例如：需包含 3 支短影片素材供品牌投放廣告...)" 
+                              value={newProject.requirementsNote || ''} 
+                              onChange={(e) => setNewProject({...newProject, requirementsNote: e.target.value})}
+                            ></textarea>
                           </div>
                         </div>
                       </div>
@@ -1175,7 +1211,6 @@ export default function DashboardPage() {
                              }`}>{inv.status}</span>
                              {inv.status === '已接受' && (
                                <div className="flex gap-2">
-                                  {/* ✨ 付費牆：只有 Pro 才能點擊網紅 LINE */}
                                   {providerPlan === 'pro' ? (
                                     inv.creatorInfo?.lineId ? (
                                       <a href={`https://line.me/ti/p/~${inv.creatorInfo.lineId}`} target="_blank" rel="noreferrer" className="px-3 py-1.5 bg-[#06C755] text-white rounded-lg text-xs font-bold hover:bg-[#05b34c] shadow-sm flex items-center gap-1"><MessageCircle size={14}/> LINE</a>
@@ -1188,7 +1223,7 @@ export default function DashboardPage() {
                                     </button>
                                   )}
                                   
-                                  <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
+                                  <button onClick={() => setShowContractModal(true)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</button>
                                   {inv.businessReview ? (
                                     <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
                                       <Star size={12} className="fill-yellow-500 text-yellow-500"/> {inv.businessReview.rating} 已評價
@@ -1203,6 +1238,14 @@ export default function DashboardPage() {
                                   )}
                                </div>
                              )}
+                             {/* ✨ 刪除邀請按鈕 */}
+                             <button 
+                               onClick={() => handleDeleteInvitation(inv.id)}
+                               className="p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors ml-1" 
+                               title="收回/刪除邀請"
+                             >
+                               <Trash2 size={16} />
+                             </button>
                            </div>
                          </div>
                       </div>
@@ -1223,7 +1266,6 @@ export default function DashboardPage() {
             </div>
           );
         } else {
-          // ... creator invitations ...
           const myInvs = invitations.filter(inv => inv.toName === creatorProfile.name || inv.toHandle === creatorProfile.handle);
           return (
             <div className="space-y-6 animate-in fade-in duration-300">
@@ -1261,9 +1303,8 @@ export default function DashboardPage() {
                                      ) : (
                                         <button className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-xs font-bold cursor-not-allowed flex items-center gap-1"><MessageCircle size={14}/> 無 LINE</button>
                                      )}
-                                     <Link href="/calculator" className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</Link>
+                                     <button onClick={() => setShowContractModal(true)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-colors shadow-sm flex items-center gap-1"><FileSignature size={14} /> 合約</button>
                                      
-                                     {/* 創作者評價按鈕 */}
                                      {inv.creatorReview ? (
                                         <div className="flex items-center gap-1 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-lg text-xs font-bold border border-yellow-200">
                                           <Star size={12} className="fill-yellow-500 text-yellow-500"/> {inv.creatorReview.rating} 已評價
@@ -1413,16 +1454,17 @@ export default function DashboardPage() {
           <div className="space-y-6">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl font-bold text-slate-900">合約管理</h2>
-              <Link href="/calculator" className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
+              <button className="text-sky-600 font-bold text-sm hover:underline flex items-center gap-1">
                 <Plus size={16}/> 建立新合約
-              </Link>
+              </button>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer">
+              {/* ✨ 點擊預覽合約 */}
+              <div onClick={() => setShowContractModal(true)} className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group">
                 <div className="flex items-center gap-4">
-                  <div className="p-3 bg-green-100 text-green-600 rounded-lg"><FileSignature size={24}/></div>
+                  <div className="p-3 bg-green-100 text-green-600 rounded-lg group-hover:scale-110 transition-transform"><FileSignature size={24}/></div>
                   <div>
-                    <h3 className="font-bold text-slate-900">暑期親子專案推廣合約</h3>
+                    <h3 className="font-bold text-slate-900 flex items-center gap-2">暑期親子專案推廣合約 <span className="text-xs text-indigo-500 font-medium group-hover:underline">點擊預覽</span></h3>
                     <p className="text-sm text-slate-500">{role === 'business' ? '合作對象：林小美' : '合作廠商：海角七號民宿'} • 2024/06/01</p>
                   </div>
                 </div>
@@ -1514,7 +1556,7 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2"><Rocket className="text-indigo-600" size={20}/> 單次付費推廣 (Boost)</h3>
+              <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2"><Rocket className="text-indigo-600" size={20}/> 單次解鎖功能</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
                   <div className="flex justify-between items-start mb-2">
@@ -1527,16 +1569,21 @@ export default function DashboardPage() {
                     購買點數 &rarr;
                   </button>
                 </div>
+                
+                {/* ✨ 新增：單次高階邀約解鎖 */}
                 <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
                   <div className="flex justify-between items-start mb-2">
-                    <div className="p-2 bg-sky-100 text-sky-600 rounded-lg group-hover:scale-110 transition-transform"><Rocket size={20} fill="currentColor"/></div>
-                    <span className="font-bold text-slate-900">$100</span>
+                    <div className="p-2 bg-purple-100 text-purple-600 rounded-lg group-hover:scale-110 transition-transform"><Crown size={20} fill="currentColor"/></div>
+                    <span className="font-bold text-slate-900">$150</span>
                   </div>
-                  <h4 className="font-bold text-slate-900 flex-grow">精準推播 (Smart Push)</h4>
-                  <p className="text-xs text-slate-500 mt-1 mb-4">主動推播給附近 10 位符合條件的網紅。</p>
-                  <button onClick={() => { setPurchaseItem({ id: 'boost-push', name: '精準推播 (單次)', price: 100, type: 'one-time' }); setPaymentStep('form'); }} className="mt-auto text-xs font-bold text-indigo-600 hover:underline text-left">
-                    購買點數 &rarr;
-                  </button>
+                  <h4 className="font-bold text-slate-900 flex-grow">單次解鎖高流量網紅</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">獲得 1 張「高階邀約券」，可單次解鎖查看並邀請 1 位 S 或 A 級創作者，免綁訂閱。</p>
+                  <div className="flex items-center justify-between mt-auto">
+                    <span className="text-xs font-bold text-slate-400">擁有額度：{singleInvites} 張</span>
+                    <button onClick={() => { setPurchaseItem({ id: 'boost-single-invite', name: '單次高流量解鎖券', price: 150, type: 'one-time' }); setPaymentStep('form'); }} className="text-xs font-bold text-indigo-600 hover:underline">
+                      購買票券 &rarr;
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1885,6 +1932,52 @@ export default function DashboardPage() {
             </div>
           )}
           
+          {/* ✨ 合約預覽 Modal */}
+          {showContractModal && (
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+               <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
+                  <button onClick={() => setShowContractModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={24}/></button>
+                  <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                     <div className="bg-green-100 text-green-600 p-2.5 rounded-xl"><FileSignature size={24}/></div>
+                     <h3 className="text-xl font-bold text-slate-900">數位合約預覽</h3>
+                  </div>
+                  <div className="overflow-y-auto flex-grow text-sm text-slate-600 space-y-5 pr-2">
+                     <div>
+                       <h4 className="font-bold text-slate-900 text-lg mb-1">暑期親子專案推廣合約</h4>
+                       <p className="text-xs text-slate-400">合約編號：CTR-{Date.now().toString().slice(-8)}</p>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                       <div>
+                         <p className="text-xs font-bold text-slate-400 mb-1">甲方 (提供者)</p>
+                         <p className="font-bold text-slate-800">海角七號民宿</p>
+                       </div>
+                       <div>
+                         <p className="text-xs font-bold text-slate-400 mb-1">乙方 (創作者)</p>
+                         <p className="font-bold text-slate-800">林小美 (@may_travel)</p>
+                       </div>
+                     </div>
+                     <div className="space-y-2">
+                       <h4 className="font-bold text-slate-900">合約條款與規範</h4>
+                       <div className="bg-slate-50 p-4 rounded-xl space-y-3 text-xs leading-relaxed border border-slate-100">
+                         <p>1. 雙方同意於 <span className="font-bold">2024年06月01日 至 2024年06月30日</span> 期間進行互惠合作。</p>
+                         <p>2. 乙方承諾產出：<span className="font-bold text-indigo-600">IG 圖文貼文 1 則、限時動態 3 則</span>。</p>
+                         <p>3. 甲方承諾提供：<span className="font-bold text-indigo-600">海景雙人房免費住宿一晚（含雙人早餐）</span>。</p>
+                         <p>4. 乙方需於體驗後 14 日內提供圖文草稿供甲方確認，並於確認後 3 日內發布至指定平台。</p>
+                         <p>5. 若因不可抗力因素導致無法履約，雙方應盡速通知並協商延期。違約方需賠償本次體驗之等值金額。</p>
+                       </div>
+                     </div>
+                     <div className="flex justify-between items-center bg-green-50 px-4 py-3 rounded-xl border border-green-200 text-green-700 text-xs font-bold mt-2">
+                       <span>狀態：雙方已完成數位簽署</span>
+                       <CheckCircle2 size={16} />
+                     </div>
+                  </div>
+                  <div className="mt-6 pt-4 border-t border-slate-100">
+                     <button onClick={() => setShowContractModal(false)} className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors active:scale-95 shadow-lg">確認並關閉</button>
+                  </div>
+               </div>
+            </div>
+          )}
+
           {/* 案源詳情 Modal */}
           {viewProject && (
             <div className="fixed inset-0 z-[150] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
@@ -1937,7 +2030,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                       <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm"><Camera size={18} className="text-blue-600"/> 內容需求</h4>
-                      <p className="text-sm text-slate-600 mb-4 leading-relaxed font-medium">{viewProject.requirements}</p>
+                      <p className="text-sm text-slate-600 mb-4 leading-relaxed font-medium whitespace-pre-line">{viewProject.requirements}</p>
                       <div className="flex items-center gap-2 text-xs font-bold text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100">
                         <Users size={16} className="text-indigo-500"/>
                         <span>剩餘 <span className="text-indigo-600 text-base">{viewProject.spots || 0}</span> 個名額</span>
@@ -1953,7 +2046,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ✨ 新增：查看申請者完整履歷 Modal */}
+          {/* ✨ 查看申請者完整履歷 Modal */}
           {viewApplicant && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 sm:p-4 bg-slate-900/70 backdrop-blur-sm animate-in fade-in duration-200">
               <div className="bg-white w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-5 duration-300 relative">
@@ -2173,6 +2266,20 @@ export default function DashboardPage() {
                      >
                        <Zap size={18} fill="currentColor"/> 前往升級 Pro
                      </button>
+                     
+                     {/* ✨ 提示單次解鎖選項 (如果不是因為超過免費次數而擋) */}
+                     {upgradeReason === 'tier' && (
+                       <button 
+                         onClick={() => {
+                             setActiveTab('wallet');
+                             setShowUpgradeModal(false);
+                         }}
+                         className="w-full py-3 bg-white text-amber-600 border border-amber-200 font-bold rounded-xl shadow-sm hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
+                       >
+                         購買單次高階邀約 ($150)
+                       </button>
+                     )}
+
                      <button 
                        onClick={() => setShowUpgradeModal(false)}
                        className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 text-sm"
