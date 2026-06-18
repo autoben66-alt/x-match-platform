@@ -181,7 +181,7 @@ export default function TripsPage() {
 
   const [showAuthModal, setShowAuthModal] = useState(false); // 登入視窗
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示視窗
-  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit'); // ✨ 記錄升級的原因，顯示不同文案
+  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit');
 
   const [isVerifying, setIsVerifying] = useState(false); // 登入驗證中
   const [isSending, setIsSending] = useState(false);
@@ -245,18 +245,43 @@ export default function TripsPage() {
     { id: '體驗', label: '求體驗', icon: Ticket },
   ];
 
-  const filteredTrips = trips.filter(trip => {
+  // ✨ 組合篩選邏輯，並將 S/A 級創作者置頂
+  const sortedFilteredTrips = trips.filter(trip => {
     const matchesSearch = trip.destination.includes(searchTerm) || trip.tags.some(tag => tag.includes(searchTerm));
     const matchesCategory = categoryFilter === '全部' || trip.category === categoryFilter;
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    // 讓 S 和 A 級排在最前面
+    const getTierWeight = (tier?: string) => {
+      if (tier === 'S') return 100;
+      if (tier === 'A') return 90;
+      return 0;
+    };
+    
+    const weightA = getTierWeight(a.tier);
+    const weightB = getTierWeight(b.tier);
+    
+    if (weightA !== weightB) {
+      return weightB - weightA; // 權重高的在前面
+    }
+    // 如果等級相同，維持原本的排序 (通常是 ID 降序或發布時間)
+    return b.id.localeCompare(a.id);
   });
 
   // 開啟視窗 (查看履歷)
   const handleOpenInvite = (trip: Trip) => {
     setSelectedTrip(trip);
     setInviteStep('profile'); 
-    setMessage(`哈囉 ${trip.creatorName}！\n\n我們是[您的店家名稱]，看到您預計前往${trip.destination}，誠摯邀請您來體驗我們的服務！\n\n我們可以提供：\n1. 免費體驗...\n2. 特別招待...\n\n期待您的回覆！`);
+    setMessage(''); // 清空原本預設的文字，讓業者可以點擊使用範本
     setIsSuccess(false);
+  };
+
+  // ✨ 處理「使用範本」點擊
+  const handleUseTemplate = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (selectedTrip) {
+      setMessage(`哈囉 ${selectedTrip.creatorName}！\n\n我們是 [您的品牌/店家名稱]，看到您預計前往 ${selectedTrip.destination}，非常喜歡您的創作風格與這趟旅程計畫！\n\n我們想邀請您來體驗我們的 [住宿/餐飲/活動]，並提供專屬互惠方案。\n\n我們預計提供：\n1. [提供項目一]\n2. [提供項目二]\n\n詳細的合作內容與時間都可以再討論，期待能與您合作！`);
+    }
   };
 
   // 處理「前往邀請」點擊 (權限檢查核心邏輯)
@@ -315,8 +340,7 @@ export default function TripsPage() {
         setIsProviderLoggedIn(true);
         setShowAuthModal(false);
 
-        // --- 這裡模擬後台回傳的會員狀態 ---
-        // 隨機模擬：50% 機率是付費版，50% 是免費版 (實際應由後端 user.role 或 user.subscription 決定)
+        // 隨機模擬：50% 機率是付費版，50% 是免費版
         const isPaidMember = Math.random() > 0.5; 
         
         if (isPaidMember) {
@@ -446,7 +470,7 @@ export default function TripsPage() {
       ) : (
         /* Trips List */
         <div className="grid grid-cols-1 gap-6">
-          {filteredTrips.map(trip => (
+          {sortedFilteredTrips.map(trip => (
             <div key={trip.id} className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row gap-6 hover:shadow-lg hover:border-indigo-200 transition-all duration-300 group relative overflow-hidden">
               
               {trip.daysLeft !== undefined && trip.daysLeft <= 3 && (trip.status === 'Open' || trip.status === '招募中') && (
@@ -566,7 +590,7 @@ export default function TripsPage() {
             </div>
           ))}
 
-          {filteredTrips.length === 0 && (
+          {sortedFilteredTrips.length === 0 && (
               <div className="text-center py-16 bg-slate-50 rounded-xl border border-dashed border-slate-300">
                   <Clock className="mx-auto h-12 w-12 text-slate-300 mb-3" />
                   <p className="text-slate-500 font-medium">找不到符合條件的行程或正在同步中</p>
@@ -700,7 +724,10 @@ export default function TripsPage() {
                     ></textarea>
                     <div className="flex justify-between mt-2">
                        <p className="text-xs text-slate-400">系統將自動帶入您的店家資訊</p>
-                       <button className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
+                       <button 
+                         onClick={handleUseTemplate}
+                         className="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                       >
                           <FileText size={12} /> 使用範本
                        </button>
                     </div>
@@ -817,11 +844,9 @@ export default function TripsPage() {
                  {upgradeReason === 'limit' ? '免費額度已用完' : '付費會員專屬功能'}
               </h2>
               <p className="text-slate-500 text-sm mb-6 whitespace-pre-line leading-relaxed">
-                 {upgradeReason === 'limit' 
-                   ? `您本月的 ${FREE_LIMIT} 次邀請額度已達上限。\n升級至專業版即可解鎖無限邀請！`
-                   : upgradeReason === 'tier'
-                   ? `「邀請 S/A 級頂尖創作者」為專業版 (Pro) 專屬。\n升級後即可無限制邀約高影響力網紅！`
-                   : `「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。\n升級後即可與創作者零距離洽談！`}
+                 {upgradeReason === 'limit' && <>您本月的 {FREE_LIMIT} 次邀請額度已達上限。<br />升級至專業版即可解鎖無限邀請！</>}
+                 {upgradeReason === 'tier' && <>「邀請 S/A 級頂尖創作者」為專業版 (Pro) 專屬。<br />升級後即可無限制邀約高影響力網紅！</>}
+                 {upgradeReason === 'line' && <>「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。<br />升級後即可與創作者零距離洽談！</>}
               </p>
               
               <div className="space-y-3">
