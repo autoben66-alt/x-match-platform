@@ -66,6 +66,15 @@ export interface Creator {
   tier?: string; 
 }
 
+// ✨ 定義專屬付費方案介面
+export interface PremiumPlan {
+  id: string;
+  title: string;
+  price: string;
+  description: string;
+  features: string[];
+}
+
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -75,9 +84,10 @@ interface CreatorDetail extends Creator {
   portfolio: string[];     
   lineId?: string;
   socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; }; 
+  premiumPlans?: PremiumPlan[]; // ✨ 綁定付費方案
 }
 
-// ✨ 網紅評級顯示標籤組件
+// 網紅評級顯示標籤組件
 const TierBadge = ({ tier }: { tier?: string }) => {
   if (!tier || tier === '未評級') {
     return <span className="px-2 py-0.5 rounded text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200">未評級</span>;
@@ -98,7 +108,6 @@ const TierBadge = ({ tier }: { tier?: string }) => {
 const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group cursor-pointer h-full flex flex-col">
-      {/* 封面圖區域 */}
       <div className="h-40 bg-slate-100 relative overflow-hidden">
         {creator.coverImage && (
           <img 
@@ -108,7 +117,6 @@ const CreatorCard = ({ creator }: { creator: CreatorDetail }) => {
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-60"></div>
-        {/* ✨ 右上角顯示評級 */}
         <div className="absolute top-3 right-3">
           <TierBadge tier={creator.tier} />
         </div>
@@ -190,7 +198,24 @@ const ENRICH_DATA = [
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
     averageViews: 45000, completionScore: 5.0,
-    socialLinks: { ig: 'https://instagram.com', yt: 'https://youtube.com', tiktok: '', other: 'https://behance.net' }
+    socialLinks: { ig: 'https://instagram.com', yt: 'https://youtube.com', tiktok: '', other: 'https://behance.net' },
+    // ✨ 新增 S 級專屬付費方案假資料
+    premiumPlans: [
+      {
+        id: 'plan-s1',
+        title: '品牌深度代言 (三個月)',
+        price: 'NT$ 150,000',
+        description: '為您的品牌量身打造為期三個月的深度曝光計畫，包含影像創作與肖像權使用，適合大型行銷檔期。',
+        features: ['3支 4K 質感短片', '6篇 深度圖文推廣', '品牌肖像授權 3 個月', '專屬粉絲優惠導購']
+      },
+      {
+        id: 'plan-s2',
+        title: '線下實體活動出席 + 紀錄',
+        price: 'NT$ 50,000',
+        description: '親臨您的實體店面、新店開幕或記者會，透過鏡頭帶領粉絲身歷其境。',
+        features: ['出席活動 2 小時', '1支 活動精華短影音', '3則 現場限時動態']
+      }
+    ]
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
@@ -226,7 +251,7 @@ export default function CreatorsPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false); // 登入提示
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示 (Pro Only)
-  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit'); // ✨
+  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit'); 
   
   const [inviteMessage, setInviteMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -237,7 +262,7 @@ export default function CreatorsPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
 
   useEffect(() => {
-    // ✨ 建立預設展示資料 (Fallback Data)
+    // 建立預設展示資料 (Fallback Data)
     const fallbackCreators: CreatorDetail[] = ENRICH_DATA.map((enrich, index) => ({
       id: 'fallback-' + index,
       name: enrich.name,
@@ -256,6 +281,7 @@ export default function CreatorsPage() {
       rates: enrich.rates,
       tier: enrich.tier, 
       socialLinks: enrich.socialLinks, 
+      premiumPlans: (enrich as any).premiumPlans || [], // ✨ 載入付費方案資料
       tags: ['👑 創始會員', ...enrich.tags],
       badges: ['創始會員', '官方認證'],
       averageViews: enrich.averageViews,
@@ -303,6 +329,7 @@ export default function CreatorsPage() {
                 rates: formatRates(u.rates),
                 tier: u.tier || enrich.tier || '未評級', 
                 socialLinks: u.socialLinks || enrich.socialLinks, 
+                premiumPlans: u.premiumPlans || (enrich as any).premiumPlans || [], // ✨ 抓取雲端付費方案
                 tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
                 badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
                 averageViews: u.averageViews || enrich.averageViews || 5000,
@@ -410,14 +437,33 @@ export default function CreatorsPage() {
       return;
     }
 
-    // ✨ 檢查是否為 S/A 級網紅，且非 Pro 會員
     if ((selectedCreator?.tier === 'S' || selectedCreator?.tier === 'A') && providerPlan !== 'pro') {
-      setUpgradeReason('tier'); // 設定升級原因為 tier，這會彈出包含「單次付費解鎖」按鈕的 Modal
+      setUpgradeReason('tier'); 
       setShowUpgradeModal(true);
       return;
     }
     
     setInviteMessage(`哈囉 ${selectedCreator?.name || ''}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
+    setSelectedProjectId('');
+    setShowInviteModal(true);
+    setSendSuccess(false);
+  };
+
+  // ✨ 處理點擊「洽詢付費方案」
+  const handleInquirePlan = (plan: PremiumPlan) => {
+    if (!isProviderLoggedIn) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    // S 級方案依然受權限控管保護
+    if (providerPlan !== 'pro') {
+      setUpgradeReason('tier'); 
+      setShowUpgradeModal(true);
+      return;
+    }
+    
+    setInviteMessage(`哈囉 ${selectedCreator?.name || ''}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n我們對您的專屬方案【${plan.title}】（${plan.price}）非常有興趣，希望能進一步討論合作細節與檔期安排。\n\n期待您的回覆！`);
     setSelectedProjectId('');
     setShowInviteModal(true);
     setSendSuccess(false);
@@ -521,7 +567,7 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* ✨ 創作者分級制度介紹 (全新升級版 - 移除被動分潤文字) */}
+      {/* 創作者分級制度介紹 */}
       <div className="bg-white border-b border-slate-200 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
@@ -546,6 +592,7 @@ export default function CreatorsPage() {
               <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-amber-100/50">
                 <p className="text-[11px] font-bold text-amber-800 mb-1.5 flex items-center gap-1"><Sparkles size={12}/> 創作者尊榮特權</p>
                 <ul className="text-[10px] text-amber-700/90 space-y-1">
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">自訂專案</span>：解鎖上架「專屬付費合作方案」功能</span></li>
                   <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">獨佔案源</span>：專屬 S 級別頂規高預算合作案</span></li>
                   <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">專人服務</span>：官方 1 對 1 頂級商業品牌媒合</span></li>
                 </ul>
@@ -630,7 +677,6 @@ export default function CreatorsPage() {
                     <div>
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <h3 className="font-bold text-slate-900">{creator.name}</h3>
-                        {/* ✨ 排行榜顯示評級 */}
                         <TierBadge tier={creator.tier} />
                       </div>
                       <p className="text-xs text-slate-500 mb-1">已完成 {creator.completedJobs} 筆合作</p>
@@ -803,7 +849,6 @@ export default function CreatorsPage() {
                     ))}
                   </div>
                   
-                  {/* ✨ 社群連結展示 */}
                   {selectedCreator.socialLinks && (
                     <div className="flex items-center gap-3 mt-3">
                       {selectedCreator.socialLinks.ig && <a href={selectedCreator.socialLinks.ig} target="_blank" rel="noreferrer" className="text-pink-600 hover:text-pink-700 bg-pink-50 p-1.5 rounded-lg transition-colors"><Instagram size={18}/></a>}
@@ -813,7 +858,6 @@ export default function CreatorsPage() {
                   )}
                 </div>
 
-                {/* 指標展示卡片 */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar mt-4 sm:mt-0">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
@@ -832,7 +876,6 @@ export default function CreatorsPage() {
                 </div>
               </div>
 
-              {/* Founder Badge Highlights */}
               {selectedCreator.badges?.includes('創始會員') && (
                 <div className="mb-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 rounded-2xl flex items-center gap-4 shadow-inner">
                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl shadow-md">
@@ -845,7 +888,6 @@ export default function CreatorsPage() {
                 </div>
               )}
 
-              {/* Bio */}
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2">
                   <User size={16} className="text-sky-500" /> 關於我
@@ -853,8 +895,37 @@ export default function CreatorsPage() {
                 <p className="text-slate-600 leading-relaxed font-medium">{selectedCreator.bio}</p>
               </div>
 
+              {/* ✨ S級專屬付費方案區塊 */}
+              {selectedCreator.tier === 'S' && selectedCreator.premiumPlans && selectedCreator.premiumPlans.length > 0 && (
+                <div className="mb-8">
+                  <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm tracking-widest uppercase">
+                    <Crown size={18} className="text-amber-500 fill-amber-500"/> S級專屬付費方案
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     {selectedCreator.premiumPlans.map(plan => (
+                       <div key={plan.id} className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-2xl shadow-sm relative overflow-hidden flex flex-col">
+                         <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase tracking-widest">Premium</div>
+                         <h5 className="font-bold text-slate-900 text-lg mb-1 pr-16">{plan.title}</h5>
+                         <p className="text-2xl font-black text-orange-600 mb-3">{plan.price}</p>
+                         <p className="text-xs text-slate-600 mb-4 leading-relaxed flex-grow">{plan.description}</p>
+                         <ul className="space-y-2 mb-5">
+                           {plan.features.map((feature, idx) => (
+                             <li key={idx} className="text-xs text-slate-700 flex items-start gap-1.5"><CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5"/> {feature}</li>
+                           ))}
+                         </ul>
+                         <button 
+                           onClick={() => handleInquirePlan(plan)}
+                           className="w-full py-2.5 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 shadow-md active:scale-95 transition-all mt-auto"
+                         >
+                           洽詢此方案
+                         </button>
+                       </div>
+                     ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                {/* Audience Insight */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase">
                     <BarChart3 size={18} className="text-indigo-500"/> 受眾分析
@@ -875,7 +946,6 @@ export default function CreatorsPage() {
                   </div>
                 </div>
 
-                {/* Reference Rates */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
@@ -898,7 +968,6 @@ export default function CreatorsPage() {
                 </div>
               </div>
 
-              {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
@@ -914,7 +983,6 @@ export default function CreatorsPage() {
 
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                <div className="flex gap-3 w-full sm:w-auto">
-                 {/* ✨ LINE 聯繫按鈕 (防跳島付費牆) */}
                  {providerPlan === 'pro' ? (
                     <button 
                       onClick={handleLineContact}
@@ -931,7 +999,6 @@ export default function CreatorsPage() {
                     </button>
                  )}
                  
-                 {/* ✨ 發送合作邀請按鈕 (防跳島付費牆) */}
                  {providerPlan !== 'pro' && (selectedCreator.tier === 'S' || selectedCreator.tier === 'A') ? (
                     <button 
                       onClick={() => {
@@ -997,7 +1064,6 @@ export default function CreatorsPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {/* 選擇附帶案源下拉選單 */}
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                         <Briefcase size={16} className="text-indigo-600"/> 選擇附帶案源 (選填)
@@ -1020,7 +1086,6 @@ export default function CreatorsPage() {
                         ))}
                       </select>
                       
-                      {/* 越級邀請提示 */}
                       {selectedProjectId && projects.find(p => p.id === selectedProjectId)?.requiredTier === 'S' && selectedCreator.tier !== 'S' && (
                         <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs mt-3 shadow-sm animate-in fade-in slide-in-from-top-2">
                           <p className="font-bold mb-1 flex items-center gap-1"><AlertCircle size={14} className="text-orange-500"/> 越級邀請提示</p>
@@ -1069,7 +1134,7 @@ export default function CreatorsPage() {
 
       {/* --- Auth/Login Modal (身分驗證) --- */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 relative scale-100 animate-in zoom-in-95">
               <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                  <X size={24} />
@@ -1108,9 +1173,9 @@ export default function CreatorsPage() {
         </div>
       )}
 
-      {/* --- Upgrade Alert Modal (Pro Only Feature) --- */}
+      {/* --- Upgrade Alert Modal (動態升級 / 權限提示) --- */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  {upgradeReason === 'limit' ? (
@@ -1131,7 +1196,7 @@ export default function CreatorsPage() {
               <div className="space-y-3">
                  <button 
                    onClick={() => {
-                       setProviderPlan('pro'); 
+                       setProviderPlan('pro'); // 模擬升級
                        setShowUpgradeModal(false);
                    }}
                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
