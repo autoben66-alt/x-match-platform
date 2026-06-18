@@ -148,7 +148,8 @@ export default function DashboardPage() {
     socialLinks: { ig: '', yt: '', tiktok: '', other: '' },
     rates: { post: 0, story: 0, reels: 0 },
     audience: { gender: '', age: '', topCity: '' },
-    followers: 0, averageViews: 0, completionScore: 5.0
+    followers: 0, averageViews: 0, completionScore: 5.0,
+    premiumPlans: [] as any[] // ✨ 狀態擴充：付費方案陣列
   });
   
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -231,7 +232,8 @@ export default function DashboardPage() {
             rates: d.rates || prev.rates, audience: d.audience || prev.audience,
             followers: d.followers || prev.followers, 
             averageViews: d.averageViews || prev.averageViews,
-            completionScore: d.completionScore || prev.completionScore
+            completionScore: d.completionScore || prev.completionScore,
+            premiumPlans: d.premiumPlans || prev.premiumPlans || [] // ✨ 讀取付費方案資料
           }));
         } else if (role === 'business') {
           setProviderPlan(d.plan === 'Pro' ? 'pro' : 'free');
@@ -426,6 +428,7 @@ export default function DashboardPage() {
         rates: creatorProfile.rates, 
         audience: creatorProfile.audience,
         socialLinks: creatorProfile.socialLinks, 
+        premiumPlans: creatorProfile.premiumPlans || [], // ✨ 寫入付費方案資料
         tier: creatorProfile.tier,
         followers: creatorProfile.followers, 
         engagement: 4.5, completedJobs: 0,
@@ -574,11 +577,9 @@ export default function DashboardPage() {
           return;
         }
         
-        // 1. 真實註冊：建立 Firebase 帳號
         const userCredential = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
         const user = userCredential.user;
 
-        // 2. 寫入初始資料至 Firestore
         await setDoc(doc(db, 'artifacts', internalAppId, 'public', 'data', 'users', user.uid), {
           id: user.uid,
           name: authName,
@@ -594,13 +595,13 @@ export default function DashboardPage() {
             averageViews: 0,
             completionScore: 5.0,
             portfolio: [],
-            tags: []
+            tags: [],
+            premiumPlans: [] // 初始化為空陣列
           } : {
             singleInvites: 0
           })
         });
       } else {
-        // 真實登入：驗證帳號密碼
         await signInWithEmailAndPassword(auth, authEmail, authPassword);
       }
       
@@ -622,7 +623,7 @@ export default function DashboardPage() {
     }
   };
 
-  // ✨ 真實 Firebase Auth 登出
+  // 真實 Firebase Auth 登出
   const handleLogout = async () => {
     if (auth) {
       try {
@@ -641,6 +642,30 @@ export default function DashboardPage() {
     setRole(newRole);
     localStorage.setItem('xmatch_role', newRole);
     setActiveTab('overview'); 
+  };
+
+  // ✨ 處理專屬付費方案的相關操作
+  const handleAddPlan = () => {
+    setCreatorProfile(p => ({
+      ...p,
+      premiumPlans: [...(p.premiumPlans || []), { id: `plan-${Date.now()}`, title: '', price: '', description: '', features: [''] }]
+    }));
+  };
+
+  const handleUpdatePlan = (index: number, field: string, value: any) => {
+    setCreatorProfile(p => {
+      const newPlans = [...(p.premiumPlans || [])];
+      newPlans[index] = { ...newPlans[index], [field]: value };
+      return { ...p, premiumPlans: newPlans };
+    });
+  };
+
+  const handleRemovePlan = (index: number) => {
+    setCreatorProfile(p => {
+      const newPlans = [...(p.premiumPlans || [])];
+      newPlans.splice(index, 1);
+      return { ...p, premiumPlans: newPlans };
+    });
   };
 
   const themeText = role === 'business' ? 'text-indigo-600' : 'text-purple-600';
@@ -692,7 +717,6 @@ export default function DashboardPage() {
                 <User size={16}/> 我是創作者
               </button>
             </div>
-            {/* ✨ 真實 Firebase 註冊/登入表單綁定 */}
             <form onSubmit={handleAuth} className="space-y-4">
               {authMode === 'register' && (
                 <div className="animate-in slide-in-from-bottom-2 fade-in duration-300">
@@ -940,11 +964,9 @@ export default function DashboardPage() {
                            const isPremiumTier = info.tier === 'S' || info.tier === 'A';
                            const isLocked = isPremiumTier && providerPlan !== 'pro' && !unlockedApps.includes(app.id);
 
-                           // 若觸發付費牆，顯示上鎖的模糊卡片
                            if (isLocked) {
                              return (
                                <div key={app.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col sm:flex-row items-center group">
-                                  {/* 上鎖提示區塊 */}
                                   <div className="absolute inset-0 bg-slate-50/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-6 text-center">
                                     <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mb-3 shadow-inner">
                                       <Lock size={24} className="text-amber-500" />
@@ -977,7 +999,6 @@ export default function DashboardPage() {
                                       </button>
                                     </div>
                                   </div>
-                                  {/* 底層模糊假資料 (視覺誘餌) */}
                                   <div className="opacity-40 flex w-full p-6 items-start gap-4 filter blur-[3px]">
                                     <div className="w-16 h-16 bg-slate-300 rounded-full shrink-0 border-2 border-white"></div>
                                     <div className="flex-1 space-y-3">
@@ -990,10 +1011,8 @@ export default function DashboardPage() {
                              );
                            }
 
-                           // 正常顯示的履歷卡片
                            return (
                              <div key={app.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-                               {/* 創作者卡片頭部 */}
                                <div className="flex flex-col sm:flex-row items-start gap-5 mb-5 border-b border-slate-100 pb-5">
                                  <div className="relative shrink-0">
                                    <img src={info.avatar || app.toAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.fromName}`} className="w-16 h-16 rounded-full border-4 border-slate-50 shadow-sm" alt="Avatar"/>
@@ -1018,7 +1037,6 @@ export default function DashboardPage() {
                                         </span>
                                         {app.status === '已接受' && (
                                             <div className="flex gap-2 justify-end flex-wrap mt-2">
-                                                {/* ✨ 付費牆/解鎖後可看 LINE */}
                                                 {info.lineId ? (
                                                   <a 
                                                       href={`https://line.me/ti/p/~${info.lineId}`}
@@ -1197,7 +1215,6 @@ export default function DashboardPage() {
                             </div>
                           )}
 
-                          {/* ✨ 新增：基本交付內容需求選項 */}
                           <div>
                             <label className="block text-xs font-bold text-slate-700 mb-2">基本交付內容需求 <span className="text-red-500">*</span></label>
                             <div className="flex flex-wrap gap-2 mb-3">
@@ -1325,7 +1342,6 @@ export default function DashboardPage() {
                                   )}
                                </div>
                              )}
-                             {/* ✨ 刪除邀請按鈕 */}
                              <button 
                                onClick={() => handleDeleteInvitation(inv.id)}
                                className="p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors ml-1" 
@@ -1546,7 +1562,6 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              {/* ✨ 點擊預覽合約 */}
               <div onClick={() => setShowContractModal(true)} className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer group">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-green-100 text-green-600 rounded-lg group-hover:scale-110 transition-transform"><FileSignature size={24}/></div>
@@ -1657,7 +1672,6 @@ export default function DashboardPage() {
                   </button>
                 </div>
                 
-                {/* ✨ 新增：單次高階邀約解鎖 */}
                 <div className="bg-white p-5 rounded-xl border border-slate-200 hover:border-indigo-300 transition-colors group cursor-pointer flex flex-col">
                   <div className="flex justify-between items-start mb-2">
                     <div className="p-2 bg-purple-100 text-purple-600 rounded-lg group-hover:scale-110 transition-transform"><Crown size={20} fill="currentColor"/></div>
@@ -1846,7 +1860,7 @@ export default function DashboardPage() {
                                value={creatorProfile.bio} onChange={(e) => setCreatorProfile(p => ({...p, bio: e.target.value}))} />
                    </div>
 
-                   {/* ✨ 頻道連結 */}
+                   {/* 頻道連結 */}
                    <div className="pt-4 border-t border-slate-100">
                      <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><LinkIcon size={16} className="text-slate-400"/> 社群頻道連結 (將展示於履歷)</h4>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1921,7 +1935,6 @@ export default function DashboardPage() {
                  <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                    <h3 className="font-black text-slate-800 mb-5 flex items-center gap-2 uppercase tracking-widest text-sm"><BarChart3 size={18} className="text-indigo-500"/> 社群數據與受眾分析</h3>
                    <div className="space-y-4">
-                     {/* ✨ 新增粉絲數與觀看數的輸入欄位 */}
                      <div>
                        <label className="block text-xs font-bold text-slate-500 mb-1.5">粉絲總數 (Followers)</label>
                        <div className="flex items-center relative">
@@ -1954,6 +1967,69 @@ export default function DashboardPage() {
                               value={creatorProfile.audience.topCity} onChange={(e) => setCreatorProfile(p => ({...p, audience: {...p.audience, topCity: e.target.value}}))} />
                      </div>
                    </div>
+                 </div>
+               </div>
+               
+               {/* ✨ S級專屬付費方案設定 (Premium Plans) */}
+               <div className="lg:col-span-3 mt-8 bg-gradient-to-br from-white to-amber-50/30 p-6 sm:p-8 rounded-2xl border border-amber-200 shadow-sm relative overflow-hidden">
+                 {creatorProfile.tier !== 'S' && (
+                   <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-white p-6 text-center">
+                     <div className="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center mb-3 border border-amber-400/30">
+                        <Lock className="text-amber-400 w-6 h-6" />
+                     </div>
+                     <h4 className="font-bold text-xl mb-2 text-white drop-shadow-md">S 級創作者專屬功能</h4>
+                     <p className="text-sm text-slate-100 max-w-md leading-relaxed drop-shadow-md">持續累積優良完案紀錄，升級至 S 級後即可解鎖「自訂付費方案」功能，於前台展示您的專屬高單價接案模式！</p>
+                   </div>
+                 )}
+                 
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 relative z-0">
+                   <div>
+                     <h3 className="font-black text-slate-900 flex items-center gap-2 text-lg">
+                       <Crown size={20} className="text-amber-500 fill-amber-500"/> 專屬付費方案設定 (Premium Plans)
+                     </h3>
+                     <p className="text-xs text-slate-500 mt-1">設定您的高單價合作方案，吸引優質品牌主動洽詢。</p>
+                   </div>
+                   <button
+                     onClick={handleAddPlan}
+                     className="text-sm bg-slate-900 text-white px-4 py-2.5 rounded-xl font-bold shadow-sm hover:bg-slate-800 transition-colors flex items-center gap-2 active:scale-95"
+                   >
+                     <Plus size={16}/> 新增方案
+                   </button>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-0">
+                   {(creatorProfile.premiumPlans || []).map((plan, index) => (
+                     <div key={plan.id} className="bg-white p-5 rounded-xl border border-amber-200 shadow-sm relative group hover:shadow-md transition-shadow">
+                       <button 
+                         onClick={() => handleRemovePlan(index)} 
+                         className="absolute top-3 right-3 p-1.5 bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                         title="刪除此方案"
+                       >
+                         <Trash2 size={16}/>
+                       </button>
+                       <div className="pr-8 mb-4">
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">方案名稱</label>
+                          <input type="text" className="w-full p-2.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 focus:bg-white" value={plan.title} onChange={e => handleUpdatePlan(index, 'title', e.target.value)} placeholder="例如：品牌深度代言"/>
+                       </div>
+                       <div className="mb-4">
+                          <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">方案價格</label>
+                          <input type="text" className="w-full p-2.5 border border-slate-200 rounded-lg text-sm font-bold text-amber-600 outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 focus:bg-white" value={plan.price} onChange={e => handleUpdatePlan(index, 'price', e.target.value)} placeholder="例如：NT$ 150,000"/>
+                       </div>
+                       <div className="mb-4">
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">方案描述</label>
+                         <textarea className="w-full p-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 focus:bg-white h-20 resize-none" value={plan.description} onChange={e => handleUpdatePlan(index, 'description', e.target.value)} placeholder="簡單說明此方案的優勢與特色..."/>
+                       </div>
+                       <div>
+                         <label className="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">交付內容與特權 <span className="text-[10px] font-normal normal-case">(每行一項)</span></label>
+                         <textarea className="w-full p-2.5 border border-slate-200 rounded-lg text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-amber-500 bg-slate-50 focus:bg-white h-24 resize-none leading-relaxed" value={(plan.features || []).join('\n')} onChange={e => handleUpdatePlan(index, 'features', e.target.value.split('\n'))} placeholder="例如：&#10;3支 4K 質感短片&#10;品牌肖像授權 3 個月"/>
+                       </div>
+                     </div>
+                   ))}
+                   {(!creatorProfile.premiumPlans || creatorProfile.premiumPlans.length === 0) && (
+                     <div className="md:col-span-2 text-sm text-slate-400 font-medium text-center py-10 bg-white border-2 border-dashed border-slate-200 rounded-2xl">
+                        您尚未設定任何付費方案，點擊右上角新增您的第一個專屬方案吧！
+                     </div>
+                   )}
                  </div>
                </div>
              </div>
@@ -2335,12 +2411,10 @@ export default function DashboardPage() {
                   <h2 className="text-xl font-bold text-slate-900 mb-2">
                      {upgradeReason === 'limit' ? '免費額度已用完' : '付費會員專屬功能'}
                   </h2>
-                  <p className="text-slate-500 text-sm mb-6 whitespace-pre-line leading-relaxed">
-                     {upgradeReason === 'limit' 
-                       ? `您本月的免費額度已達上限。\n升級至專業版即可解鎖無限邀請！`
-                       : upgradeReason === 'tier'
-                       ? `「查看及邀請 S/A 級高流量網紅」為專業版 (Pro) 專屬。\n升級後即可無限制邀約高影響力網紅！`
-                       : `「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。\n升級後即可與創作者零距離洽談！`}
+                  <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                     {upgradeReason === 'limit' && <>您本月的免費額度已達上限。<br />升級至專業版即可解鎖無限邀請！</>}
+                     {upgradeReason === 'tier' && <>「邀請 S/A 級頂尖創作者」為專業版 (Pro) 專屬。<br />升級後即可無限制邀約高影響力網紅！</>}
+                     {upgradeReason === 'line' && <>「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。<br />升級後即可與創作者零距離洽談！</>}
                   </p>
                   
                   <div className="space-y-3">
