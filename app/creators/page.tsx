@@ -63,7 +63,7 @@ export interface Creator {
   location: string;
   bio: string;
   coverImage?: string;
-  tier?: string; // ✨ 新增分級
+  tier?: string; 
 }
 
 interface CreatorDetail extends Creator {
@@ -74,7 +74,7 @@ interface CreatorDetail extends Creator {
   audience: { gender: string; age: string; topCity: string; };
   portfolio: string[];     
   lineId?: string;
-  socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; }; // ✨ 新增社群連結
+  socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; }; 
 }
 
 // ✨ 網紅評級顯示標籤組件
@@ -163,7 +163,7 @@ interface ProjectMinimal {
   id: string;
   title: string;
   totalValue: string;
-  requiredTier?: string; // ✨ 新增案源綁定的限制等級
+  requiredTier?: string; 
 }
 
 // 模擬豐富資料 (含評級與社群連結)
@@ -226,6 +226,7 @@ export default function CreatorsPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false); // 登入提示
   const [showUpgradeModal, setShowUpgradeModal] = useState(false); // 升級提示 (Pro Only)
+  const [upgradeReason, setUpgradeReason] = useState<'limit' | 'line' | 'tier'>('limit'); // ✨
   
   const [inviteMessage, setInviteMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -253,8 +254,8 @@ export default function CreatorsPage() {
       portfolio: enrich.portfolio,
       audience: enrich.audience,
       rates: enrich.rates,
-      tier: enrich.tier, // ✨ 寫入假資料的評級
-      socialLinks: enrich.socialLinks, // ✨ 寫入社群連結
+      tier: enrich.tier, 
+      socialLinks: enrich.socialLinks, 
       tags: ['👑 創始會員', ...enrich.tags],
       badges: ['創始會員', '官方認證'],
       averageViews: enrich.averageViews,
@@ -285,7 +286,7 @@ export default function CreatorsPage() {
               });
 
               return {
-                id: u.id || Date.now() + index, // 修復：保留 Firebase 原始字串 ID
+                id: u.id || Date.now() + index, 
                 name: u.name || enrich.name,
                 handle: u.handle || `@${u.email ? u.email.split('@')[0] : 'creator'}`,
                 lineId: u.lineId || enrich.lineId || (u.handle ? u.handle.replace('@', '') : ''),
@@ -300,15 +301,14 @@ export default function CreatorsPage() {
                 portfolio: u.portfolio?.length > 0 ? u.portfolio : enrich.portfolio,
                 audience: u.audience || enrich.audience,
                 rates: formatRates(u.rates),
-                tier: u.tier || enrich.tier || '未評級', // ✨ 抓取資料庫評級
-                socialLinks: u.socialLinks || enrich.socialLinks, // ✨ 抓取社群連結
+                tier: u.tier || enrich.tier || '未評級', 
+                socialLinks: u.socialLinks || enrich.socialLinks, 
                 tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
                 badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
                 averageViews: u.averageViews || enrich.averageViews || 5000,
                 completionScore: u.completionScore || enrich.completionScore || 5.0
               };
             });
-            // 將陣列反轉，確保最新新增的創作者會出現在最前面
             setCreators(mappedCreators.reverse());
         } else {
             setCreators(fallbackCreators);
@@ -333,7 +333,7 @@ export default function CreatorsPage() {
             id: data.id,
             title: data.title,
             totalValue: data.totalValue,
-            requiredTier: data.requiredTier || '無限制' // ✨ 抓取該案源是否為 S 級
+            requiredTier: data.requiredTier || '無限制' 
           } as ProjectMinimal;
         }));
       }
@@ -347,7 +347,6 @@ export default function CreatorsPage() {
   const topCreators = [...creators].sort((a, b) => b.completedJobs - a.completedJobs).slice(0, 3);
   
   const filteredCreators = creators.filter(creator => {
-    // 修復：增加防護，避免 undefined 造成搜尋功能崩潰
     const safeName = creator.name || '';
     const safeHandle = creator.handle || '';
     const safeTags = Array.isArray(creator.tags) ? creator.tags : [];
@@ -376,7 +375,6 @@ export default function CreatorsPage() {
   // --- 執行登入 (模擬後台驗證) ---
   const handleLogin = () => {
     setIsVerifying(true);
-    
     setTimeout(() => {
         setIsVerifying(false);
         setIsProviderLoggedIn(true);
@@ -390,30 +388,36 @@ export default function CreatorsPage() {
   // --- 處理「LINE 聯繫」點擊 (權限檢查: 必須登入且為 Pro) ---
   const handleLineContact = (e: React.MouseEvent) => {
     e.preventDefault(); 
-
     if (!isProviderLoggedIn) {
       setShowAuthModal(true);
       return;
     }
-
     if (providerPlan !== 'pro') {
-      setShowUpgradeModal(true); // 跳出升級提示
+      setUpgradeReason('line');
+      setShowUpgradeModal(true); 
       return;
     }
-
     if (selectedCreator) {
       const lineUrl = `https://line.me/ti/p/~${selectedCreator.lineId || selectedCreator.handle.replace('@', '')}`;
       window.open(lineUrl, '_blank');
     }
   };
 
+  // --- 處理「發送合作邀請」點擊 (加入 Paywall 權限檢查) ---
   const handleOpenInvite = () => {
     if (!isProviderLoggedIn) {
       setShowAuthModal(true);
       return;
     }
+
+    // ✨ 檢查是否為 S/A 級網紅，且非 Pro 會員
+    if ((selectedCreator?.tier === 'S' || selectedCreator?.tier === 'A') && providerPlan !== 'pro') {
+      setUpgradeReason('tier'); // 設定升級原因為 tier，這會彈出包含「單次付費解鎖」按鈕的 Modal
+      setShowUpgradeModal(true);
+      return;
+    }
     
-    setInviteMessage(`哈囉 ${selectedCreator?.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
+    setInviteMessage(`哈囉 ${selectedCreator?.name || ''}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n在此誠摯邀請您參與我們的合作案源，希望能有互惠合作的機會。\n\n詳細合作內容可以再一起討論，期待您的回覆！`);
     setSelectedProjectId('');
     setShowInviteModal(true);
     setSendSuccess(false);
@@ -449,7 +453,7 @@ export default function CreatorsPage() {
           completionScore: selectedCreator?.completionScore,
           tags: selectedCreator?.tags,
           lineId: selectedCreator?.lineId,
-          tier: selectedCreator?.tier // 夾帶評級資訊
+          tier: selectedCreator?.tier 
         }
       });
 
@@ -517,7 +521,7 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* ✨ 創作者分級制度介紹 (全新升級版) */}
+      {/* ✨ 創作者分級制度介紹 (全新升級版 - 移除被動分潤文字) */}
       <div className="bg-white border-b border-slate-200 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
@@ -526,7 +530,7 @@ export default function CreatorsPage() {
             </h2>
             <p className="text-slate-600 text-sm max-w-2xl mx-auto">
               我們透過數據分析與完案信用，將創作者分為四個等級。<br className="hidden sm:block"/>
-              <span className="font-bold text-indigo-600">S/A 級別創作者享有平台專屬的「現金分潤」與「高單價案源獨佔」特權！</span>
+              <span className="font-bold text-indigo-600">S/A 級別創作者享有平台專屬的「高單價案源獨佔」等優先特權！</span>
             </p>
           </div>
           
@@ -539,11 +543,9 @@ export default function CreatorsPage() {
               </div>
               <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">擁有極高流量與粉絲黏著度，能為品牌帶來爆炸性曝光。</p>
               
-              {/* ✨ 新增的創作者誘因區塊 */}
               <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-amber-100/50">
                 <p className="text-[11px] font-bold text-amber-800 mb-1.5 flex items-center gap-1"><Sparkles size={12}/> 創作者尊榮特權</p>
                 <ul className="text-[10px] text-amber-700/90 space-y-1">
-                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">被動分潤</span>：廠商付費解鎖聯繫，創作者享現金分潤</span></li>
                   <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">獨佔案源</span>：專屬 S 級別頂規高預算合作案</span></li>
                   <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">專人服務</span>：官方 1 對 1 頂級商業品牌媒合</span></li>
                 </ul>
@@ -560,11 +562,9 @@ export default function CreatorsPage() {
               </div>
               <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">穩定產出高質感內容，粉絲互動率極佳，口碑行銷首選。</p>
               
-              {/* ✨ 新增的創作者誘因區塊 */}
               <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-indigo-100/50">
                 <p className="text-[11px] font-bold text-indigo-800 mb-1.5 flex items-center gap-1"><Star size={12}/> 創作者進階特權</p>
                 <ul className="text-[10px] text-indigo-700/90 space-y-1">
-                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">解鎖分潤</span>：享有廠商單次解鎖聯絡方式分潤機制</span></li>
                   <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">優先推薦</span>：付費與優質旅宿案源優先錄取保障</span></li>
                   <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">首頁曝光</span>：高機率登上首頁「熱門創作者」版位</span></li>
                 </ul>
@@ -582,7 +582,7 @@ export default function CreatorsPage() {
               <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">具備明確個人風格與穩定的觀看基數，適合常態性互惠合作。</p>
               <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-sky-100/50">
                 <p className="text-[11px] font-bold text-sky-800 mb-1.5">💡 創作者成長路徑</p>
-                <p className="text-[10px] text-sky-700/90 leading-relaxed">持續接案累積「完案信用評分」，達標後將自動升級為 A 級，解鎖被動收入與更多高單價資源。</p>
+                <p className="text-[10px] text-sky-700/90 leading-relaxed">持續接案累積「完案信用評分」，達標後將自動升級為 A 級，解鎖更多高單價資源。</p>
               </div>
               <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block text-center mt-auto">所有會員皆可邀請</div>
             </div>
@@ -924,19 +924,32 @@ export default function CreatorsPage() {
                     </button>
                  ) : (
                     <button 
-                      onClick={() => setShowUpgradeModal(true)}
+                      onClick={handleLineContact}
                       className="flex-1 sm:flex-none px-6 py-3.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
                     >
                       <Lock size={16} /> 升級 Pro 解鎖聯繫方式
                     </button>
                  )}
                  
-                 <button 
-                   onClick={handleOpenInvite}
-                   className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
-                 >
-                   <Mail size={18} /> 發送合作邀請
-                 </button>
+                 {/* ✨ 發送合作邀請按鈕 (防跳島付費牆) */}
+                 {providerPlan !== 'pro' && (selectedCreator.tier === 'S' || selectedCreator.tier === 'A') ? (
+                    <button 
+                      onClick={() => {
+                        setUpgradeReason('tier');
+                        setShowUpgradeModal(true);
+                      }}
+                      className="flex-1 sm:flex-none px-6 py-3.5 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                    >
+                      <Lock size={16} /> 升級解鎖發送邀請
+                    </button>
+                 ) : (
+                    <button 
+                      onClick={handleOpenInvite}
+                      className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap"
+                    >
+                      <Mail size={18} /> 發送合作邀請
+                    </button>
+                 )}
                </div>
             </div>
 
@@ -1007,7 +1020,7 @@ export default function CreatorsPage() {
                         ))}
                       </select>
                       
-                      {/* ✨ 越級邀請提示 */}
+                      {/* 越級邀請提示 */}
                       {selectedProjectId && projects.find(p => p.id === selectedProjectId)?.requiredTier === 'S' && selectedCreator.tier !== 'S' && (
                         <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs mt-3 shadow-sm animate-in fade-in slide-in-from-top-2">
                           <p className="font-bold mb-1 flex items-center gap-1"><AlertCircle size={14} className="text-orange-500"/> 越級邀請提示</p>
@@ -1100,23 +1113,48 @@ export default function CreatorsPage() {
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                 <Lock size={32} className="text-amber-500" />
+                 {upgradeReason === 'limit' ? (
+                    <AlertCircle size={32} className="text-red-500" />
+                 ) : (
+                    <Lock size={32} className="text-amber-500" />
+                 )}
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">付費會員專屬功能</h2>
-              <p className="text-slate-500 text-sm mb-6">
-                 「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬功能。<br/>升級後即可與所有頂尖創作者零距離洽談！
+              <h2 className="text-xl font-bold text-slate-900 mb-2">
+                 {upgradeReason === 'limit' ? '免費額度已用完' : '付費會員專屬功能'}
+              </h2>
+              <p className="text-slate-500 text-sm mb-6 leading-relaxed">
+                 {upgradeReason === 'limit' && <>您本月的免費額度已達上限。<br />升級至專業版即可解鎖無限邀請！</>}
+                 {upgradeReason === 'tier' && <>「邀請 S/A 級頂尖創作者」為專業版 (Pro) 專屬。<br />升級後即可無限制邀約高影響力網紅！</>}
+                 {upgradeReason === 'line' && <>「直接查看網紅 LINE 聯繫方式」為專業版 (Pro) 專屬。<br />升級後即可與創作者零距離洽談！</>}
               </p>
               
               <div className="space-y-3">
                  <button 
                    onClick={() => {
-                       setProviderPlan('pro'); // 模擬升級
+                       setProviderPlan('pro'); 
                        setShowUpgradeModal(false);
                    }}
                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                  >
-                   <Sparkles size={18} fill="currentColor"/> 立即升級解鎖
+                   <Sparkles size={18} fill="currentColor"/> 立即升級 Pro
                  </button>
+                 
+                 {/* ✨ 提示單次解鎖選項 */}
+                 {upgradeReason === 'tier' && (
+                   <button 
+                     onClick={() => {
+                         setProviderPlan('pro'); 
+                         setShowUpgradeModal(false);
+                         if (selectedCreator) {
+                             handleOpenInvite();
+                         }
+                     }}
+                     className="w-full py-3 bg-white text-amber-600 border border-amber-200 font-bold rounded-xl shadow-sm hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
+                   >
+                     購買單次高階邀約 ($150)
+                   </button>
+                 )}
+
                  <button 
                    onClick={() => setShowUpgradeModal(false)}
                    className="w-full py-3 text-slate-400 font-bold hover:text-slate-600 text-sm"
