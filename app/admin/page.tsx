@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, DollarSign, Settings, LogOut, ShieldAlert, 
   TrendingUp, CheckCircle2, XCircle, MoreVertical, Search, ShieldCheck, 
   Activity, ArrowUpRight, FileText, Briefcase, Bell,
-  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit, Save, UserCog, Medal, Crown, Instagram, Youtube, Link as LinkIcon
+  AlertTriangle, Quote, Plus, Loader2, Upload, X, Image as ImageIcon, Trash2, Edit, Save, UserCog, Medal, Crown, Instagram, Youtube, Link as LinkIcon, HeartHandshake, Star, AlertCircle
 } from 'lucide-react';
 
 // --- 自定義 Link 元件 (解決預覽環境問題) ---
@@ -52,7 +52,7 @@ if (typeof window !== 'undefined' && firebaseConfig.apiKey) {
 const internalAppId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'x-match-a83f0';
 
 // 資料型別定義
-type AdminTab = 'overview' | 'users' | 'revenue' | 'settings';
+type AdminTab = 'overview' | 'users' | 'revenue' | 'settings' | 'matches';
 
 interface UserData {
   id: string; name: string; email: string; role: string; plan: string; status: string; joinDate: string; tier?: string;
@@ -73,6 +73,22 @@ interface TestimonialData {
   id: string; image: string; quote: string; authorInitial: string; authorName: string; authorLocation: string; metricIcon: string; metricLabel: string; rating: number;
 }
 
+// ✨ 新增媒合案件資料介面
+interface MatchData {
+  id: string;
+  fromName: string;
+  toName: string;
+  type: 'invite' | 'application';
+  status: string;
+  date: string;
+  projectTitle?: string;
+  message?: string;
+  extraConditions?: string;
+  creatorInfo?: any;
+  businessReview?: any;
+  creatorReview?: any;
+}
+
 // 初始模擬資料
 const MOCK_USERS: UserData[] = [
   { id: '1', name: '海角七號民宿', email: 'cape7@example.com', role: '商家', plan: 'Pro', status: '活躍', joinDate: '2024/02/15' },
@@ -86,6 +102,12 @@ const MOCK_TX: TransactionData[] = [
   { id: 'TX-1049', user: '海角七號民宿', item: '專業版 Pro (月訂閱)', amount: 1200, status: '成功', date: '2024/06/01 10:23' },
   { id: 'TX-1048', user: 'Ocean Blue 衝浪店', item: '置頂推廣 (單次)', amount: 300, status: '成功', date: '2024/05/28 15:40' },
   { id: 'TX-1047', user: '老宅咖啡·午後', item: '精準推播 (單次)', amount: 100, status: '成功', date: '2024/05/25 09:12' },
+];
+
+// ✨ 初始模擬媒合資料
+const MOCK_MATCHES: MatchData[] = [
+  { id: 'inv-1001', fromName: '海角七號民宿', toName: '林小美', type: 'invite', status: '已接受', date: '2024/06/02 14:20', projectTitle: '海景房開箱體驗', message: '邀請您來體驗...' },
+  { id: 'inv-1002', fromName: 'Jason 攝影', toName: '慢活・私廚', type: 'application', status: '待審核', date: '2024/06/03 09:15', projectTitle: '春季無菜單料理試吃', extraConditions: '加碼 YouTube Shorts' }
 ];
 
 export default function AdminDashboardPage() {
@@ -109,6 +131,11 @@ export default function AdminDashboardPage() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [transactions, setTransactions] = useState<TransactionData[]>([]);
   const [testimonials, setTestimonials] = useState<TestimonialData[]>([]);
+  const [matches, setMatches] = useState<MatchData[]>([]); // ✨ 新增媒合資料狀態
+
+  // ✨ 媒合管理專用狀態
+  const [matchStatusFilter, setMatchStatusFilter] = useState('全部狀態');
+  const [viewMatch, setViewMatch] = useState<MatchData | null>(null);
 
   // 首頁評價 CMS 控制狀態
   const [newTestimonial, setNewTestimonial] = useState({ quote: '', authorName: '', metricLabel: '' });
@@ -177,7 +204,18 @@ export default function AdminDashboardPage() {
       }
     }, (err) => console.error("無法讀取評價資料:", err));
 
-    return () => { unsubUsers(); unsubTx(); unsubTestimonials(); };
+    // ✨ 監聽媒合案件 (Invitations)
+    const matchesCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'invitations');
+    const unsubMatches = onSnapshot(matchesCol, (snapshot) => {
+      if (snapshot.empty) {
+        setMatches(MOCK_MATCHES);
+      } else {
+        const data = snapshot.docs.map(d => d.data() as MatchData);
+        setMatches(data.sort((a, b) => b.id.localeCompare(a.id)));
+      }
+    }, (err) => console.error("無法讀取媒合資料:", err));
+
+    return () => { unsubUsers(); unsubTx(); unsubTestimonials(); unsubMatches(); };
   }, [fbUser, isLoggedIn]);
 
   const filteredUsers = users.filter(u => {
@@ -658,6 +696,180 @@ export default function AdminDashboardPage() {
             )}
           </div>
         );
+
+      // ✨ 新增媒合管理頁面 (Matches)
+      case 'matches':
+        const filteredMatches = matches.filter(m => {
+           const safeFrom = m.fromName || '';
+           const safeTo = m.toName || '';
+           const safeProject = m.projectTitle || '';
+           const matchSearch = safeFrom.toLowerCase().includes(searchTerm.toLowerCase()) || safeTo.toLowerCase().includes(searchTerm.toLowerCase()) || safeProject.toLowerCase().includes(searchTerm.toLowerCase());
+           const statusMatch = matchStatusFilter === '全部狀態' || m.status === matchStatusFilter;
+           return matchSearch && statusMatch;
+        });
+
+        return (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-slate-900">媒合案件監控</h2>
+              <div className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-100 flex items-center gap-2">
+                <HeartHandshake size={16}/> 總媒合數：{matches.length}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
+              <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50 rounded-t-xl">
+                <div className="relative w-full sm:max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                  <input 
+                    type="text" placeholder="搜尋發起人、接收方或案源..." 
+                    className="w-full pl-9 p-2.5 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-sm"
+                    value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                  />
+                </div>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <select className="border border-slate-200 rounded-xl p-2.5 text-sm bg-white font-bold text-slate-600 outline-none shadow-sm cursor-pointer" value={matchStatusFilter} onChange={e => setMatchStatusFilter(e.target.value)}>
+                    <option value="全部狀態">全部狀態</option>
+                    <option value="待審核">待審核 (應徵)</option>
+                    <option value="待回覆">待回覆 (邀請)</option>
+                    <option value="已接受">已接受 (合作中)</option>
+                    <option value="已婉拒">已婉拒</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto flex-grow pb-10">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-white border-b text-slate-400 uppercase text-[10px] font-black tracking-widest">
+                    <tr>
+                      <th className="px-6 py-5">案件時間</th>
+                      <th className="px-6 py-5">方向/類型</th>
+                      <th className="px-6 py-5">發送方 (From)</th>
+                      <th className="px-6 py-5">接收方 (To)</th>
+                      <th className="px-6 py-5">關聯案源</th>
+                      <th className="px-6 py-5">進度狀態</th>
+                      <th className="px-6 py-5 text-right">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {filteredMatches.length > 0 ? filteredMatches.map(m => {
+                      const isCompleted = m.businessReview || m.creatorReview;
+                      return (
+                        <tr key={m.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-6 py-4 text-[11px] text-slate-500 font-mono">{m.date}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold ${m.type === 'invite' ? 'bg-purple-50 text-purple-700 border border-purple-100' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                              {m.type === 'invite' ? '業者邀請' : '網紅應徵'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 font-bold text-slate-800">{m.fromName}</td>
+                          <td className="px-6 py-4 font-bold text-slate-800">{m.toName}</td>
+                          <td className="px-6 py-4 text-xs text-slate-500 truncate max-w-[150px]">{m.projectTitle || '-'}</td>
+                          <td className="px-6 py-4">
+                            {isCompleted ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 flex items-center gap-1 w-fit"><Star size={12} className="text-green-600" fill="currentColor"/> 已結案 (有評價)</span>
+                            ) : (
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold w-fit ${
+                                m.status === '已接受' ? 'bg-indigo-100 text-indigo-700' :
+                                m.status === '已婉拒' ? 'bg-slate-100 text-slate-500' : 'bg-orange-100 text-orange-700'
+                              }`}>{m.status}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button onClick={() => setViewMatch(m)} className="text-xs font-bold text-sky-600 hover:text-sky-800 hover:underline">查看詳情</button>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
+                      <tr><td colSpan={7} className="px-6 py-20 text-center text-slate-400 font-medium">沒有符合條件的媒合案件</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 媒合案件詳情 Modal */}
+            {viewMatch && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
+                  <div className="flex justify-between items-start mb-6 border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="font-bold text-xl text-slate-900 flex items-center gap-2"><Briefcase className="text-indigo-500" /> 案件詳情紀錄</h3>
+                      <p className="text-xs text-slate-400 mt-1 font-mono">Case ID: {viewMatch.id}</p>
+                    </div>
+                    <button onClick={() => setViewMatch(null)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                       <div className="flex-1 text-center">
+                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">發送方 (From)</p>
+                         <p className="font-bold text-slate-800">{viewMatch.fromName}</p>
+                       </div>
+                       <ArrowUpRight size={24} className="text-slate-300" />
+                       <div className="flex-1 text-center">
+                         <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">接收方 (To)</p>
+                         <p className="font-bold text-slate-800">{viewMatch.toName}</p>
+                       </div>
+                    </div>
+
+                    {viewMatch.projectTitle && (
+                      <div>
+                        <p className="text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-widest">關聯案源 / 方案</p>
+                        <p className="bg-indigo-50 text-indigo-800 font-bold text-sm px-4 py-2.5 rounded-lg border border-indigo-100">{viewMatch.projectTitle}</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-widest">邀請 / 應徵訊息內容</p>
+                      <div className="bg-slate-50 text-slate-700 text-sm p-4 rounded-xl border border-slate-100 whitespace-pre-line leading-relaxed max-h-48 overflow-y-auto">
+                        {viewMatch.message || '無附帶訊息'}
+                      </div>
+                    </div>
+
+                    {viewMatch.extraConditions && (
+                      <div>
+                        <p className="text-xs font-bold text-orange-500 mb-1.5 uppercase tracking-widest flex items-center gap-1"><AlertCircle size={14}/> 創作者加碼條件</p>
+                        <div className="bg-orange-50 text-orange-800 text-sm p-4 rounded-xl border border-orange-100 whitespace-pre-line leading-relaxed">
+                          {viewMatch.extraConditions}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 評價狀態展示 */}
+                    {(viewMatch.businessReview || viewMatch.creatorReview) && (
+                      <div className="border-t border-slate-200 pt-6">
+                         <p className="text-xs font-bold text-slate-500 mb-3 uppercase tracking-widest">結案評價紀錄</p>
+                         <div className="space-y-3">
+                           {viewMatch.businessReview && (
+                             <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                               <p className="text-xs font-bold text-slate-400 mb-1">業者評價</p>
+                               <div className="flex items-center gap-1 text-yellow-500 mb-1">
+                                 {Array.from({ length: viewMatch.businessReview.rating || 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
+                               </div>
+                               <p className="text-sm text-slate-700 italic">"{viewMatch.businessReview.comment}"</p>
+                             </div>
+                           )}
+                           {viewMatch.creatorReview && (
+                             <div className="bg-white border border-slate-200 p-3 rounded-xl shadow-sm">
+                               <p className="text-xs font-bold text-slate-400 mb-1">創作者評價</p>
+                               <div className="flex items-center gap-1 text-yellow-500 mb-1">
+                                 {Array.from({ length: viewMatch.creatorReview.rating || 5 }).map((_, i) => <Star key={i} size={12} fill="currentColor" />)}
+                               </div>
+                               <p className="text-sm text-slate-700 italic">"{viewMatch.creatorReview.comment}"</p>
+                             </div>
+                           )}
+                         </div>
+                      </div>
+                    )}
+
+                  </div>
+                  <button onClick={() => setViewMatch(null)} className="w-full mt-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">關閉</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
       
       case 'revenue':
         return (
@@ -907,6 +1119,7 @@ export default function AdminDashboardPage() {
           {[
             { id: 'overview', icon: LayoutDashboard, label: '營運總覽' },
             { id: 'users', icon: Users, label: '用戶管理' },
+            { id: 'matches', icon: HeartHandshake, label: '媒合案件' },
             { id: 'revenue', icon: DollarSign, label: '財務報表' },
             { id: 'settings', icon: Settings, label: '系統設定' }
           ].map((item) => (
