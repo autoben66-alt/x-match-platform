@@ -517,53 +517,88 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* ✨ 創作者分級制度介紹 */}
+      {/* ✨ 創作者分級制度介紹 (全新升級版) */}
       <div className="bg-white border-b border-slate-200 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-slate-900 mb-2 flex items-center justify-center gap-2">
               <Award className="text-indigo-500" /> 平台專屬網紅分級制度
             </h2>
-            <p className="text-slate-600 text-sm">
-              我們透過數據分析與完案信用，將創作者分為四個等級，幫助您快速找到最合適的合作對象。
+            <p className="text-slate-600 text-sm max-w-2xl mx-auto">
+              我們透過數據分析與完案信用，將創作者分為四個等級。<br className="hidden sm:block"/>
+              <span className="font-bold text-indigo-600">S/A 級別創作者享有平台專屬的「現金分潤」與「高單價案源獨佔」特權！</span>
             </p>
           </div>
+          
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* S 級 */}
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform flex flex-col h-full">
               <div className="flex items-center gap-2 mb-3">
                 <span className="bg-gradient-to-r from-yellow-300 to-amber-500 text-slate-900 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm shadow-sm"><Crown size={14}/>S</span>
                 <h3 className="font-bold text-slate-900">頂規頭部網紅</h3>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed mb-3">擁有極高流量與粉絲黏著度，能為品牌帶來爆炸性曝光。</p>
-              <div className="text-[10px] font-bold text-amber-700 bg-amber-100/50 px-2 py-1 rounded inline-block">Pro 會員專屬解鎖</div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">擁有極高流量與粉絲黏著度，能為品牌帶來爆炸性曝光。</p>
+              
+              {/* ✨ 新增的創作者誘因區塊 */}
+              <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-amber-100/50">
+                <p className="text-[11px] font-bold text-amber-800 mb-1.5 flex items-center gap-1"><Sparkles size={12}/> 創作者尊榮特權</p>
+                <ul className="text-[10px] text-amber-700/90 space-y-1">
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">被動分潤</span>：廠商付費解鎖聯繫，創作者享現金分潤</span></li>
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">獨佔案源</span>：專屬 S 級別頂規高預算合作案</span></li>
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">專人服務</span>：官方 1 對 1 頂級商業品牌媒合</span></li>
+                </ul>
+              </div>
+
+              <div className="text-[10px] font-bold text-amber-700 bg-amber-100/50 px-2 py-1 rounded inline-block text-center mt-auto">業者需 Pro 會員或單次付費解鎖</div>
             </div>
+
             {/* A 級 */}
-            <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+            <div className="bg-indigo-50/50 border border-indigo-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform flex flex-col h-full">
               <div className="flex items-center gap-2 mb-3">
                 <span className="bg-indigo-100 text-indigo-700 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border border-indigo-200">A</span>
                 <h3 className="font-bold text-slate-900">高影響力創作者</h3>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed mb-3">穩定產出高質感內容，粉絲互動率極佳，口碑行銷首選。</p>
-              <div className="text-[10px] font-bold text-indigo-700 bg-indigo-100/50 px-2 py-1 rounded inline-block">Pro 會員專屬解鎖</div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">穩定產出高質感內容，粉絲互動率極佳，口碑行銷首選。</p>
+              
+              {/* ✨ 新增的創作者誘因區塊 */}
+              <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-indigo-100/50">
+                <p className="text-[11px] font-bold text-indigo-800 mb-1.5 flex items-center gap-1"><Star size={12}/> 創作者進階特權</p>
+                <ul className="text-[10px] text-indigo-700/90 space-y-1">
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">解鎖分潤</span>：享有廠商單次解鎖聯絡方式分潤機制</span></li>
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">優先推薦</span>：付費與優質旅宿案源優先錄取保障</span></li>
+                  <li className="flex items-start gap-1"><span className="shrink-0 mt-0.5">•</span> <span><span className="font-bold">首頁曝光</span>：高機率登上首頁「熱門創作者」版位</span></li>
+                </ul>
+              </div>
+
+              <div className="text-[10px] font-bold text-indigo-700 bg-indigo-100/50 px-2 py-1 rounded inline-block text-center mt-auto">業者需 Pro 會員或單次付費解鎖</div>
             </div>
+
             {/* B 級 */}
-            <div className="bg-sky-50/50 border border-sky-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+            <div className="bg-sky-50/50 border border-sky-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform flex flex-col h-full">
               <div className="flex items-center gap-2 mb-3">
                 <span className="bg-sky-100 text-sky-700 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border border-sky-200">B</span>
                 <h3 className="font-bold text-slate-900">中階穩健創作者</h3>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed mb-3">具備明確個人風格與穩定的觀看基數，適合常態性互惠合作。</p>
-              <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block">所有會員皆可邀請</div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">具備明確個人風格與穩定的觀看基數，適合常態性互惠合作。</p>
+              <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-sky-100/50">
+                <p className="text-[11px] font-bold text-sky-800 mb-1.5">💡 創作者成長路徑</p>
+                <p className="text-[10px] text-sky-700/90 leading-relaxed">持續接案累積「完案信用評分」，達標後將自動升級為 A 級，解鎖被動收入與更多高單價資源。</p>
+              </div>
+              <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block text-center mt-auto">所有會員皆可邀請</div>
             </div>
+
             {/* C 級 */}
-            <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform">
+            <div className="bg-emerald-50/50 border border-emerald-100 p-5 rounded-2xl shadow-sm hover:-translate-y-1 transition-transform flex flex-col h-full">
               <div className="flex items-center gap-2 mb-3">
                 <span className="bg-emerald-100 text-emerald-700 w-8 h-8 rounded-full flex items-center justify-center font-black text-sm border border-emerald-200">C</span>
                 <h3 className="font-bold text-slate-900">潛力微網紅 KOC</h3>
               </div>
-              <p className="text-xs text-slate-600 leading-relaxed mb-3">素人或新手創作者，粉絲少但極具真實感，適合大量鋪陳口碑。</p>
-              <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block">所有會員皆可邀請</div>
+              <p className="text-xs text-slate-600 leading-relaxed mb-3 flex-grow">素人或新手創作者，粉絲少但極具真實感，適合大量鋪陳口碑。</p>
+              <div className="mb-3 bg-white/50 p-2.5 rounded-lg border border-emerald-100/50">
+                <p className="text-[11px] font-bold text-emerald-800 mb-1.5">🎯 新手起步優勢</p>
+                <p className="text-[10px] text-emerald-700/90 leading-relaxed">完善 Media Kit，透過內建「智能合約」保障權益，安心累積您的第一批商業合作評價。</p>
+              </div>
+              <div className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded inline-block text-center mt-auto">所有會員皆可邀請</div>
             </div>
           </div>
         </div>
