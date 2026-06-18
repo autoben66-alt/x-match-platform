@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase, Eye, Star, Lock, AlertCircle, LogIn, Link as LinkIcon 
+  Search, Trophy, Flame, ChevronDown, Award, X, MapPin, Instagram, Youtube, BarChart3, Users, User, DollarSign, Camera, Mail, CheckCircle2, Filter, Crown, Sparkles, Loader2, MessageCircle, Send, Briefcase, Eye, Star, Lock, AlertCircle, LogIn, Link as LinkIcon, ArrowRight, Zap
 } from 'lucide-react';
 
 // --- 自定義 Link 元件 (解決預覽環境問題) ---
@@ -66,7 +66,7 @@ export interface Creator {
   tier?: string; 
 }
 
-// ✨ 定義專屬付費方案介面
+// 定義專屬付費方案介面
 export interface PremiumPlan {
   id: string;
   title: string;
@@ -84,7 +84,7 @@ interface CreatorDetail extends Creator {
   portfolio: string[];     
   lineId?: string;
   socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; }; 
-  premiumPlans?: PremiumPlan[]; // ✨ 綁定付費方案
+  premiumPlans?: PremiumPlan[]; // 綁定付費方案
 }
 
 // 網紅評級顯示標籤組件
@@ -199,7 +199,6 @@ const ENRICH_DATA = [
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
     averageViews: 45000, completionScore: 5.0,
     socialLinks: { ig: 'https://instagram.com', yt: 'https://youtube.com', tiktok: '', other: 'https://behance.net' },
-    // ✨ 新增 S 級專屬付費方案假資料
     premiumPlans: [
       {
         id: 'plan-s1',
@@ -281,7 +280,7 @@ export default function CreatorsPage() {
       rates: enrich.rates,
       tier: enrich.tier, 
       socialLinks: enrich.socialLinks, 
-      premiumPlans: (enrich as any).premiumPlans || [], // ✨ 載入付費方案資料
+      premiumPlans: (enrich as any).premiumPlans || [], 
       tags: ['👑 創始會員', ...enrich.tags],
       badges: ['創始會員', '官方認證'],
       averageViews: enrich.averageViews,
@@ -289,7 +288,7 @@ export default function CreatorsPage() {
     }));
 
     if (!db) { 
-      setCreators(fallbackCreators); // 填入展示資料
+      setCreators(fallbackCreators); 
       setIsLoading(false); 
       return; 
     }
@@ -329,7 +328,7 @@ export default function CreatorsPage() {
                 rates: formatRates(u.rates),
                 tier: u.tier || enrich.tier || '未評級', 
                 socialLinks: u.socialLinks || enrich.socialLinks, 
-                premiumPlans: u.premiumPlans || (enrich as any).premiumPlans || [], // ✨ 抓取雲端付費方案
+                premiumPlans: u.premiumPlans || (enrich as any).premiumPlans || [], // 抓取雲端付費方案
                 tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
                 badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
                 averageViews: u.averageViews || enrich.averageViews || 5000,
@@ -373,6 +372,11 @@ export default function CreatorsPage() {
 
   const topCreators = [...creators].sort((a, b) => b.completedJobs - a.completedJobs).slice(0, 3);
   
+  // ✨ 提取 S 級創作者的付費方案 (用於首頁/列表曝光)
+  const sTierPlans = creators
+    .filter(c => c.tier === 'S' && Array.isArray(c.premiumPlans) && c.premiumPlans.length > 0)
+    .flatMap(c => c.premiumPlans!.map(plan => ({ creator: c, plan })));
+
   const filteredCreators = creators.filter(creator => {
     const safeName = creator.name || '';
     const safeHandle = creator.handle || '';
@@ -406,13 +410,12 @@ export default function CreatorsPage() {
         setIsVerifying(false);
         setIsProviderLoggedIn(true);
         setShowAuthModal(false);
-        // 隨機模擬：50% 機率是付費版，50% 是免費版
         const isPaidMember = Math.random() > 0.5; 
         setProviderPlan(isPaidMember ? 'pro' : 'free');
     }, 1200);
   };
 
-  // --- 處理「LINE 聯繫」點擊 (權限檢查: 必須登入且為 Pro) ---
+  // --- 處理「LINE 聯繫」點擊 ---
   const handleLineContact = (e: React.MouseEvent) => {
     e.preventDefault(); 
     if (!isProviderLoggedIn) {
@@ -430,7 +433,7 @@ export default function CreatorsPage() {
     }
   };
 
-  // --- 處理「發送合作邀請」點擊 (加入 Paywall 權限檢查) ---
+  // --- 處理「發送合作邀請」點擊 ---
   const handleOpenInvite = () => {
     if (!isProviderLoggedIn) {
       setShowAuthModal(true);
@@ -449,21 +452,22 @@ export default function CreatorsPage() {
     setSendSuccess(false);
   };
 
-  // ✨ 處理點擊「洽詢付費方案」
-  const handleInquirePlan = (plan: PremiumPlan) => {
+  // --- 處理點擊「洽詢付費方案」 (從列表或 Modal 內點擊) ---
+  const handleInquirePlan = (creator: CreatorDetail, plan: PremiumPlan) => {
+    setSelectedCreator(creator);
+    
     if (!isProviderLoggedIn) {
       setShowAuthModal(true);
       return;
     }
 
-    // S 級方案依然受權限控管保護
     if (providerPlan !== 'pro') {
       setUpgradeReason('tier'); 
       setShowUpgradeModal(true);
       return;
     }
     
-    setInviteMessage(`哈囉 ${selectedCreator?.name || ''}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n我們對您的專屬方案【${plan.title}】（${plan.price}）非常有興趣，希望能進一步討論合作細節與檔期安排。\n\n期待您的回覆！`);
+    setInviteMessage(`哈囉 ${creator.name}！\n\n我們是 [您的店家名稱]，非常喜歡您的創作風格！\n\n我們對您的專屬方案【${plan.title}】（${plan.price}）非常有興趣，希望能進一步討論合作細節與檔期安排。\n\n期待您的回覆！`);
     setSelectedProjectId('');
     setShowInviteModal(true);
     setSendSuccess(false);
@@ -552,7 +556,7 @@ export default function CreatorsPage() {
           </div>
         </div>
         
-        {/* Provider Status Display (僅在登入後顯示) */}
+        {/* Provider Status Display */}
         {isProviderLoggedIn && (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 flex justify-end">
                 <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 shadow-sm flex items-center gap-3 animate-in fade-in slide-in-from-right-5">
@@ -567,7 +571,7 @@ export default function CreatorsPage() {
         )}
       </div>
 
-      {/* 創作者分級制度介紹 */}
+      {/* ✨ 創作者分級制度介紹 */}
       <div className="bg-white border-b border-slate-200 py-8 sm:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
@@ -651,6 +655,62 @@ export default function CreatorsPage() {
         </div>
       </div>
 
+      {/* ✨ S級專屬付費方案曝光區塊 */}
+      {sTierPlans.length > 0 && (
+        <div className="bg-slate-900 py-16 border-b border-slate-800 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                  <Crown className="text-amber-400 fill-amber-400" size={28} /> S級創作者 專屬付費方案
+                </h2>
+                <p className="text-slate-400 text-sm">頂尖流量操盤手親自企劃，為您的品牌帶來爆炸性曝光，免去繁瑣溝通直接下訂！</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sTierPlans.map((item, idx) => (
+                <div key={`${item.creator.id}-${item.plan.id}-${idx}`} className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-transform duration-300">
+                  <div className="flex items-center gap-4 mb-4 border-b border-white/10 pb-4">
+                    <img src={item.creator.avatar} alt={item.creator.name} className="w-12 h-12 rounded-full border-2 border-amber-400 object-cover" />
+                    <div>
+                      <h4 className="font-bold text-white flex items-center gap-2">
+                        {item.creator.name} <TierBadge tier="S" />
+                      </h4>
+                      <p className="text-xs text-slate-400">{item.creator.handle}</p>
+                    </div>
+                  </div>
+                  <div className="flex-grow">
+                    <div className="inline-block bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded-sm uppercase tracking-widest mb-3">Premium Plan</div>
+                    <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{item.plan.title}</h3>
+                    <p className="text-2xl font-black text-amber-400 mb-3">{item.plan.price}</p>
+                    <p className="text-sm text-slate-300 leading-relaxed mb-4 line-clamp-2">{item.plan.description}</p>
+                    <ul className="space-y-2 mb-6">
+                      {item.plan.features.slice(0, 3).map((feature, fIdx) => (
+                        <li key={fIdx} className="text-xs text-slate-300 flex items-start gap-2">
+                          <CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                          <span className="line-clamp-1">{feature}</span>
+                        </li>
+                      ))}
+                      {item.plan.features.length > 3 && <li className="text-xs text-slate-500 italic">...及更多專屬特權</li>}
+                    </ul>
+                  </div>
+                  <button 
+                    onClick={() => handleInquirePlan(item.creator, item.plan)}
+                    className="w-full py-3 bg-amber-500 text-slate-900 font-bold rounded-xl hover:bg-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)] active:scale-95 transition-all mt-auto flex justify-center gap-2"
+                  >
+                    洽詢此方案 <ArrowRight size={18}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 🏆 Leaderboard Section */}
       {topCreators.length > 0 && (
         <div className="bg-white border-b border-slate-200 pt-12 pb-16">
@@ -677,6 +737,7 @@ export default function CreatorsPage() {
                     <div>
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <h3 className="font-bold text-slate-900">{creator.name}</h3>
+                        {/* ✨ 排行榜顯示評級 */}
                         <TierBadge tier={creator.tier} />
                       </div>
                       <p className="text-xs text-slate-500 mb-1">已完成 {creator.completedJobs} 筆合作</p>
@@ -849,6 +910,7 @@ export default function CreatorsPage() {
                     ))}
                   </div>
                   
+                  {/* ✨ 社群連結展示 */}
                   {selectedCreator.socialLinks && (
                     <div className="flex items-center gap-3 mt-3">
                       {selectedCreator.socialLinks.ig && <a href={selectedCreator.socialLinks.ig} target="_blank" rel="noreferrer" className="text-pink-600 hover:text-pink-700 bg-pink-50 p-1.5 rounded-lg transition-colors"><Instagram size={18}/></a>}
@@ -858,6 +920,7 @@ export default function CreatorsPage() {
                   )}
                 </div>
 
+                {/* 指標展示卡片 */}
                 <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 no-scrollbar mt-4 sm:mt-0">
                   <div className="flex-1 sm:flex-none text-center p-4 bg-white rounded-2xl border border-slate-100 shadow-sm min-w-[100px]">
                     <p className="text-xs font-bold text-slate-400 mb-1 tracking-wider uppercase">粉絲數</p>
@@ -876,6 +939,7 @@ export default function CreatorsPage() {
                 </div>
               </div>
 
+              {/* Founder Badge Highlights */}
               {selectedCreator.badges?.includes('創始會員') && (
                 <div className="mb-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 rounded-2xl flex items-center gap-4 shadow-inner">
                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl shadow-md">
@@ -888,6 +952,7 @@ export default function CreatorsPage() {
                 </div>
               )}
 
+              {/* Bio */}
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2">
                   <User size={16} className="text-sky-500" /> 關於我
@@ -914,10 +979,10 @@ export default function CreatorsPage() {
                            ))}
                          </ul>
                          <button 
-                           onClick={() => handleInquirePlan(plan)}
-                           className="w-full py-2.5 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 shadow-md active:scale-95 transition-all mt-auto"
+                           onClick={() => handleInquirePlan(selectedCreator, plan)}
+                           className="w-full py-2.5 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 shadow-md active:scale-95 transition-all mt-auto flex justify-center items-center gap-2"
                          >
-                           洽詢此方案
+                           洽詢此方案 <ArrowRight size={16}/>
                          </button>
                        </div>
                      ))}
@@ -926,6 +991,7 @@ export default function CreatorsPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Audience Insight */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase">
                     <BarChart3 size={18} className="text-indigo-500"/> 受眾分析
@@ -946,6 +1012,7 @@ export default function CreatorsPage() {
                   </div>
                 </div>
 
+                {/* Reference Rates */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
@@ -968,6 +1035,7 @@ export default function CreatorsPage() {
                 </div>
               </div>
 
+              {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
@@ -983,6 +1051,7 @@ export default function CreatorsPage() {
 
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                <div className="flex gap-3 w-full sm:w-auto">
+                 {/* ✨ LINE 聯繫按鈕 (防跳島付費牆) */}
                  {providerPlan === 'pro' ? (
                     <button 
                       onClick={handleLineContact}
@@ -999,6 +1068,7 @@ export default function CreatorsPage() {
                     </button>
                  )}
                  
+                 {/* ✨ 發送合作邀請按鈕 (防跳島付費牆) */}
                  {providerPlan !== 'pro' && (selectedCreator.tier === 'S' || selectedCreator.tier === 'A') ? (
                     <button 
                       onClick={() => {
@@ -1064,6 +1134,7 @@ export default function CreatorsPage() {
                   </div>
 
                   <div className="space-y-4">
+                    {/* 選擇附帶案源下拉選單 */}
                     <div>
                       <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
                         <Briefcase size={16} className="text-indigo-600"/> 選擇附帶案源 (選填)
@@ -1086,6 +1157,7 @@ export default function CreatorsPage() {
                         ))}
                       </select>
                       
+                      {/* 越級邀請提示 */}
                       {selectedProjectId && projects.find(p => p.id === selectedProjectId)?.requiredTier === 'S' && selectedCreator.tier !== 'S' && (
                         <div className="bg-orange-50 border border-orange-200 text-orange-800 p-3 rounded-xl text-xs mt-3 shadow-sm animate-in fade-in slide-in-from-top-2">
                           <p className="font-bold mb-1 flex items-center gap-1"><AlertCircle size={14} className="text-orange-500"/> 越級邀請提示</p>
@@ -1134,7 +1206,7 @@ export default function CreatorsPage() {
 
       {/* --- Auth/Login Modal (身分驗證) --- */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 relative scale-100 animate-in zoom-in-95">
               <button onClick={() => setShowAuthModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600">
                  <X size={24} />
@@ -1175,7 +1247,7 @@ export default function CreatorsPage() {
 
       {/* --- Upgrade Alert Modal (動態升級 / 權限提示) --- */}
       {showUpgradeModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300">
            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center scale-100 animate-in zoom-in-95">
               <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
                  {upgradeReason === 'limit' ? (
@@ -1201,23 +1273,18 @@ export default function CreatorsPage() {
                    }}
                    className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                  >
-                   <Sparkles size={18} fill="currentColor"/> 立即升級 Pro
+                   <Zap size={18} fill="currentColor"/> 前往升級 Pro
                  </button>
                  
-                 {/* ✨ 提示單次解鎖選項 */}
+                 {/* ✨ 提示單次解鎖選項 (如果不是因為超過免費次數而擋) */}
                  {upgradeReason === 'tier' && (
-                   <button 
-                     onClick={() => {
-                         setProviderPlan('pro'); 
-                         setShowUpgradeModal(false);
-                         if (selectedCreator) {
-                             handleOpenInvite();
-                         }
-                     }}
+                   <Link
+                     href="/dashboard"
+                     onClick={() => setShowUpgradeModal(false)}
                      className="w-full py-3 bg-white text-amber-600 border border-amber-200 font-bold rounded-xl shadow-sm hover:bg-amber-50 transition-all flex items-center justify-center gap-2"
                    >
                      購買單次高階邀約 ($150)
-                   </button>
+                   </Link>
                  )}
 
                  <button 

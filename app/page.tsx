@@ -8,7 +8,7 @@ import {
   X, MapPin, Instagram, Youtube, BarChart3, User, DollarSign, Camera, Mail, CheckCircle2, Award, Crown, Sparkles, Quote, Eye, Building2, Briefcase, Flame, Globe, Lock, AlertCircle, LogIn, Link as LinkIcon, Shield, Calendar, Info
 } from 'lucide-react';
 
-// --- 自定義 Link 元件 (解決預覽環境無法解析 next/link 的問題) ---
+// --- 自定義 Link 元件 (解決預覽環境問題) ---
 const Link = ({ href, children, className, ...props }: any) => {
   return (
     <a href={href} className={className} {...props}>
@@ -62,6 +62,15 @@ export interface Creator {
   tier?: string; 
 }
 
+// ✨ 定義專屬付費方案介面
+export interface PremiumPlan {
+  id: string;
+  title: string;
+  price: string;
+  description: string;
+  features: string[];
+}
+
 interface CreatorDetail extends Creator {
   completedJobs: number;
   rating: number;
@@ -71,6 +80,7 @@ interface CreatorDetail extends Creator {
   portfolio: string[];     
   lineId?: string;
   socialLinks?: { ig?: string; yt?: string; tiktok?: string; other?: string; }; 
+  premiumPlans?: PremiumPlan[]; // ✨ 綁定付費方案
 }
 
 const TierBadge = ({ tier }: { tier?: string }) => {
@@ -164,7 +174,6 @@ interface Testimonial {
   rating?: number;
 }
 
-// ✨ 擴充廠商資料結構 (加入案源詳情的欄位)
 interface ProviderDetail {
   id: string;
   name: string;        
@@ -179,11 +188,11 @@ interface ProviderDetail {
   rating: number;
   spotsLeft: number;    
   description?: string; 
-  valueBreakdown?: string; // 新增
-  requirements?: string; // 新增
-  gallery?: string[]; // 新增
-  validDays?: string; // 新增
-  requiredTier?: string; // 新增
+  valueBreakdown?: string; 
+  requirements?: string; 
+  gallery?: string[]; 
+  validDays?: string; 
+  requiredTier?: string; 
 }
 
 interface EnrichData {
@@ -206,6 +215,7 @@ interface EnrichData {
   completionScore: number; 
   tier: string; 
   socialLinks: { ig: string; yt: string; tiktok: string; other: string }; 
+  premiumPlans?: PremiumPlan[]; // ✨
 }
 
 const ENRICH_DATA: EnrichData[] = [
@@ -229,7 +239,23 @@ const ENRICH_DATA: EnrichData[] = [
     audience: { gender: "男性 60%", age: "18-34歲", topCity: "台中/高雄" },
     portfolio: [ "https://images.unsplash.com/photo-1502680390469-be75c86b636f?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?ixlib=rb-4.0.3", "https://images.unsplash.com/photo-1469474968028-56623f02e42e?ixlib=rb-4.0.3" ],
     averageViews: 45000, completionScore: 5.0,
-    socialLinks: { ig: 'https://instagram.com', yt: 'https://youtube.com', tiktok: '', other: 'https://behance.net' }
+    socialLinks: { ig: 'https://instagram.com', yt: 'https://youtube.com', tiktok: '', other: 'https://behance.net' },
+    premiumPlans: [
+      {
+        id: 'plan-s1',
+        title: '品牌深度代言 (三個月)',
+        price: 'NT$ 150,000',
+        description: '為您的品牌量身打造為期三個月的深度曝光計畫，包含影像創作與肖像權使用，適合大型行銷檔期。',
+        features: ['3支 4K 質感短片', '6篇 深度圖文推廣', '品牌肖像授權 3 個月', '專屬粉絲優惠導購']
+      },
+      {
+        id: 'plan-s2',
+        title: '線下實體活動出席 + 紀錄',
+        price: 'NT$ 50,000',
+        description: '親臨您的實體店面、新店開幕或記者會，透過鏡頭帶領粉絲身歷其境。',
+        features: ['出席活動 2 小時', '1支 活動精華短影音', '3則 現場限時動態']
+      }
+    ]
   },
   {
     name: "食尚艾莉", handle: "@elly_eats", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elly", lineId: "elly_eats",
@@ -244,7 +270,6 @@ const ENRICH_DATA: EnrichData[] = [
   }
 ];
 
-// ✨ 模擬優質廠商資料 (擴充了案源詳情的內容)
 const FALLBACK_PROJECTS: ProviderDetail[] = [
     {
         id: "p1", 
@@ -336,7 +361,7 @@ export default function Home() {
   
   const [selectedCreator, setSelectedCreator] = useState<CreatorDetail | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<ProviderDetail | null>(null); 
-  const [activeProjectImage, setActiveProjectImage] = useState<string>(''); // ✨ 新增畫廊圖片切換狀態
+  const [activeProjectImage, setActiveProjectImage] = useState<string>(''); 
 
   // 監聽 Firebase 資料
   useEffect(() => {
@@ -358,6 +383,7 @@ export default function Home() {
       rates: enrich.rates,
       tier: enrich.tier, 
       socialLinks: enrich.socialLinks, 
+      premiumPlans: (enrich as any).premiumPlans || [], // ✨ 寫入付費方案資料
       tags: ['👑 創始會員', ...enrich.tags],
       badges: ['創始會員', '官方認證'],
       averageViews: enrich.averageViews,
@@ -407,6 +433,7 @@ export default function Home() {
               rates: formatRates(u.rates),
               tier: u.tier || enrich.tier || '未評級', 
               socialLinks: u.socialLinks || enrich.socialLinks, 
+              premiumPlans: u.premiumPlans || (enrich as any).premiumPlans || [], // ✨
               tags: isFounder ? ['👑 創始會員', ...(u.tags || enrich.tags)] : (u.tags || enrich.tags),
               badges: isFounder ? ['創始會員', '官方認證'] : ['官方認證'],
               averageViews: u.averageViews || enrich.averageViews || 5000,
@@ -427,7 +454,7 @@ export default function Home() {
       setIsLoading(false); 
     });
 
-    // 2. 抓取真實廠商案源 (擴充讀取更多詳情欄位)
+    // 2. 抓取真實廠商案源
     const projectsCol = collection(db, 'artifacts', internalAppId, 'public', 'data', 'projects');
     const unsubscribeProjects = onSnapshot(projectsCol, (snapshot) => {
         if (!snapshot.empty) {
@@ -447,7 +474,6 @@ export default function Home() {
                     rating: 5.0, 
                     spotsLeft: raw.spotsLeft !== undefined ? raw.spotsLeft : 3,
                     description: raw.description || "歡迎優質創作者合作...",
-                    // ✨ 新增讀取案源詳細欄位
                     valueBreakdown: raw.valueBreakdown || "詳情請見合約",
                     requirements: raw.requirements || "請配合商家規範",
                     gallery: raw.gallery || [raw.image || ""],
@@ -485,6 +511,16 @@ export default function Home() {
     };
   }, []);
 
+  // ✨ 提取 S 級創作者的付費方案 (用於首頁曝光)
+  const sTierPlans = creators
+    .filter(c => c.tier === 'S' && Array.isArray(c.premiumPlans) && c.premiumPlans.length > 0)
+    .flatMap(c => c.premiumPlans!.map(plan => ({ creator: c, plan })));
+
+  const handleInquirePlan = (creator: CreatorDetail, plan: PremiumPlan) => {
+    setSelectedCreator(creator);
+    // 業者點擊後，首頁直接帶入至創造者詳細 modal 中，可直接點擊發送邀請或前往後台
+  };
+
   const founderCount = creators.length;
   const founderMax = 50;
   const founderPercentage = Math.min((founderCount / founderMax) * 100, 100);
@@ -495,14 +531,13 @@ export default function Home() {
       <div className="relative bg-slate-900 overflow-hidden w-full h-[50vh] md:h-[60vh] lg:h-[75vh]">
         <div className="absolute inset-0">
           <img 
-            /* 💡 請在這裡替換您的圖片路徑 */
             src="/hero.png" 
             alt="X-Match 媒合新標準" 
             className="w-full h-full object-cover object-left md:object-center"
           />
         </div>
         
-        {/* 按鈕區域：調整高度與間距，導入毛玻璃特效 */}
+        {/* 按鈕區域 */}
         <div className="relative h-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col justify-end pb-12 md:pb-20 z-10">
           <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full max-w-md mx-auto lg:mx-0 lg:ml-12">
             
@@ -570,7 +605,7 @@ export default function Home() {
                 key={provider.id} 
                 onClick={() => {
                   setSelectedProvider(provider);
-                  setActiveProjectImage(provider.coverImage); // ✨ 設定預設大圖
+                  setActiveProjectImage(provider.coverImage);
                 }}
                 className="group bg-white rounded-2xl border border-slate-100 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full relative cursor-pointer"
               >
@@ -697,6 +732,62 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* ✨ S級專屬付費方案曝光區塊 */}
+      {sTierPlans.length > 0 && (
+        <div className="bg-slate-900 py-16 border-t border-b border-slate-800 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-10 gap-4">
+              <div>
+                <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
+                  <Crown className="text-amber-400 fill-amber-400" size={28} /> S級創作者 專屬付費方案
+                </h2>
+                <p className="text-slate-400 text-sm">頂尖流量操盤手親自企劃，為您的品牌帶來爆炸性曝光，免去繁瑣溝通直接下訂！</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sTierPlans.map((item, idx) => (
+                <div key={`${item.creator.id}-${item.plan.id}-${idx}`} className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-6 flex flex-col hover:-translate-y-1 transition-transform duration-300">
+                  <div className="flex items-center gap-4 mb-4 border-b border-white/10 pb-4">
+                    <img src={item.creator.avatar} alt={item.creator.name} className="w-12 h-12 rounded-full border-2 border-amber-400 object-cover" />
+                    <div>
+                      <h4 className="font-bold text-white flex items-center gap-2">
+                        {item.creator.name} <TierBadge tier="S" />
+                      </h4>
+                      <p className="text-xs text-slate-400">{item.creator.handle}</p>
+                    </div>
+                  </div>
+                  <div className="flex-grow">
+                    <div className="inline-block bg-amber-500 text-slate-900 text-[10px] font-black px-2 py-1 rounded-sm uppercase tracking-widest mb-3">Premium Plan</div>
+                    <h3 className="text-xl font-bold text-white mb-2 line-clamp-1">{item.plan.title}</h3>
+                    <p className="text-2xl font-black text-amber-400 mb-3">{item.plan.price}</p>
+                    <p className="text-sm text-slate-300 leading-relaxed mb-4 line-clamp-2">{item.plan.description}</p>
+                    <ul className="space-y-2 mb-6">
+                      {item.plan.features.slice(0, 3).map((feature, fIdx) => (
+                        <li key={fIdx} className="text-xs text-slate-300 flex items-start gap-2">
+                          <CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                          <span className="line-clamp-1">{feature}</span>
+                        </li>
+                      ))}
+                      {item.plan.features.length > 3 && <li className="text-xs text-slate-500 italic">...及更多專屬特權</li>}
+                    </ul>
+                  </div>
+                  <button 
+                    onClick={() => handleInquirePlan(item.creator, item.plan)}
+                    className="w-full py-3 bg-amber-500 text-slate-900 font-bold rounded-xl hover:bg-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.3)] active:scale-95 transition-all mt-auto flex justify-center gap-2"
+                  >
+                    洽詢此方案 <ArrowRight size={18}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* How it Works Section */}
       <div className="bg-slate-50 py-20 border-t border-slate-100">
@@ -849,6 +940,7 @@ export default function Home() {
                     ))}
                   </div>
                   
+                  {/* ✨ 社群連結展示 */}
                   {selectedCreator.socialLinks && (
                     <div className="flex items-center gap-3 mt-3">
                       {selectedCreator.socialLinks.ig && <a href={selectedCreator.socialLinks.ig} target="_blank" rel="noreferrer" className="text-pink-600 hover:text-pink-700 bg-pink-50 p-1.5 rounded-lg transition-colors"><Instagram size={18}/></a>}
@@ -876,6 +968,7 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Founder Badge Highlights */}
               {selectedCreator.badges?.includes('創始會員') && (
                 <div className="mb-8 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-orange-100 rounded-2xl flex items-center gap-4 shadow-inner">
                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2.5 rounded-xl shadow-md">
@@ -888,6 +981,7 @@ export default function Home() {
                 </div>
               )}
 
+              {/* Bio */}
               <div className="mb-8 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <h3 className="text-sm font-black text-slate-900 mb-3 tracking-widest uppercase flex items-center gap-2">
                   <User size={16} className="text-sky-500" /> 關於我
@@ -895,7 +989,38 @@ export default function Home() {
                 <p className="text-slate-600 leading-relaxed font-medium">{selectedCreator.bio}</p>
               </div>
 
+              {/* ✨ S級專屬付費方案區塊 */}
+              {selectedCreator.tier === 'S' && selectedCreator.premiumPlans && selectedCreator.premiumPlans.length > 0 && (
+                <div className="mb-8">
+                  <h4 className="font-black text-slate-900 mb-4 flex items-center gap-2 text-sm tracking-widest uppercase">
+                    <Crown size={18} className="text-amber-500 fill-amber-500"/> S級專屬付費方案
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                     {selectedCreator.premiumPlans.map(plan => (
+                       <div key={plan.id} className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 p-5 rounded-2xl shadow-sm relative overflow-hidden flex flex-col">
+                         <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-bl-lg uppercase tracking-widest">Premium</div>
+                         <h5 className="font-bold text-slate-900 text-lg mb-1 pr-16">{plan.title}</h5>
+                         <p className="text-2xl font-black text-orange-600 mb-3">{plan.price}</p>
+                         <p className="text-xs text-slate-600 mb-4 leading-relaxed flex-grow">{plan.description}</p>
+                         <ul className="space-y-2 mb-5">
+                           {plan.features.map((feature, idx) => (
+                             <li key={idx} className="text-xs text-slate-700 flex items-start gap-1.5"><CheckCircle2 size={14} className="text-amber-500 shrink-0 mt-0.5"/> {feature}</li>
+                           ))}
+                         </ul>
+                         <Link 
+                           href="/dashboard"
+                           className="w-full py-2.5 bg-slate-900 text-white font-bold text-sm rounded-xl hover:bg-slate-800 shadow-md active:scale-95 transition-all mt-auto flex justify-center items-center gap-2"
+                         >
+                           登入以洽詢此方案 <ArrowRight size={16}/>
+                         </Link>
+                       </div>
+                     ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                {/* Audience Insight */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase">
                     <BarChart3 size={18} className="text-indigo-500"/> 受眾分析
@@ -903,19 +1028,20 @@ export default function Home() {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                       <span className="text-sm font-medium text-slate-500">性別分佈</span>
-                      <span className="font-bold text-slate-800">{selectedCreator.audience.gender}</span>
+                      <span className="font-bold text-slate-800">{selectedCreator.audience?.gender || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between items-center pb-3 border-b border-slate-50">
                       <span className="text-sm font-medium text-slate-500">主力年齡</span>
-                      <span className="font-bold text-slate-800">{selectedCreator.audience.age}</span>
+                      <span className="font-bold text-slate-800">{selectedCreator.audience?.age || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-500">熱門城市</span>
-                      <span className="font-bold text-slate-800">{selectedCreator.audience.topCity}</span>
+                      <span className="font-bold text-slate-800">{selectedCreator.audience?.topCity || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
 
+                {/* Reference Rates */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
                   <div className="absolute top-0 right-0 w-32 h-32 bg-green-50 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
                   <h4 className="font-black text-slate-900 mb-5 flex items-center gap-2 text-sm tracking-widest uppercase relative z-10">
@@ -924,24 +1050,25 @@ export default function Home() {
                   <div className="space-y-4 relative z-10">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><Camera size={14} className="text-slate-400"/> 圖文貼文</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.post}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates?.post || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 rounded-full border-2 border-slate-400"></div> 限時動態</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.story}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates?.story || 0}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-slate-600 flex items-center gap-2"><div className="w-3 h-3 bg-slate-400 rounded-sm"></div> Reels 短影音</span>
-                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates.reels}</span>
+                      <span className="font-black text-slate-800 bg-slate-50 px-2 py-1 rounded">{selectedCreator.rates?.reels || 0}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Portfolio */}
               <div>
                 <h3 className="text-sm font-black text-slate-900 mb-4 tracking-widest uppercase">近期作品 (Portfolio)</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                  {selectedCreator.portfolio.map((img, i) => (
+                  {selectedCreator.portfolio?.map((img, i) => (
                     <div key={i} className="aspect-square rounded-xl overflow-hidden bg-slate-100 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all cursor-pointer border border-slate-200">
                       <img src={img} className="w-full h-full object-cover" alt="Portfolio" />
                     </div>
@@ -954,7 +1081,7 @@ export default function Home() {
             <div className="p-4 sm:p-6 border-t border-slate-200 bg-white sticky bottom-0 flex justify-end items-center z-20">
                <div className="flex gap-3 w-full sm:w-auto">
                  <Link href="/dashboard" className="flex-1 sm:flex-none px-6 py-3.5 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 transition-all whitespace-nowrap">
-                   <Mail size={18} /> 發送合作邀請
+                   <LogIn size={18} /> 登入以聯絡創作者
                  </Link>
                </div>
             </div>
